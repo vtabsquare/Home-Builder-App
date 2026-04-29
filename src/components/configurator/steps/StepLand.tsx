@@ -1,5 +1,5 @@
 import { useConfig } from '@/store/configurator';
-import { StepShell, SelectableCard } from './StepShell';
+import { StepShell, SelectableCard } from '../StepShell';
 import { Home, MapPin } from 'lucide-react';
 import { formatMoney } from '@/lib/cost';
 
