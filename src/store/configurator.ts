@@ -25,6 +25,9 @@ export interface ConfigState {
   timeline: string;
   // Kiosk
   kioskMode: boolean;
+  // Customization
+  customPlan: any | null;
+  planHistory: { id: string; label: string; type: string; targetId: string; original: any }[];
 }
 
 export interface ConfigActions {
@@ -41,6 +44,9 @@ export interface ConfigActions {
   setMaterial: (m: Material) => void;
   setLead: (p: Partial<Pick<ConfigState, 'name' | 'phone' | 'email' | 'timeline'>>) => void;
   setKioskMode: (v: boolean) => void;
+  setCustomPlan: (p: any | null) => void;
+  addHistoryRecord: (record: { label: string; type: string; targetId: string; original: any }) => void;
+  removeHistoryRecord: (id: string) => void;
   reset: () => void;
 }
 
@@ -65,6 +71,8 @@ const initial: ConfigState = {
   email: '',
   timeline: '',
   kioskMode: false,
+  customPlan: null,
+  planHistory: [],
 };
 
 export const useConfig = create<ConfigState & ConfigActions>()(
@@ -89,6 +97,13 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       setMaterial: (material) => set({ material }),
       setLead: (p) => set((s) => ({ ...s, ...p })),
       setKioskMode: (kioskMode) => set({ kioskMode }),
+      setCustomPlan: (customPlan) => set({ customPlan }),
+      addHistoryRecord: (record) => set((s) => {
+        // Prevent duplicate history for same target/type if possible, or just append
+        const id = Math.random().toString(36).substr(2, 9);
+        return { planHistory: [...s.planHistory, { ...record, id }] };
+      }),
+      removeHistoryRecord: (id) => set((s) => ({ planHistory: s.planHistory.filter(r => r.id !== id) })),
       reset: () => set({ ...initial }),
     }),
     { name: 'gbti-configurator' }
