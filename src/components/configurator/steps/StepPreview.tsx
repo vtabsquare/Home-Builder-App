@@ -3,9 +3,10 @@ import { useConfig, RoofType, Material } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { FloorPlanCanvas } from '../FloorPlanCanvas';
 import { ElevationCanvas } from '../ElevationCanvas';
+import { CustomEditorCanvas } from '../CustomEditorCanvas';
 import { Plan } from '@/lib/floorplan';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History } from 'lucide-react';
+import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool } from 'lucide-react';
 
 interface Props {
   plan: Plan;
@@ -45,7 +46,7 @@ function getRoomTabs(plan: Plan): RoomTab[] {
 }
 
 export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
-  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan } = useConfig();
+  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, presetId, setPresetId, homeType, advancedEditorMode, setAdvancedEditorMode } = useConfig();
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [advanced, setAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -109,12 +110,12 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             {(['2d', '3d'] as const).map((v) => (
               <button
                 key={v}
-                onClick={() => setView(v)}
+                onClick={() => { setView(v); setAdvancedEditorMode(false); }}
                 className={`relative rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
-                  view === v ? 'text-ink-foreground' : 'text-muted-foreground'
+                  view === v && !advancedEditorMode ? 'text-ink-foreground' : 'text-muted-foreground'
                 }`}
               >
-                {view === v && (
+                {view === v && !advancedEditorMode && (
                   <motion.div layoutId="view-pill" className="absolute inset-0 rounded-full bg-ink"
                     transition={{ type: 'spring', stiffness: 400, damping: 32 }} />
                 )}
@@ -123,8 +124,26 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             ))}
           </div>
 
-          {view === '2d' && (
+          {view === '2d' && !advancedEditorMode && (
             <div className="flex items-center gap-2">
+              {/* Preset selector */}
+              <div className="inline-flex rounded-full bg-surface/80 p-0.5 border border-border">
+                {[0, 1].map((id) => (
+                  <button
+                    key={id}
+                    onClick={() => setPresetId(id)}
+                    className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                      presetId === id
+                        ? 'bg-clay text-white shadow-md'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Layers size={10} className="inline mr-1 -mt-0.5" />
+                    Preset {String.fromCharCode(65 + id)}
+                  </button>
+                ))}
+              </div>
+
               <button
                 onClick={() => setAdvanced((v) => !v)}
                 className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -149,7 +168,6 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       onClick={() => {
                         onChange?.(stagedPlan);
                         setStagedPlan(null);
-                        // Clear history after save
                         planHistory.forEach(h => removeHistoryRecord(h.id));
                       }}
                       className="flex items-center gap-1.5 rounded-full bg-clay px-4 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-clay/90 transition-all active:scale-95"
@@ -159,10 +177,29 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   )}
                 </>
               )}
+
+              {/* Custom Editor Button */}
+              <button
+                onClick={() => setAdvancedEditorMode(true)}
+                className="flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-600 px-3 py-1.5 text-xs font-bold hover:bg-blue-100 transition-all active:scale-95"
+              >
+                <PenTool size={12} />
+                Custom Editor
+              </button>
             </div>
           )}
 
-          {view === '3d' && (
+          {advancedEditorMode && (
+            <button
+              onClick={() => setAdvancedEditorMode(false)}
+              className="flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 text-red-600 px-3 py-1.5 text-xs font-bold hover:bg-red-100 transition-all"
+            >
+              <X size={12} />
+              Exit Custom Editor
+            </button>
+          )}
+
+          {view === '3d' && !advancedEditorMode && (
             <>
               <Group label="Roof">
                 {ROOFS.map((r) => (
@@ -189,7 +226,19 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             onTouchEnd={handleTouchEnd}
           >
             <AnimatePresence mode="wait">
-              {view === '2d' ? (
+              {advancedEditorMode ? (
+                <motion.div key="editor" className="h-full w-full"
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}>
+                  <CustomEditorCanvas
+                    homeType={homeType}
+                    onChange={(editorPlan) => {
+                      setCustomPlan(editorPlan);
+                    }}
+                    initialPlan={null}
+                  />
+                </motion.div>
+              ) : view === '2d' ? (
                 <motion.div key="2d" className="h-full w-full"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   transition={{ duration: 0.3 }}>
@@ -249,20 +298,22 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
               )}
             </AnimatePresence>
 
-            {/* Top-left badge */}
-            <div className="pointer-events-none absolute left-4 top-4 rounded-full glass-panel px-3 py-1.5 text-[10px] font-display font-semibold uppercase tracking-[0.2em]">
-              {view === '2d' ? `${currentPlan.width}′ × ${currentPlan.height}′` : 'Front elevation'}
-            </div>
+            {/* Top-left badge (only for non-editor views) */}
+            {!advancedEditorMode && (
+              <div className="pointer-events-none absolute left-4 top-4 rounded-full glass-panel px-3 py-1.5 text-[10px] font-display font-semibold uppercase tracking-[0.2em]">
+                {view === '2d' ? `${currentPlan.width}′ × ${currentPlan.height}′` : 'Front elevation'}
+              </div>
+            )}
             
             {/* Staged indicator */}
-            {stagedPlan && (
+            {stagedPlan && !advancedEditorMode && (
               <div className="pointer-events-none absolute left-4 top-14 flex items-center gap-1.5 rounded-full bg-clay/10 border border-clay/30 px-3 py-1 text-[9px] font-bold text-clay uppercase tracking-widest animate-pulse">
                 <Check size={10} /> Unsaved Changes
               </div>
             )}
 
           {/* Current room label overlay */}
-          {activeTab !== 'overview' && (
+          {activeTab !== 'overview' && !advancedEditorMode && (
             <motion.div
               key={activeTab}
               initial={{ opacity: 0, y: 12 }}
@@ -276,47 +327,49 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             </motion.div>
           )}
 
-          {/* Room navigation tabs */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[90%] max-w-[520px]">
-            <div className="relative flex items-center gap-1">
-              <button onClick={() => scrollTabs('left')}
-                className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full glass-panel hover:bg-white/80 transition-colors">
-                <ChevronLeft size={14} />
-              </button>
+          {/* Room navigation tabs (only for non-editor views) */}
+          {!advancedEditorMode && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[90%] max-w-[520px]">
+              <div className="relative flex items-center gap-1">
+                <button onClick={() => scrollTabs('left')}
+                  className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full glass-panel hover:bg-white/80 transition-colors">
+                  <ChevronLeft size={14} />
+                </button>
 
-              <div ref={tabScrollRef}
-                className="flex-1 overflow-x-auto scrollbar-hide flex items-center gap-1.5 rounded-2xl glass-panel px-2 py-1.5">
-                {roomTabs.map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                        isActive
-                          ? 'text-white shadow-md'
-                          : 'text-foreground/70 hover:bg-white/50'
-                      }`}
-                      style={isActive ? { background: tab.color } : {}}
-                    >
-                      <Icon size={12} />
-                      {tab.label}
-                    </button>
-                  );
-                })}
+                <div ref={tabScrollRef}
+                  className="flex-1 overflow-x-auto scrollbar-hide flex items-center gap-1.5 rounded-2xl glass-panel px-2 py-1.5">
+                  {roomTabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                          isActive
+                            ? 'text-white shadow-md'
+                            : 'text-foreground/70 hover:bg-white/50'
+                        }`}
+                        style={isActive ? { background: tab.color } : {}}
+                      >
+                        <Icon size={12} />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button onClick={() => scrollTabs('right')}
+                  className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full glass-panel hover:bg-white/80 transition-colors">
+                  <ChevronRight size={14} />
+                </button>
               </div>
-
-              <button onClick={() => scrollTabs('right')}
-                className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full glass-panel hover:bg-white/80 transition-colors">
-                <ChevronRight size={14} />
-              </button>
             </div>
-          </div>
+          )}
         </div>
 
           {/* Change Log Sidebar */}
-          {advanced && planHistory.length > 0 && (
+          {advanced && planHistory.length > 0 && !advancedEditorMode && (
             <div className="hidden lg:flex flex-col w-[240px] border-l border-border bg-surface/30 backdrop-blur-sm p-4 overflow-y-auto">
               <div className="flex items-center gap-2 mb-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 <History size={14} /> Change Log
@@ -335,8 +388,6 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                         };
                         setStagedPlan(revertedPlan);
                         removeHistoryRecord(record.id);
-                        // If no more history, and stagedPlan matches plan, set stagedPlan to null?
-                        // For now just update staged.
                       }}
                       className="absolute right-2 top-2 h-5 w-5 flex items-center justify-center rounded-md bg-red-50 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
                     >
@@ -353,9 +404,11 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
         </div>
 
         {/* Swipe hint for mobile */}
-        <p className="text-center text-[10px] text-muted-foreground uppercase tracking-widest md:hidden">
-          ← Swipe tabs to navigate rooms →
-        </p>
+        {!advancedEditorMode && (
+          <p className="text-center text-[10px] text-muted-foreground uppercase tracking-widest md:hidden">
+            ← Swipe tabs to navigate rooms →
+          </p>
+        )}
       </div>
     </StepShell>
   );

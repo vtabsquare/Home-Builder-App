@@ -406,6 +406,15 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
           ))}
         </Group>
       )}
+      {room.type === 'garden' && (
+        <Group opacity={0.25}>
+          {Array.from({ length: Math.ceil((rw + rh) / (scale)) }).map((_, i) => (
+            <Line key={`ghatch-${i}`}
+              points={[Math.min(i * scale, rw), Math.max(0, i * scale - rw), Math.max(0, i * scale - rh), Math.min(i * scale, rh)]}
+              stroke="hsl(120, 35%, 45%)" strokeWidth={0.8} />
+          ))}
+        </Group>
+      )}
     </Group>
   );
 };

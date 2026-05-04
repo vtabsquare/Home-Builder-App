@@ -25,6 +25,9 @@ export interface ConfigState {
   timeline: string;
   // Kiosk
   kioskMode: boolean;
+  // Presets & Custom Editor
+  presetId: number; // 0 or 1
+  advancedEditorMode: boolean;
   // Customization
   customPlan: any | null;
   planHistory: { id: string; label: string; type: string; targetId: string; original: any }[];
@@ -44,6 +47,8 @@ export interface ConfigActions {
   setMaterial: (m: Material) => void;
   setLead: (p: Partial<Pick<ConfigState, 'name' | 'phone' | 'email' | 'timeline'>>) => void;
   setKioskMode: (v: boolean) => void;
+  setPresetId: (id: number) => void;
+  setAdvancedEditorMode: (v: boolean) => void;
   setCustomPlan: (p: any | null) => void;
   addHistoryRecord: (record: { label: string; type: string; targetId: string; original: any }) => void;
   removeHistoryRecord: (id: string) => void;
@@ -71,6 +76,8 @@ const initial: ConfigState = {
   email: '',
   timeline: '',
   kioskMode: false,
+  presetId: 0,
+  advancedEditorMode: false,
   customPlan: null,
   planHistory: [],
 };
@@ -85,7 +92,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       setLand: (land) => set({ land }),
       setHomeType: (homeType) => {
         const d = HOME_TYPE_DEFAULTS[homeType];
-        set({ homeType, bedrooms: d.bedrooms, bathrooms: d.bathrooms });
+        set({ homeType, bedrooms: d.bedrooms, bathrooms: d.bathrooms, presetId: 0, customPlan: null });
       },
       setBedrooms: (bedrooms) => set({ bedrooms: Math.max(1, Math.min(6, bedrooms)) }),
       setBathrooms: (bathrooms) => set({ bathrooms: Math.max(1, Math.min(5, bathrooms)) }),
@@ -97,6 +104,8 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       setMaterial: (material) => set({ material }),
       setLead: (p) => set((s) => ({ ...s, ...p })),
       setKioskMode: (kioskMode) => set({ kioskMode }),
+      setPresetId: (presetId) => set({ presetId, customPlan: null }),
+      setAdvancedEditorMode: (advancedEditorMode) => set({ advancedEditorMode }),
       setCustomPlan: (customPlan) => set({ customPlan }),
       addHistoryRecord: (record) => set((s) => {
         // Prevent duplicate history for same target/type if possible, or just append

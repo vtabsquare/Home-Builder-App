@@ -19,7 +19,7 @@ const Index = () => {
   const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan } = config;
 
   const cost = useMemo(() => computeCost(config), [config]);
-  const basePlan = useMemo(() => generatePlan(config), [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.addons]);
+  const basePlan = useMemo(() => generatePlan(config), [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.addons, config.presetId]);
 
   const plan = customPlan || basePlan;
 
