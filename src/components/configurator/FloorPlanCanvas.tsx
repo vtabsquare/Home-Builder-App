@@ -569,6 +569,7 @@ const DoorShape = ({ door, room, scale, offsetX, offsetY, doorIndex, selected, o
   const rw = room.w * scale;
   const rh = room.h * scale;
   const dw = door.width * scale;
+  const isOpen = door.doorType === 'open';
   
   let cx = 0, cy = 0, rot = 0;
   const isOut = door.swing === 'out';
@@ -620,15 +621,25 @@ const DoorShape = ({ door, room, scale, offsetX, offsetY, doorIndex, selected, o
       {/* Gap in the wall */}
       <Rect x={-dw / 2 - 1} y={-2} width={dw + 2} height={4} fill="#f8f9fa" />
       
-      {/* Swing arc */}
-      <Arc x={-dw / 2} y={0} innerRadius={0} outerRadius={dw} angle={90} rotation={0} 
-        fill={selected ? "rgba(239, 68, 68, 0.15)" : "rgba(0,0,0,0.05)"} stroke={selected ? "#ef4444" : "rgba(0,0,0,0.3)"} strokeWidth={1.5} dash={[4, 4]} />
-      
-      {/* Door panel (open at 90 degrees) */}
-      <Line points={[-dw / 2, 0, -dw / 2, dw]} stroke={selected ? "#ef4444" : "#4a4a4a"} strokeWidth={3} lineCap="round" shadowColor="black" shadowBlur={4} shadowOpacity={0.2} shadowOffset={{x: 2, y: 2}} />
+      {isOpen ? (
+        <>
+          {/* Open door: just show dashed opening indicator (no swing, no panel) */}
+          <Line points={[-dw / 2, -2, -dw / 2, 2]} stroke={selected ? "#ef4444" : "#888"} strokeWidth={2} dash={[3, 3]} />
+          <Line points={[dw / 2, -2, dw / 2, 2]} stroke={selected ? "#ef4444" : "#888"} strokeWidth={2} dash={[3, 3]} />
+        </>
+      ) : (
+        <>
+          {/* Swing arc */}
+          <Arc x={-dw / 2} y={0} innerRadius={0} outerRadius={dw} angle={90} rotation={0} 
+            fill={selected ? "rgba(239, 68, 68, 0.15)" : "rgba(0,0,0,0.05)"} stroke={selected ? "#ef4444" : "rgba(0,0,0,0.3)"} strokeWidth={1.5} dash={[4, 4]} />
+          
+          {/* Door panel (open at 90 degrees) */}
+          <Line points={[-dw / 2, 0, -dw / 2, dw]} stroke={selected ? "#ef4444" : "#4a4a4a"} strokeWidth={3} lineCap="round" shadowColor="black" shadowBlur={4} shadowOpacity={0.2} shadowOffset={{x: 2, y: 2}} />
+        </>
+      )}
 
       {selected && (
-        <Group x={0} y={dw / 2} rotation={-rot} 
+        <Group x={0} y={isOpen ? 10 : dw / 2} rotation={-rot} 
           onPointerDown={(e) => {
             e.cancelBubble = true;
             onDelete();

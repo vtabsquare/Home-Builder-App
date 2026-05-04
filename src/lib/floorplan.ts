@@ -19,6 +19,7 @@ export interface DoorInfo {
   width: number; // ft
   swing?: 'in' | 'out';
   connectsTo?: string; // room id
+  doorType?: 'standard' | 'open'; // standard = swinging door, open = archway (no door panel)
 }
 
 export interface WindowInfo {
@@ -233,13 +234,30 @@ function sharedWallMidpoint(a: Room, wall: 'top'|'bottom'|'left'|'right', b: Roo
   }
 }
 
+function getDoorType(roomTypeA: Room['type'], roomTypeB: Room['type']): 'standard' | 'open' {
+  const openTypes: Room['type'][] = ['living', 'kitchen', 'dining'];
+  // If BOTH rooms are open-type (living↔kitchen, kitchen↔dining, etc.), use open door
+  if (openTypes.includes(roomTypeA) && openTypes.includes(roomTypeB)) return 'open';
+  // Bedroom and bathroom always get standard doors
+  if (roomTypeA === 'bedroom' || roomTypeB === 'bedroom') return 'standard';
+  if (roomTypeA === 'bathroom' || roomTypeB === 'bathroom') return 'standard';
+  return 'open';
+}
+
 function injectAdjacencyDoors(rooms: Room[]): void {
   const connected = new Set<string>();
   const hasDining = rooms.some(r => r.type === 'dining');
+  const hasHallway = rooms.some(r => r.type === 'hallway');
 
   const hasEntrance = (room: Room) => room.doors.some(d => {
     const c = rooms.find(r => r.id === d.connectsTo);
     return c && (c.type === 'hallway' || c.type === 'living');
+  });
+
+  // In no-hallway plans, check if bedroom already has any entrance (to living/kitchen/dining)
+  const hasAnyEntrance = (room: Room) => room.doors.some(d => {
+    const c = rooms.find(r => r.id === d.connectsTo);
+    return c && (c.type === 'hallway' || c.type === 'living' || c.type === 'kitchen' || c.type === 'dining');
   });
 
   for (let i = 0; i < rooms.length; i++) {
@@ -250,10 +268,12 @@ function injectAdjacencyDoors(rooms: Room[]): void {
       if (connected.has(key)) continue;
 
       if (a.type === 'carport' || b.type === 'carport') continue;
-      // Skip garden doors - garden is outdoor
       if (a.type === 'garden' || b.type === 'garden') continue;
 
       const types = [a.type, b.type];
+
+      // Skip balcony connections to kitchen/dining/bathroom (balcony only connects to living/bedroom)
+      if (types.includes('balcony') && ['kitchen', 'dining', 'bathroom'].some(t => types.includes(t as any))) continue;
       
       if (a.type === 'bedroom' && b.type === 'bedroom') continue;
 
@@ -264,7 +284,11 @@ function injectAdjacencyDoors(rooms: Room[]): void {
       if (types.includes('bathroom') && types.includes('bedroom')) {
         const bath = a.type === 'bathroom' ? a : b;
         const bed = a.type === 'bedroom' ? a : b;
-        if (bath.id !== `bath-attached-${bed.id}`) continue;
+        if (bath.id !== `bath-attached-${bed.id}`) {
+          // In no-hallway plans, allow non-attached bath to connect to a bedroom as fallback
+          if (hasHallway) continue;
+          if (bath.doors.length >= 1) continue;
+        }
       }
       
       if (types.includes('bathroom') && types.includes('hallway')) {
@@ -273,7 +297,15 @@ function injectAdjacencyDoors(rooms: Room[]): void {
       }
 
       if (a.type === 'bathroom' && b.type === 'bathroom') continue;
-      if (types.includes('bathroom') && ['living', 'kitchen', 'dining'].some(t => types.includes(t as any))) continue;
+
+      // Bathroom connections to living/kitchen/dining
+      if (types.includes('bathroom') && ['living', 'kitchen', 'dining'].some(t => types.includes(t as any))) {
+        if (hasHallway) continue;
+        // In no-hallway plans, allow non-attached bathroom connections
+        const bath = a.type === 'bathroom' ? a : b;
+        if (bath.id.includes('attached')) continue;
+      }
+
       if (a.type === 'bathroom' && a.doors.length >= 1) continue;
       if (b.type === 'bathroom' && b.doors.length >= 1) continue;
 
@@ -284,7 +316,13 @@ function injectAdjacencyDoors(rooms: Room[]): void {
         if (hasEntrance(b)) continue;
       }
 
-      if (types.includes('bedroom') && ['kitchen', 'dining'].some(t => types.includes(t as any))) continue;
+      // Bedroom↔kitchen/dining: block in hallway plans, allow in no-hallway plans as fallback
+      if (types.includes('bedroom') && ['kitchen', 'dining'].some(t => types.includes(t as any))) {
+        if (hasHallway) continue;
+        // In no-hallway plans, only allow if bedroom has no entrance yet
+        const bed = a.type === 'bedroom' ? a : b;
+        if (hasAnyEntrance(bed)) continue;
+      }
 
       const adj = roomsAreAdjacent(a, b);
       if (!adj.shared) continue;
@@ -301,12 +339,13 @@ function injectAdjacencyDoors(rooms: Room[]): void {
       const bHasDoor = b.doors.some(d => d.wall === oppositeWall[adj.wall] && Math.abs(d.position - clamp(posB)) < 0.25);
 
       let doorW = types.includes('bathroom') ? 2.5 : 3;
+      const doorType = getDoorType(a.type, b.type);
 
       if (!aHasDoor) {
-        a.doors.push({ wall: adj.wall, position: clamp(posA), width: doorW, swing: 'in', connectsTo: b.id });
+        a.doors.push({ wall: adj.wall, position: clamp(posA), width: doorW, swing: 'in', connectsTo: b.id, doorType });
       }
       if (!bHasDoor) {
-        b.doors.push({ wall: oppositeWall[adj.wall], position: clamp(posB), width: doorW, swing: 'in', connectsTo: a.id });
+        b.doors.push({ wall: oppositeWall[adj.wall], position: clamp(posB), width: doorW, swing: 'in', connectsTo: a.id, doorType });
       }
 
       connected.add(key);
@@ -317,6 +356,8 @@ function injectAdjacencyDoors(rooms: Room[]): void {
 // ── Validation ─────────────────────────────────────────────────────────────
 
 function cleanupDoors(rooms: Room[]): void {
+  const hasHallway = rooms.some(r => r.type === 'hallway');
+
   for (const room of rooms) {
     if (room.type === 'bathroom') {
       const isAttached = room.id.includes('attached');
@@ -335,7 +376,12 @@ function cleanupDoors(rooms: Room[]): void {
         if (isAttached) {
           isValid = (connectedRoom.id === targetBedId);
         } else {
-          isValid = (connectedRoom.type === 'hallway');
+          // Non-attached bath: connect to hallway, or any accessible room if no hallway
+          if (hasHallway) {
+            isValid = (connectedRoom.type === 'hallway');
+          } else {
+            isValid = ['living', 'kitchen', 'dining', 'hallway', 'bedroom'].includes(connectedRoom.type);
+          }
         }
 
         if (isValid && !validDoorFound) {
@@ -370,6 +416,14 @@ function cleanupDoors(rooms: Room[]): void {
         if (connectedRoom.type === 'bathroom' || connectedRoom.type === 'balcony') {
           validDoors.push(door);
         } else if (connectedRoom.type === 'hallway' || connectedRoom.type === 'living') {
+          if (!entranceFound) {
+            validDoors.push(door);
+            entranceFound = true;
+          } else {
+            connectedRoom.doors = connectedRoom.doors.filter(d => d.connectsTo !== room.id);
+          }
+        } else if (!hasHallway && (connectedRoom.type === 'kitchen' || connectedRoom.type === 'dining')) {
+          // In no-hallway plans, allow kitchen/dining as entrance fallback
           if (!entranceFound) {
             validDoors.push(door);
             entranceFound = true;
@@ -427,7 +481,7 @@ function starterPresetA(c: ConfigState): Plan {
     x: 0, y: 0, w: 14, h: 18,
     color: COLORS.living,
     furniture: livingFurniture(14, 18),
-    doors: [{ wall: 'left', position: 0.8, width: 3.5, swing: 'in' }],
+    doors: [{ wall: 'left', position: 0.8, width: 3.5, swing: 'in', doorType: 'standard' as const }],
     windows: [{ wall: 'left', position: 0.35, width: 4 }, { wall: 'top', position: 0.4, width: 5 }],
   });
 
@@ -449,40 +503,30 @@ function starterPresetA(c: ConfigState): Plan {
     windows: [{ wall: 'left', position: 0.5, width: 3 }],
   });
 
-  // Hallway
-  rooms.push({
-    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
-    x: 14, y: 0, w: 3, h: H,
-    color: COLORS.hallway,
-    furniture: [],
-    doors: [],
-    windows: [],
-  });
-
-  // Right column: Bedrooms
+  // Right column: Bedrooms (no hallway - rooms connect directly to living or via kitchen)
   rooms.push({
     id: 'bed-0', type: 'bedroom', label: 'MASTER BEDROOM',
-    x: 17, y: 0, w: 8, h: 16,
+    x: 14, y: 0, w: 11, h: 16,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(8, 16, true),
+    furniture: bedroomFurniture(11, 16, true),
     doors: [],
     windows: [{ wall: 'right', position: 0.4, width: 3 }],
   });
 
   rooms.push({
     id: 'bath-attached-bed-0', type: 'bathroom', label: 'MASTER BATH',
-    x: 17, y: 16, w: 8, h: 7,
+    x: 14, y: 16, w: 11, h: 7,
     color: COLORS.bathroom,
-    furniture: bathroomFurniture(8, 7, true),
+    furniture: bathroomFurniture(11, 7, true),
     doors: [],
     windows: [{ wall: 'right', position: 0.5, width: 2 }],
   });
 
   rooms.push({
     id: 'bed-1', type: 'bedroom', label: 'BEDROOM 2',
-    x: 17, y: 23, w: 8, h: 13,
+    x: 14, y: 23, w: 11, h: 13,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(8, 13, false),
+    furniture: bedroomFurniture(11, 13, false),
     doors: [],
     windows: [{ wall: 'right', position: 0.4, width: 3 }],
   });
@@ -496,7 +540,7 @@ function starterPresetA(c: ConfigState): Plan {
       { type: 'plant', x: 1, y: 0.8, w: 1.5, h: 1.5 },
       { type: 'plant', x: W - 3, y: 0.8, w: 1.5, h: 1.5 },
     ],
-    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out' }],
+    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out', doorType: 'standard' as const }],
     windows: [],
   });
 
@@ -527,34 +571,24 @@ function starterPresetB(c: ConfigState): Plan {
   // Top row: Living Room
   rooms.push({
     id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
-    x: 0, y: 0, w: 18, h: 14,
+    x: 0, y: 0, w: 18, h: 17,
     color: COLORS.living,
-    furniture: livingFurniture(18, 14),
-    doors: [{ wall: 'top', position: 0.3, width: 3.5, swing: 'in' }],
+    furniture: livingFurniture(18, 17),
+    doors: [{ wall: 'top', position: 0.3, width: 3.5, swing: 'in', doorType: 'standard' as const }],
     windows: [{ wall: 'top', position: 0.65, width: 5 }, { wall: 'left', position: 0.4, width: 4 }],
   });
 
   // Kitchen right of living
   rooms.push({
     id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-    x: 18, y: 0, w: 15, h: 14,
+    x: 18, y: 0, w: 15, h: 17,
     color: COLORS.kitchen,
-    furniture: kitchenFurniture(15, 14, c.kitchen),
+    furniture: kitchenFurniture(15, 17, c.kitchen),
     doors: [],
     windows: [{ wall: 'right', position: 0.5, width: 3 }, { wall: 'top', position: 0.5, width: 3 }],
   });
 
-  // Hallway horizontal
-  rooms.push({
-    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
-    x: 0, y: 14, w: W, h: 3,
-    color: COLORS.hallway,
-    furniture: [],
-    doors: [],
-    windows: [],
-  });
-
-  // Bottom row: Bedrooms + bath
+  // Bottom row: Bedrooms + bath (no hallway - connect directly to living/kitchen)
   rooms.push({
     id: 'bed-0', type: 'bedroom', label: 'MASTER BEDROOM',
     x: 0, y: 17, w: 14, h: 13,
@@ -566,41 +600,21 @@ function starterPresetB(c: ConfigState): Plan {
 
   rooms.push({
     id: 'bath-attached-bed-0', type: 'bathroom', label: 'BATH',
-    x: 14, y: 17, w: 8, h: 8,
+    x: 14, y: 17, w: 8, h: 13,
     color: COLORS.bathroom,
-    furniture: bathroomFurniture(8, 8, true),
+    furniture: bathroomFurniture(8, 13, true),
     doors: [],
     windows: [{ wall: 'bottom', position: 0.5, width: 2 }],
   });
 
   rooms.push({
     id: 'bed-1', type: 'bedroom', label: 'BEDROOM 2',
-    x: 14, y: 25, w: 8, h: 5,
+    x: 22, y: 17, w: 11, h: 13,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(8, 5, false),
+    furniture: bedroomFurniture(11, 13, false),
     doors: [],
-    windows: [{ wall: 'bottom', position: 0.5, width: 3 }],
+    windows: [{ wall: 'right', position: 0.4, width: 3 }, { wall: 'bottom', position: 0.5, width: 3 }],
   });
-
-  // Fix bedroom 2 to be taller
-  const bed1 = rooms.find(r => r.id === 'bed-1');
-  if (bed1) {
-    bed1.y = 17;
-    bed1.x = 22;
-    bed1.w = 11;
-    bed1.h = 13;
-    bed1.furniture = bedroomFurniture(11, 13, false);
-    bed1.windows = [{ wall: 'right', position: 0.4, width: 3 }, { wall: 'bottom', position: 0.5, width: 3 }];
-  }
-  // Bath also needs adjustment
-  const bath = rooms.find(r => r.id === 'bath-attached-bed-0');
-  if (bath) {
-    bath.x = 14;
-    bath.y = 17;
-    bath.w = 8;
-    bath.h = 13;
-    bath.furniture = bathroomFurniture(8, 13, true);
-  }
 
   injectAdjacencyDoors(rooms);
   cleanupDoors(rooms);
@@ -629,47 +643,37 @@ function familyPresetA(c: ConfigState): Plan {
     windows: [],
   });
 
-  // Living room next to garden
+  // Living room next to garden (extended to fill hallway gap)
   rooms.push({
     id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
-    x: gardenW, y: 0, w: 18, h: 20,
+    x: gardenW, y: 0, w: 22, h: 20,
     color: COLORS.living,
-    furniture: livingFurniture(18, 20),
-    doors: [{ wall: 'left', position: 0.8, width: 3.5, swing: 'in' }],
+    furniture: livingFurniture(22, 20),
+    doors: [{ wall: 'left', position: 0.8, width: 3.5, swing: 'in', doorType: 'standard' as const }],
     windows: [{ wall: 'top', position: 0.4, width: 6 }],
   });
 
-  // Kitchen below garden
+  // Kitchen below garden (width matches garden to avoid overlapping Living)
   rooms.push({
     id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-    x: 0, y: gardenH, w: gardenW + 4, h: 14,
+    x: 0, y: gardenH, w: gardenW, h: 14,
     color: COLORS.kitchen,
-    furniture: kitchenFurniture(gardenW + 4, 14, c.kitchen),
+    furniture: kitchenFurniture(gardenW, 14, c.kitchen),
     doors: [],
     windows: [{ wall: 'left', position: 0.5, width: 4 }],
   });
 
   rooms.push({
     id: 'dining', type: 'dining', label: 'DINING',
-    x: 0, y: gardenH + 14, w: gardenW + 4, h: H - gardenH - 14 - 4,
+    x: 0, y: gardenH + 14, w: gardenW, h: H - gardenH - 14 - 4,
     color: COLORS.dining,
-    furniture: diningFurniture(gardenW + 4, H - gardenH - 14 - 4),
+    furniture: diningFurniture(gardenW, H - gardenH - 14 - 4),
     doors: [],
     windows: [{ wall: 'left', position: 0.5, width: 3 }],
   });
 
-  // Hallway
-  rooms.push({
-    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
-    x: gardenW + 18, y: 0, w: 4, h: H - 4,
-    color: COLORS.hallway,
-    furniture: [],
-    doors: [],
-    windows: [],
-  });
-
-  // Private wing - right side
-  const bedX = gardenW + 18 + 4;
+  // Private wing - right side (no hallway - bedrooms connect directly to living)
+  const bedX = gardenW + 22;
   const bedW = W - bedX;
 
   rooms.push({
@@ -717,7 +721,7 @@ function familyPresetA(c: ConfigState): Plan {
       { type: 'plant', x: 1, y: 0.8, w: 1.5, h: 1.5 },
       { type: 'plant', x: W - 3, y: 0.8, w: 1.5, h: 1.5 },
     ],
-    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out' }],
+    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out', doorType: 'standard' as const }],
     windows: [],
   });
 
@@ -730,9 +734,9 @@ function familyPresetA(c: ConfigState): Plan {
   // Add bed-2
   rooms.push({
     id: 'bed-2', type: 'bedroom', label: 'BEDROOM 3',
-    x: gardenW + 4, y: 20, w: 14, h: H - 20 - 4,
+    x: gardenW + 4, y: 20, w: 18, h: H - 20 - 4,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(14, H - 20 - 4, false),
+    furniture: bedroomFurniture(18, H - 20 - 4, false),
     doors: [],
     windows: [{ wall: 'bottom', position: 0.5, width: 3 }],
   });
@@ -768,35 +772,25 @@ function familyPresetB(c: ConfigState): Plan {
     x: 0, y: 0, w: W - gardenW, h: 16,
     color: COLORS.living,
     furniture: livingFurniture(W - gardenW, 16),
-    doors: [{ wall: 'left', position: 0.7, width: 3.5, swing: 'in' }],
+    doors: [{ wall: 'left', position: 0.7, width: 3.5, swing: 'in', doorType: 'standard' as const }],
     windows: [{ wall: 'top', position: 0.3, width: 6 }, { wall: 'left', position: 0.3, width: 4 }],
   });
 
-  // Below living: Kitchen + Dining side by side
+  // Below living: Kitchen + Dining side by side (extended height, no hallway)
   rooms.push({
     id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-    x: 0, y: 16, w: 16, h: 12,
+    x: 0, y: 16, w: 16, h: 15,
     color: COLORS.kitchen,
-    furniture: kitchenFurniture(16, 12, c.kitchen),
+    furniture: kitchenFurniture(16, 15, c.kitchen),
     doors: [],
     windows: [{ wall: 'left', position: 0.5, width: 4 }],
   });
 
   rooms.push({
     id: 'dining', type: 'dining', label: 'DINING',
-    x: 16, y: 16, w: 14, h: 12,
+    x: 16, y: 16, w: 14, h: 15,
     color: COLORS.dining,
-    furniture: diningFurniture(14, 12),
-    doors: [],
-    windows: [],
-  });
-
-  // Hallway - horizontal between public and private
-  rooms.push({
-    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
-    x: 0, y: 28, w: W, h: 3,
-    color: COLORS.hallway,
-    furniture: [],
+    furniture: diningFurniture(14, 15),
     doors: [],
     windows: [],
   });
@@ -804,14 +798,14 @@ function familyPresetB(c: ConfigState): Plan {
   // Right side of garden down
   rooms.push({
     id: 'bed-2', type: 'bedroom', label: 'BEDROOM 3',
-    x: W - gardenW, y: gardenH, w: gardenW, h: 18,
+    x: W - gardenW, y: gardenH, w: gardenW, h: 21,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(gardenW, 18, false),
+    furniture: bedroomFurniture(gardenW, 21, false),
     doors: [],
     windows: [{ wall: 'right', position: 0.4, width: 3 }],
   });
 
-  // Bottom row: Bedrooms
+  // Bottom row: Bedrooms (no hallway - connect via kitchen/dining)
   const bottomY = 31;
   const bottomH = H - bottomY;
 
@@ -884,7 +878,7 @@ function premiumPresetA(c: ConfigState): Plan {
     x: gardenW, y: 0, w: 20, h: 22,
     color: COLORS.living,
     furniture: livingFurniture(20, 22),
-    doors: [{ wall: 'left', position: 0.85, width: 4, swing: 'in' }],
+    doors: [{ wall: 'left', position: 0.85, width: 4, swing: 'in', doorType: 'standard' as const }],
     windows: [{ wall: 'top', position: 0.3, width: 6 }, { wall: 'top', position: 0.7, width: 5 }],
   });
 
@@ -993,7 +987,7 @@ function premiumPresetA(c: ConfigState): Plan {
       { type: 'plant', x: 1, y: 0.8, w: 1.5, h: 1.5 },
       { type: 'plant', x: W - 3, y: 0.8, w: 1.5, h: 1.5 },
     ],
-    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out' }],
+    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out', doorType: 'standard' as const }],
     windows: [],
   });
 
@@ -1028,7 +1022,7 @@ function premiumPresetB(c: ConfigState): Plan {
     x: 0, y: 0, w: 22, h: 20,
     color: COLORS.living,
     furniture: livingFurniture(22, 20),
-    doors: [{ wall: 'left', position: 0.8, width: 4, swing: 'in' }],
+    doors: [{ wall: 'left', position: 0.8, width: 4, swing: 'in', doorType: 'standard' as const }],
     windows: [{ wall: 'top', position: 0.3, width: 6 }, { wall: 'left', position: 0.35, width: 5 }],
   });
 
@@ -1158,7 +1152,7 @@ function premiumPresetB(c: ConfigState): Plan {
       { type: 'plant', x: 1, y: 0.8, w: 1.5, h: 1.5 },
       { type: 'plant', x: W - 3, y: 0.8, w: 1.5, h: 1.5 },
     ],
-    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out' }],
+    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out', doorType: 'standard' as const }],
     windows: [],
   });
 
