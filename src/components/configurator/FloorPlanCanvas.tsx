@@ -246,53 +246,62 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
         <Layer listening={true}>
           {localPlan.rooms.map((room) => (
             <Group key={`dw-${room.id}`}>
-              {(room.doors || []).map((d, di) => (
-                <DoorShape 
-                  key={`d-${di}`} 
-                  door={d} 
-                  room={room} 
-                  scale={scale} 
-                  offsetX={offsetX} 
-                  offsetY={offsetY} 
-                  doorIndex={di}
-                  selected={selectedDoor?.roomId === room.id && selectedDoor?.doorIndex === di}
-                  onSelect={() => {
-                    if (advanced) {
-                      setSelectedDoor({ roomId: room.id, doorIndex: di });
-                      setSelectedRoomId(null);
-                    }
-                  }}
-                  onDragMove={(newWall: string, newPos: number) => {
-                    const updatedRooms = localPlan.rooms.map(r => {
-                      if (r.id === room.id) {
-                        const newDoors = [...r.doors];
-                        newDoors[di] = { ...newDoors[di], wall: newWall as any, position: newPos };
-                        return { ...r, doors: newDoors };
+              {(room.doors || []).map((d, di) => {
+                // Prevent rendering duplicate doors for connected rooms
+                if (d.connectsTo && room.id > d.connectsTo) return null;
+
+                return (
+                  <DoorShape 
+                    key={`d-${di}`} 
+                    door={d} 
+                    room={room} 
+                    scale={scale} 
+                    offsetX={offsetX} 
+                    offsetY={offsetY} 
+                    doorIndex={di}
+                    selected={selectedDoor?.roomId === room.id && selectedDoor?.doorIndex === di}
+                    onSelect={() => {
+                      if (advanced) {
+                        setSelectedDoor({ roomId: room.id, doorIndex: di });
+                        setSelectedRoomId(null);
                       }
-                      return r;
-                    });
-                    const updatedPlan = { ...localPlan, rooms: updatedRooms };
-                    setLocalPlan(updatedPlan);
-                  }}
-                  onDragEnd={() => {
-                    onChange?.(localPlan);
-                  }}
-                  onDelete={() => {
-                    if (advanced) {
+                    }}
+                    onDragMove={(newWall: string, newPos: number) => {
                       const updatedRooms = localPlan.rooms.map(r => {
                         if (r.id === room.id) {
-                          return { ...r, doors: r.doors.filter((_, idx) => idx !== di) };
+                          const newDoors = [...r.doors];
+                          newDoors[di] = { ...newDoors[di], wall: newWall as any, position: newPos };
+                          return { ...r, doors: newDoors };
                         }
                         return r;
                       });
                       const updatedPlan = { ...localPlan, rooms: updatedRooms };
                       setLocalPlan(updatedPlan);
-                      onChange?.(updatedPlan);
-                      setSelectedDoor(null);
-                    }
-                  }}
-                />
-              ))}
+                    }}
+                    onDragEnd={() => {
+                      onChange?.(localPlan);
+                    }}
+                    onDelete={() => {
+                      if (advanced) {
+                        const updatedRooms = localPlan.rooms.map(r => {
+                          if (r.id === room.id) {
+                            return { ...r, doors: r.doors.filter((_, idx) => idx !== di) };
+                          }
+                          // Also remove the connected door from the other room
+                          if (d.connectsTo && r.id === d.connectsTo) {
+                            return { ...r, doors: r.doors.filter(od => od.connectsTo !== room.id) };
+                          }
+                          return r;
+                        });
+                        const updatedPlan = { ...localPlan, rooms: updatedRooms };
+                        setLocalPlan(updatedPlan);
+                        onChange?.(updatedPlan);
+                        setSelectedDoor(null);
+                      }
+                    }}
+                  />
+                );
+              })}
               {(room.windows || []).map((w, wi) => (
                 <WindowShape key={`w-${wi}`} window={w} room={room} scale={scale} offsetX={offsetX} offsetY={offsetY} />
               ))}
@@ -377,7 +386,12 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
       onTransformEnd={onTransformEnd}
       ref={innerRef}
     >
-      <Rect width={rw} height={rh} fill={room.color} opacity={1} stroke="#2c2c2c" strokeWidth={3} />
+      <Rect width={rw} height={rh} fill={room.color} opacity={1} />
+      {/* Explicitly draw individual walls to support open floor plans */}
+      {(!room.openWalls || !room.openWalls.includes('top')) && <Line points={[0, 0, rw, 0]} stroke="#2c2c2c" strokeWidth={3} />}
+      {(!room.openWalls || !room.openWalls.includes('bottom')) && <Line points={[0, rh, rw, rh]} stroke="#2c2c2c" strokeWidth={3} />}
+      {(!room.openWalls || !room.openWalls.includes('left')) && <Line points={[0, 0, 0, rh]} stroke="#2c2c2c" strokeWidth={3} />}
+      {(!room.openWalls || !room.openWalls.includes('right')) && <Line points={[rw, 0, rw, rh]} stroke="#2c2c2c" strokeWidth={3} />}
       
       {/* Floor Textures */}
       {room.type === 'bathroom' && (
@@ -421,12 +435,12 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
 
 /* ─── Furniture ─── */
 const FurnitureShape = ({ item, roomX, roomY, scale, offsetX, offsetY }: any) => {
-  const x = offsetX + (roomX + item.x) * scale;
-  const y = offsetY + (roomY + item.y) * scale;
   const w = item.w * scale;
   const h = item.h * scale;
-  const colors = getFurnitureColors(item.type);
   const rot = item.rotation || 0;
+  const x = offsetX + (roomX + item.x) * scale + (rot !== 0 ? w / 2 : 0);
+  const y = offsetY + (roomY + item.y) * scale + (rot !== 0 ? h / 2 : 0);
+  const colors = getFurnitureColors(item.type);
 
   return (
     <Group x={x} y={y} rotation={rot} offsetX={rot !== 0 ? w / 2 : 0} offsetY={rot !== 0 ? h / 2 : 0}>

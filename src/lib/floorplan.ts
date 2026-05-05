@@ -41,6 +41,7 @@ export interface Room {
   doors: DoorInfo[];
   windows: WindowInfo[];
   orientation?: number; // 0: Top, 1: Right, 2: Bottom, 3: Left
+  openWalls?: ('top' | 'bottom' | 'left' | 'right')[];
 }
 
 export interface Plan {
@@ -114,16 +115,21 @@ function bedroomFurniture(w: number, h: number, isMaster: boolean, orient: numbe
   const G = 0.5;
   const bedW = isMaster ? Math.min(6, w * 0.55) : Math.min(4.5, w * 0.5);
   const bedH = isMaster ? 7 : 6;
-  const wardH = Math.min(h - 4, 6);
+  const wardW = Math.min(w - 4, 6); // Wardrobe is wide
+  const wardH = 2.2; // Wardrobe is shallow
 
-  if (orient === 0 || orient === 2) {
-    const bedY = orient === 0 ? G : h - bedH - G;
-    items.push({ type: 'bed', x: (w - bedW) / 2, y: bedY, w: bedW, h: bedH, rotation: orient === 0 ? 0 : 180 });
-    items.push({ type: 'wardrobe', x: w - 2.5, y: (h - wardH) / 2, w: 2.2, h: wardH });
-  } else {
-    const bedX = orient === 1 ? w - bedH - G : G;
-    items.push({ type: 'bed', x: bedX, y: (h - bedW) / 2, w: bedH, h: bedW, rotation: orient === 1 ? 90 : 270 });
-    items.push({ type: 'wardrobe', x: (w - wardH) / 2, y: 0.5, w: wardH, h: 2.2 });
+  if (orient === 0) {
+    items.push({ type: 'bed', x: (w - bedW) / 2, y: G, w: bedW, h: bedH, rotation: 0 });
+    items.push({ type: 'wardrobe', x: w - G - wardH/2 - wardW/2, y: h/2 - wardW/2, w: wardW, h: wardH, rotation: 90 });
+  } else if (orient === 1) {
+    items.push({ type: 'bed', x: w - G - bedH/2 - bedW/2, y: h/2 - bedH/2, w: bedW, h: bedH, rotation: 90 });
+    items.push({ type: 'wardrobe', x: (w - wardW) / 2, y: G, w: wardW, h: wardH, rotation: 0 });
+  } else if (orient === 2) {
+    items.push({ type: 'bed', x: (w - bedW) / 2, y: h - G - bedH, w: bedW, h: bedH, rotation: 180 });
+    items.push({ type: 'wardrobe', x: G + wardH/2 - wardW/2, y: h/2 - wardW/2, w: wardW, h: wardH, rotation: 270 });
+  } else if (orient === 3) {
+    items.push({ type: 'bed', x: G + bedH/2 - bedW/2, y: h/2 - bedH/2, w: bedW, h: bedH, rotation: 270 });
+    items.push({ type: 'wardrobe', x: (w - wardW) / 2, y: h - G - wardH, w: wardW, h: wardH, rotation: 180 });
   }
   return items;
 }
@@ -131,20 +137,26 @@ function bedroomFurniture(w: number, h: number, isMaster: boolean, orient: numbe
 function bathroomFurniture(w: number, h: number, isMaster: boolean, orient: number = 0): FurnitureItem[] {
   const items: FurnitureItem[] = [];
   const G = 0.4;
-  
-  // Base items
-  const sink = { type: 'sink' as const, w: 2.2, h: 1.6 };
-  const toilet = { type: 'toilet' as const, w: 1.6, h: 2.2 };
-  const shower = isMaster ? { type: 'bathtub' as const, w: 2.6, h: 5 } : { type: 'shower' as const, w: 3, h: 3 };
+  const sinkW = 2.2, sinkH = 1.6;
+  const toiletW = 1.6, toiletH = 2.2;
+  const showerW = isMaster ? 2.6 : 3, showerH = isMaster ? 5 : 3;
 
-  if (orient === 0 || orient === 2) {
-    items.push({ ...sink, x: w - sink.w - G, y: G });
-    items.push({ ...toilet, x: w - toilet.w - G, y: h - toilet.h - G });
-    items.push({ ...shower, x: G, y: h - shower.h - G });
-  } else {
-    items.push({ ...sink, x: G, y: G, rotation: 90 });
-    items.push({ ...toilet, x: w - toilet.w - G, y: G });
-    items.push({ ...shower, x: w - shower.w - G, y: h - shower.h - G });
+  if (orient === 0) {
+    items.push({ type: 'sink', x: w - sinkW - G, y: G, w: sinkW, h: sinkH, rotation: 0 });
+    items.push({ type: 'toilet', x: w - toiletW - G, y: h - toiletH - G, w: toiletW, h: toiletH, rotation: 0 });
+    items.push({ type: 'shower', x: G, y: h - showerH - G, w: showerW, h: showerH, rotation: 0 });
+  } else if (orient === 1) {
+    items.push({ type: 'sink', x: w - G - sinkH/2 - sinkW/2, y: G + sinkW/2 - sinkH/2, w: sinkW, h: sinkH, rotation: 90 });
+    items.push({ type: 'toilet', x: w - G - toiletH/2 - toiletW/2, y: h - G - toiletW/2 - toiletH/2, w: toiletW, h: toiletH, rotation: 90 });
+    items.push({ type: 'shower', x: G + showerH/2 - showerW/2, y: h - G - showerW/2 - showerH/2, w: showerW, h: showerH, rotation: 90 });
+  } else if (orient === 2) {
+    items.push({ type: 'sink', x: G, y: h - sinkH - G, w: sinkW, h: sinkH, rotation: 180 });
+    items.push({ type: 'toilet', x: G, y: G, w: toiletW, h: toiletH, rotation: 180 });
+    items.push({ type: 'shower', x: w - showerW - G, y: G, w: showerW, h: showerH, rotation: 180 });
+  } else if (orient === 3) {
+    items.push({ type: 'sink', x: G + sinkH/2 - sinkW/2, y: h - G - sinkW/2 - sinkH/2, w: sinkW, h: sinkH, rotation: 270 });
+    items.push({ type: 'toilet', x: G + toiletH/2 - toiletW/2, y: G + toiletW/2 - toiletH/2, w: toiletW, h: toiletH, rotation: 270 });
+    items.push({ type: 'shower', x: w - G - showerH/2 - showerW/2, y: G + showerW/2 - showerH/2, w: showerW, h: showerH, rotation: 270 });
   }
   return items;
 }
@@ -152,16 +164,26 @@ function bathroomFurniture(w: number, h: number, isMaster: boolean, orient: numb
 function kitchenFurniture(w: number, h: number, kitchenType: string, orient: number = 0): FurnitureItem[] {
   const items: FurnitureItem[] = [];
   const G = 0.4;
-  const counterDepth = 2;
+  const cW = w - 2 * G - 2.2; // Leave space for fridge
+  const cH = h - 2 * G - 2.2;
+  const cD = 2;
 
-  if (orient === 0 || orient === 2) {
-    items.push({ type: 'counter', x: G, y: G, w: w - 2 * G, h: counterDepth });
-    items.push({ type: 'stove',   x: w * 0.3, y: G + 0.1, w: 2.5, h: 1.6 });
-    items.push({ type: 'fridge',  x: w - 2.5 - G, y: G + 0.1, w: 2.2, h: 2.2 });
-  } else {
-    items.push({ type: 'counter', x: G, y: G, w: counterDepth, h: h - 2 * G });
-    items.push({ type: 'stove',   x: G + 0.1, y: h * 0.3, w: 1.6, h: 2.5 });
-    items.push({ type: 'fridge',  x: G + 0.1, y: h - 2.5 - G, w: 2.2, h: 2.2 });
+  if (orient === 0) {
+    items.push({ type: 'counter', x: G, y: G, w: cW, h: cD, rotation: 0 });
+    items.push({ type: 'stove',   x: G + cW * 0.4, y: G + 0.1, w: 2.5, h: 1.6, rotation: 0 });
+    items.push({ type: 'fridge',  x: w - 2.2 - G, y: G + 0.1, w: 2.2, h: 2.2, rotation: 0 });
+  } else if (orient === 1) {
+    items.push({ type: 'counter', x: w - G - cD, y: G, w: cD, h: cH, rotation: 0 }); // Wait, counter is vertical! So w=cD, h=cH
+    items.push({ type: 'stove',   x: w - G - 1.6 - 0.1, y: G + cH * 0.4, w: 1.6, h: 2.5, rotation: 0 });
+    items.push({ type: 'fridge',  x: w - G - 2.2 - 0.1, y: h - G - 2.2, w: 2.2, h: 2.2, rotation: 0 });
+  } else if (orient === 2) {
+    items.push({ type: 'counter', x: G, y: h - G - cD, w: cW, h: cD, rotation: 0 }); // Don't use 180, just draw it normally
+    items.push({ type: 'stove',   x: G + cW * 0.4, y: h - G - 1.6 - 0.1, w: 2.5, h: 1.6, rotation: 0 });
+    items.push({ type: 'fridge',  x: w - 2.2 - G, y: h - G - 2.2 - 0.1, w: 2.2, h: 2.2, rotation: 0 });
+  } else if (orient === 3) {
+    items.push({ type: 'counter', x: G, y: G, w: cD, h: cH, rotation: 0 });
+    items.push({ type: 'stove',   x: G + 0.1, y: G + cH * 0.4, w: 1.6, h: 2.5, rotation: 0 });
+    items.push({ type: 'fridge',  x: G + 0.1, y: h - G - 2.2, w: 2.2, h: 2.2, rotation: 0 });
   }
   return items;
 }
@@ -169,20 +191,24 @@ function kitchenFurniture(w: number, h: number, kitchenType: string, orient: num
 function livingFurniture(w: number, h: number, orient: number = 0): FurnitureItem[] {
   const items: FurnitureItem[] = [];
   const G = 0.5;
-
   const tvW = Math.min(5.5, w * 0.4);
   const sofaW = Math.min(8, w * 0.6);
 
-  if (orient === 0 || orient === 2) {
-    const tvY = orient === 0 ? G : h - 1.2 - G;
-    const sofaY = orient === 0 ? h - 3 - G : G;
-    items.push({ type: 'tv', x: (w - tvW) / 2, y: tvY, w: tvW, h: 1.2 });
-    items.push({ type: 'sofa', x: (w - sofaW) / 2, y: sofaY, w: sofaW, h: 3 });
-  } else {
-    const tvX = orient === 1 ? w - 1.2 - G : G;
-    const sofaX = orient === 1 ? G : w - 3 - G;
-    items.push({ type: 'tv', x: tvX, y: (h - tvW) / 2, w: 1.2, h: tvW, rotation: 90 });
-    items.push({ type: 'sofa', x: sofaX, y: (h - sofaW) / 2, w: 3, h: sofaW, rotation: 90 });
+  if (orient === 0) {
+    items.push({ type: 'tv', x: (w - tvW) / 2, y: G, w: tvW, h: 1.2, rotation: 0 });
+    items.push({ type: 'sofa', x: (w - sofaW) / 2, y: h - 3 - G, w: sofaW, h: 3, rotation: 180 });
+  } else if (orient === 1) {
+    items.push({ type: 'tv', x: w - G - 0.6 - tvW/2, y: h/2 - 0.6, w: tvW, h: 1.2, rotation: 90 });
+    items.push({ type: 'sofa', x: G + 1.5 - sofaW/2, y: h/2 - 1.5, w: sofaW, h: 3, rotation: 270 });
+  } else if (orient === 2) {
+    items.push({ type: 'tv', x: (w - tvW) / 2, y: h - G - 1.2, w: tvW, h: 1.2, rotation: 180 });
+    items.push({ type: 'sofa', x: (w - sofaW) / 2, y: G, w: sofaW, h: 3, rotation: 0 });
+  } else if (orient === 3) {
+    items.push({ type: 'tv', x: G + 0.6 - tvW/2, y: h/2 - 0.6, w: tvW, h: 1.2, rotation: 270 });
+    items.push({ type: 'sofa', x: w - G - 1.5 - sofaW/2, y: h/2 - 1.5, w: sofaW, h: 3, rotation: 90 });
+  } else if (orient === 4) {
+    items.push({ type: 'tv', x: (w - tvW) / 2, y: G, w: tvW, h: 1.2, rotation: 0 });
+    items.push({ type: 'sofa', x: (w - sofaW) / 2, y: h/2 - 1.5, w: sofaW, h: 3, rotation: 180 });
   }
 
   return items;
@@ -470,154 +496,199 @@ function validateAndFixBathrooms(rooms: Room[]): void {
 // ── STARTER PRESETS (1000 sqft → ~25×40) ─────────────────────────────────
 
 function starterPresetA(c: ConfigState): Plan {
-  // Horizontal layout: Living left, bedrooms right
-  const W = 25;
+  const W = 28;
   const H = 40;
   const rooms: Room[] = [];
 
-  // Living + Kitchen on left side (top-to-bottom)
+  // Left side
   rooms.push({
     id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
     x: 0, y: 0, w: 14, h: 18,
     color: COLORS.living,
-    furniture: livingFurniture(14, 18),
-    doors: [{ wall: 'left', position: 0.8, width: 3.5, swing: 'in', doorType: 'standard' as const }],
-    windows: [{ wall: 'left', position: 0.35, width: 4 }, { wall: 'top', position: 0.4, width: 5 }],
-  });
-
-  rooms.push({
-    id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-    x: 0, y: 18, w: 14, h: 12,
-    color: COLORS.kitchen,
-    furniture: kitchenFurniture(14, 12, c.kitchen),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.5, width: 3 }],
+    furniture: livingFurniture(14, 18, 4),
+    openWalls: ['right'],
+    doors: [
+      { wall: 'left', position: 0.15, width: 3.5, swing: 'in', doorType: 'standard' },
+      { wall: 'bottom', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'dining' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 5 }, { wall: 'top', position: 0.5, width: 6 }],
   });
 
   rooms.push({
     id: 'dining', type: 'dining', label: 'DINING',
-    x: 0, y: 30, w: 14, h: 10,
+    x: 0, y: 18, w: 14, h: 10,
     color: COLORS.dining,
     furniture: diningFurniture(14, 10),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.5, width: 3 }],
+    doors: [
+      { wall: 'top', position: 0.5, width: 3.5, swing: 'in', doorType: 'open', connectsTo: 'living' },
+      { wall: 'bottom', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'kitchen' },
+      { wall: 'right', position: 0.5, width: 3.5, swing: 'in', doorType: 'open', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }],
   });
 
-  // Right column: Bedrooms (no hallway - rooms connect directly to living or via kitchen)
+  rooms.push({
+    id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
+    x: 0, y: 28, w: 14, h: 8,
+    color: COLORS.kitchen,
+    furniture: kitchenFurniture(14, 8, c.kitchen, 2),
+    doors: [
+      { wall: 'top', position: 0.5, width: 3.5, swing: 'in', doorType: 'open', connectsTo: 'dining' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }], // Left center
+  });
+
+  // Center Hallway
+  rooms.push({
+    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
+    x: 14, y: 0, w: 4, h: 36,
+    color: COLORS.hallway,
+    openWalls: ['left'],
+    furniture: [],
+    doors: [
+      { wall: 'left', position: 23/36, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'dining' },
+      { wall: 'right', position: 8/36, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'bed-0' },
+      { wall: 'right', position: 20/36, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'bath-common-1' },
+      { wall: 'right', position: 30/36, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'bed-1' },
+      { wall: 'bottom', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard', connectsTo: 'balcony' }
+    ],
+    windows: [],
+  });
+
+  // Right side
   rooms.push({
     id: 'bed-0', type: 'bedroom', label: 'MASTER BEDROOM',
-    x: 14, y: 0, w: 11, h: 16,
+    x: 18, y: 0, w: 10, h: 16,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(11, 16, true),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.4, width: 3 }],
+    furniture: bedroomFurniture(10, 16, true, 1),
+    doors: [
+      { wall: 'left', position: 0.5, width: 3, swing: 'out', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 4 }, { wall: 'top', position: 0.5, width: 4 }], // Right middle
   });
 
   rooms.push({
-    id: 'bath-attached-bed-0', type: 'bathroom', label: 'MASTER BATH',
-    x: 14, y: 16, w: 11, h: 7,
+    id: 'bath-common-1', type: 'bathroom', label: 'COMMON BATH',
+    x: 18, y: 16, w: 10, h: 8,
     color: COLORS.bathroom,
-    furniture: bathroomFurniture(11, 7, true),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.5, width: 2 }],
+    furniture: bathroomFurniture(10, 8, false, 1),
+    doors: [
+      { wall: 'left', position: 0.5, width: 2.5, swing: 'out', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'right', position: 0.25, width: 3 }], // Right top middle
   });
 
   rooms.push({
     id: 'bed-1', type: 'bedroom', label: 'BEDROOM 2',
-    x: 14, y: 23, w: 11, h: 13,
+    x: 18, y: 24, w: 10, h: 12,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(11, 13, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.4, width: 3 }],
+    furniture: bedroomFurniture(10, 12, false, 1),
+    doors: [
+      { wall: 'left', position: 0.5, width: 3, swing: 'out', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 4 }], // Right middle
   });
 
-  // Balcony at bottom
   rooms.push({
     id: 'balcony', type: 'balcony', label: 'BALCONY',
-    x: 0, y: H - 4, w: W, h: 4,
+    x: 0, y: 36, w: 28, h: 4,
     color: COLORS.balcony,
     furniture: [
-      { type: 'plant', x: 1, y: 0.8, w: 1.5, h: 1.5 },
-      { type: 'plant', x: W - 3, y: 0.8, w: 1.5, h: 1.5 },
+      { type: 'plant', x: 2, y: 1.5, w: 1.5, h: 1.5 },
+      { type: 'plant', x: 26, y: 1.5, w: 1.5, h: 1.5 },
     ],
-    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out', doorType: 'standard' as const }],
+    doors: [
+      { wall: 'top', position: 16/28, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
     windows: [],
   });
 
-  // Adjust dining room to not overlap balcony
-  const diningRoom = rooms.find(r => r.id === 'dining');
-  if (diningRoom) {
-    diningRoom.h = H - 4 - diningRoom.y;
-  }
-  // Adjust bed-1 to not overlap balcony
-  const bed1 = rooms.find(r => r.id === 'bed-1');
-  if (bed1) {
-    bed1.h = H - 4 - bed1.y;
-  }
-
-  injectAdjacencyDoors(rooms);
-  cleanupDoors(rooms);
+  // We skip injectAdjacencyDoors to strictly enforce this highly logical preset
+  // but we still run standard validators just in case
   validateAndFixBathrooms(rooms);
 
   return { width: W, height: H, rooms };
 }
 
 function starterPresetB(c: ConfigState): Plan {
-  // L-shaped layout: Living top, bedrooms bottom-right
   const W = 33;
   const H = 30;
   const rooms: Room[] = [];
 
-  // Top row: Living Room
-  rooms.push({
-    id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
-    x: 0, y: 0, w: 18, h: 17,
-    color: COLORS.living,
-    furniture: livingFurniture(18, 17),
-    doors: [{ wall: 'top', position: 0.3, width: 3.5, swing: 'in', doorType: 'standard' as const }],
-    windows: [{ wall: 'top', position: 0.65, width: 5 }, { wall: 'left', position: 0.4, width: 4 }],
-  });
-
-  // Kitchen right of living
+  // Left column
   rooms.push({
     id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-    x: 18, y: 0, w: 15, h: 17,
+    x: 0, y: 0, w: 15, h: 12,
     color: COLORS.kitchen,
-    furniture: kitchenFurniture(15, 17, c.kitchen),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.5, width: 3 }, { wall: 'top', position: 0.5, width: 3 }],
+    furniture: kitchenFurniture(15, 12, c.kitchen, 2),
+    doors: [
+      { wall: 'right', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }], // Left center
   });
 
-  // Bottom row: Bedrooms + bath (no hallway - connect directly to living/kitchen)
+  rooms.push({
+    id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
+    x: 0, y: 12, w: 15, h: 18,
+    color: COLORS.living,
+    openWalls: ['right'],
+    furniture: livingFurniture(15, 18, 4),
+    doors: [
+      { wall: 'bottom', position: 0.2, width: 3.5, swing: 'in', doorType: 'standard' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 5 }],
+  });
+
+  // Central Hallway
+  rooms.push({
+    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
+    x: 15, y: 0, w: 4, h: 30,
+    color: COLORS.hallway,
+    openWalls: ['left'],
+    furniture: [],
+    doors: [
+      { wall: 'left', position: 6/30, width: 3.5, swing: 'in', doorType: 'open', connectsTo: 'kitchen' },
+      { wall: 'right', position: 6/30, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'bed-0' },
+      { wall: 'right', position: 14/30, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'bath-common-1' },
+      { wall: 'right', position: 24.5/30, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'bed-1' }
+    ],
+    windows: [],
+  });
+
+  // Right column
   rooms.push({
     id: 'bed-0', type: 'bedroom', label: 'MASTER BEDROOM',
-    x: 0, y: 17, w: 14, h: 13,
+    x: 19, y: 0, w: 14, h: 12,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(14, 13, true),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.5, width: 4 }, { wall: 'bottom', position: 0.5, width: 3 }],
+    furniture: bedroomFurniture(14, 12, true, 1),
+    doors: [
+      { wall: 'left', position: 0.5, width: 3, swing: 'out', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 4 }], // Right middle
   });
 
   rooms.push({
-    id: 'bath-attached-bed-0', type: 'bathroom', label: 'BATH',
-    x: 14, y: 17, w: 8, h: 13,
+    id: 'bath-common-1', type: 'bathroom', label: 'COMMON BATH',
+    x: 19, y: 12, w: 14, h: 7,
     color: COLORS.bathroom,
-    furniture: bathroomFurniture(8, 13, true),
-    doors: [],
-    windows: [{ wall: 'bottom', position: 0.5, width: 2 }],
+    furniture: bathroomFurniture(14, 7, false, 1),
+    doors: [
+      { wall: 'left', position: 2/7, width: 2.5, swing: 'out', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'right', position: 0.25, width: 3 }], // Right top middle
   });
 
   rooms.push({
     id: 'bed-1', type: 'bedroom', label: 'BEDROOM 2',
-    x: 22, y: 17, w: 11, h: 13,
+    x: 19, y: 19, w: 14, h: 11,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(11, 13, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.4, width: 3 }, { wall: 'bottom', position: 0.5, width: 3 }],
+    furniture: bedroomFurniture(14, 11, false, 1),
+    doors: [
+      { wall: 'left', position: 0.5, width: 3, swing: 'out', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 4 }], // Right middle
   });
 
-  injectAdjacencyDoors(rooms);
-  cleanupDoors(rooms);
   validateAndFixBathrooms(rooms);
 
   return { width: W, height: H, rooms };
@@ -626,413 +697,497 @@ function starterPresetB(c: ConfigState): Plan {
 // ── FAMILY PRESETS (1600 sqft → ~32×50) ──────────────────────────────────
 
 function familyPresetA(c: ConfigState): Plan {
-  // Classic two-wing layout with garden at front-left corner
   const W = 40;
   const H = 40;
-  const gardenW = 10;
-  const gardenH = 12;
   const rooms: Room[] = [];
 
-  // Garden at front-left corner (top-left)
   rooms.push({
-    id: 'garden-0', type: 'garden', label: 'GARDEN',
-    x: 0, y: 0, w: gardenW, h: gardenH,
+    id: 'balcony', type: 'garden', label: 'GARDEN',
+    x: 0, y: 36, w: 40, h: 4,
     color: COLORS.garden,
-    furniture: gardenFurniture(gardenW, gardenH),
-    doors: [],
+    furniture: [
+      { type: 'plant', x: 2, y: 1.5, w: 1.5, h: 1.5 },
+      { type: 'plant', x: 38, y: 1.5, w: 1.5, h: 1.5 },
+    ],
+    doors: [
+      { wall: 'top', position: 14/40, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
     windows: [],
   });
 
-  // Living room next to garden (extended to fill hallway gap)
   rooms.push({
-    id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
-    x: gardenW, y: 0, w: 22, h: 20,
-    color: COLORS.living,
-    furniture: livingFurniture(22, 20),
-    doors: [{ wall: 'left', position: 0.8, width: 3.5, swing: 'in', doorType: 'standard' as const }],
-    windows: [{ wall: 'top', position: 0.4, width: 6 }],
-  });
-
-  // Kitchen below garden (width matches garden to avoid overlapping Living)
-  rooms.push({
-    id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-    x: 0, y: gardenH, w: gardenW, h: 14,
-    color: COLORS.kitchen,
-    furniture: kitchenFurniture(gardenW, 14, c.kitchen),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.5, width: 4 }],
+    id: 'garden', type: 'balcony', label: 'COVERED PATIO',
+    x: 0, y: 0, w: 12, h: 10,
+    color: COLORS.balcony,
+    furniture: [
+      { type: 'plant', x: 2, y: 2, w: 2, h: 2 },
+      { type: 'plant', x: 8, y: 2, w: 2, h: 2 },
+      { type: 'plant', x: 2, y: 6, w: 2, h: 2 },
+      { type: 'plant', x: 8, y: 6, w: 2, h: 2 }
+    ],
+    doors: [
+      { wall: 'right', position: 0.5, width: 4, swing: 'in', doorType: 'standard', connectsTo: 'living' }
+    ],
+    windows: [],
   });
 
   rooms.push({
     id: 'dining', type: 'dining', label: 'DINING',
-    x: 0, y: gardenH + 14, w: gardenW, h: H - gardenH - 14 - 4,
+    x: 0, y: 10, w: 12, h: 14,
     color: COLORS.dining,
-    furniture: diningFurniture(gardenW, H - gardenH - 14 - 4),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.5, width: 3 }],
+    furniture: [{ type: 'dining_table', x: 2, y: 4, w: 8, h: 6, rotation: 0 }],
+    doors: [
+      { wall: 'bottom', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'kitchen' },
+      { wall: 'right', position: 0.8, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }],
   });
 
-  // Private wing - right side (no hallway - bedrooms connect directly to living)
-  const bedX = gardenW + 22;
-  const bedW = W - bedX;
+  rooms.push({
+    id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
+    x: 0, y: 24, w: 12, h: 12,
+    color: COLORS.kitchen,
+    furniture: kitchenFurniture(12, 12, c.kitchen, 1),
+    doors: [
+      { wall: 'right', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }],
+  });
+
+  rooms.push({
+    id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
+    x: 12, y: 0, w: 14, h: 16,
+    color: COLORS.living,
+    openWalls: ['bottom'],
+    furniture: livingFurniture(14, 16, 4),
+    doors: [],
+    windows: [{ wall: 'top', position: 0.5, width: 5 }],
+  });
+
+  rooms.push({
+    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
+    x: 12, y: 16, w: 4, h: 20,
+    color: COLORS.hallway,
+    openWalls: ['top', 'right'],
+    furniture: [],
+    doors: [],
+    windows: [],
+  });
+
+  rooms.push({
+    id: 'sub-hallway', type: 'hallway', label: '',
+    x: 16, y: 22, w: 24, h: 4,
+    color: COLORS.hallway,
+    openWalls: ['left'],
+    furniture: [],
+    doors: [],
+    windows: [],
+  });
 
   rooms.push({
     id: 'bed-0', type: 'bedroom', label: 'MASTER BEDROOM',
-    x: bedX, y: 0, w: bedW, h: 14,
+    x: 26, y: 0, w: 14, h: 16,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(bedW, 14, true),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.35, width: 4 }, { wall: 'top', position: 0.5, width: 3 }],
+    furniture: bedroomFurniture(14, 16, true, 1),
+    doors: [
+      { wall: 'left', position: 0.8, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'living' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 5 }],
   });
 
   rooms.push({
-    id: 'bath-attached-bed-0', type: 'bathroom', label: 'MASTER BATH',
-    x: bedX, y: 14, w: bedW, h: 8,
+    id: 'bath-master', type: 'bathroom', label: 'MASTER BATH',
+    x: 26, y: 16, w: 14, h: 6,
     color: COLORS.bathroom,
-    furniture: bathroomFurniture(bedW, 8, true),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.5, width: 2 }],
+    furniture: bathroomFurniture(14, 6, true, 0),
+    doors: [
+      { wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'bed-0' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 3 }],
+  });
+
+  rooms.push({
+    id: 'bath-common-1', type: 'bathroom', label: 'COMMON BATH',
+    x: 16, y: 16, w: 10, h: 6,
+    color: COLORS.bathroom,
+    furniture: bathroomFurniture(10, 6, false, 0),
+    doors: [
+      { wall: 'bottom', position: 0.5, width: 2.5, swing: 'out', doorType: 'standard', connectsTo: 'sub-hallway' }
+    ],
+    windows: [],
   });
 
   rooms.push({
     id: 'bed-1', type: 'bedroom', label: 'BEDROOM 2',
-    x: bedX, y: 22, w: bedW, h: 10,
+    x: 16, y: 26, w: 12, h: 10,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(bedW, 10, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.4, width: 3 }],
-  });
-
-  rooms.push({
-    id: 'bath-common-1', type: 'bathroom', label: 'BATH',
-    x: bedX, y: 32, w: bedW, h: 8,
-    color: COLORS.bathroom,
-    furniture: bathroomFurniture(bedW, 8, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.5, width: 2 }],
-  });
-
-  // Balcony at bottom
-  rooms.push({
-    id: 'balcony', type: 'balcony', label: 'BALCONY',
-    x: 0, y: H - 4, w: W, h: 4,
-    color: COLORS.balcony,
-    furniture: [
-      { type: 'plant', x: 1, y: 0.8, w: 1.5, h: 1.5 },
-      { type: 'plant', x: W - 3, y: 0.8, w: 1.5, h: 1.5 },
+    furniture: bedroomFurniture(12, 10, false, 0),
+    doors: [
+      { wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'sub-hallway' }
     ],
-    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out', doorType: 'standard' as const }],
-    windows: [],
+    windows: [{ wall: 'bottom', position: 0.5, width: 4 }],
   });
 
-  // Fix bath-common to not overlap balcony
-  const bCommon = rooms.find(r => r.id === 'bath-common-1');
-  if (bCommon) {
-    bCommon.h = H - 4 - bCommon.y;
-  }
-
-  // Add bed-2
   rooms.push({
     id: 'bed-2', type: 'bedroom', label: 'BEDROOM 3',
-    x: gardenW + 4, y: 20, w: 18, h: H - 20 - 4,
+    x: 28, y: 26, w: 12, h: 10,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(18, H - 20 - 4, false),
-    doors: [],
-    windows: [{ wall: 'bottom', position: 0.5, width: 3 }],
+    furniture: bedroomFurniture(12, 10, false, 0),
+    doors: [
+      { wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'sub-hallway' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 4 }, { wall: 'bottom', position: 0.5, width: 4 }],
   });
 
-  injectAdjacencyDoors(rooms);
-  cleanupDoors(rooms);
   validateAndFixBathrooms(rooms);
-
   return { width: W, height: H, rooms };
 }
 
 function familyPresetB(c: ConfigState): Plan {
-  // Open plan with garden at front-right corner
   const W = 40;
   const H = 40;
-  const gardenW = 10;
-  const gardenH = 10;
   const rooms: Room[] = [];
 
-  // Garden at front-right corner (top-right)
   rooms.push({
-    id: 'garden-0', type: 'garden', label: 'GARDEN',
-    x: W - gardenW, y: 0, w: gardenW, h: gardenH,
-    color: COLORS.garden,
-    furniture: gardenFurniture(gardenW, gardenH),
+    id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
+    x: 0, y: 0, w: 16, h: 14,
+    color: COLORS.living,
+    furniture: livingFurniture(16, 14, 4),
+    doors: [
+      { wall: 'right', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'main-hallway' },
+      { wall: 'top', position: 0.2, width: 4, swing: 'in', doorType: 'standard', label: 'MAIN DOOR' }
+    ],
+    windows: [{ wall: 'top', position: 0.6, width: 4 }, { wall: 'left', position: 0.5, width: 5 }],
+  });
+
+  rooms.push({
+    id: 'bath-common-1', type: 'bathroom', label: 'COMMON BATH',
+    x: 0, y: 14, w: 16, h: 6,
+    color: COLORS.bathroom,
+    furniture: bathroomFurniture(16, 6, false, 1),
+    doors: [
+      { wall: 'right', position: 0.5, width: 2.5, swing: 'out', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 2 }],
+  });
+
+  rooms.push({
+    id: 'bed-0', type: 'bedroom', label: 'MASTER BEDROOM',
+    x: 0, y: 20, w: 20, h: 14,
+    color: COLORS.bedroom,
+    furniture: bedroomFurniture(20, 14, true, 1),
+    doors: [
+      { wall: 'top', position: 0.9, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 5 }],
+  });
+
+  rooms.push({
+    id: 'bath-master', type: 'bathroom', label: 'MASTER BATH',
+    x: 0, y: 34, w: 20, h: 6,
+    color: COLORS.bathroom,
+    furniture: bathroomFurniture(20, 6, true, 1),
+    doors: [
+      { wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'bed-0' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 3 }, { wall: 'bottom', position: 0.3, width: 3 }],
+  });
+
+  rooms.push({
+    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
+    x: 16, y: 0, w: 4, h: 20,
+    color: COLORS.hallway,
+    openWalls: ['right'],
+    furniture: [],
     doors: [],
     windows: [],
   });
 
-  // Top left: Living room (spans most width)
   rooms.push({
-    id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
-    x: 0, y: 0, w: W - gardenW, h: 16,
-    color: COLORS.living,
-    furniture: livingFurniture(W - gardenW, 16),
-    doors: [{ wall: 'left', position: 0.7, width: 3.5, swing: 'in', doorType: 'standard' as const }],
-    windows: [{ wall: 'top', position: 0.3, width: 6 }, { wall: 'left', position: 0.3, width: 4 }],
+    id: 'sub-hallway', type: 'hallway', label: '',
+    x: 20, y: 16, w: 20, h: 4,
+    color: COLORS.hallway,
+    openWalls: ['left'],
+    furniture: [],
+    doors: [],
+    windows: [],
   });
 
-  // Below living: Kitchen + Dining side by side (extended height, no hallway)
   rooms.push({
     id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-    x: 0, y: 16, w: 16, h: 15,
+    x: 20, y: 0, w: 10, h: 16,
     color: COLORS.kitchen,
-    furniture: kitchenFurniture(16, 15, c.kitchen),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.5, width: 4 }],
+    furniture: kitchenFurniture(10, 16, c.kitchen, 3),
+    doors: [
+      { wall: 'right', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'dining' }
+    ],
+    windows: [{ wall: 'top', position: 0.5, width: 4 }],
   });
 
   rooms.push({
     id: 'dining', type: 'dining', label: 'DINING',
-    x: 16, y: 16, w: 14, h: 15,
+    x: 30, y: 0, w: 10, h: 16,
     color: COLORS.dining,
-    furniture: diningFurniture(14, 15),
-    doors: [],
-    windows: [],
-  });
-
-  // Right side of garden down
-  rooms.push({
-    id: 'bed-2', type: 'bedroom', label: 'BEDROOM 3',
-    x: W - gardenW, y: gardenH, w: gardenW, h: 21,
-    color: COLORS.bedroom,
-    furniture: bedroomFurniture(gardenW, 21, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.4, width: 3 }],
-  });
-
-  // Bottom row: Bedrooms (no hallway - connect via kitchen/dining)
-  const bottomY = 31;
-  const bottomH = H - bottomY;
-
-  rooms.push({
-    id: 'bed-0', type: 'bedroom', label: 'MASTER BEDROOM',
-    x: 0, y: bottomY, w: 14, h: bottomH,
-    color: COLORS.bedroom,
-    furniture: bedroomFurniture(14, bottomH, true),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.4, width: 4 }, { wall: 'bottom', position: 0.5, width: 3 }],
-  });
-
-  rooms.push({
-    id: 'bath-attached-bed-0', type: 'bathroom', label: 'MASTER BATH',
-    x: 14, y: bottomY, w: 8, h: bottomH,
-    color: COLORS.bathroom,
-    furniture: bathroomFurniture(8, bottomH, true),
-    doors: [],
-    windows: [{ wall: 'bottom', position: 0.5, width: 2 }],
+    furniture: [{ type: 'dining_table', x: 1, y: 5, w: 8, h: 6, rotation: 0 }],
+    doors: [
+      { wall: 'bottom', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard', connectsTo: 'sub-hallway' },
+      { wall: 'left', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard', connectsTo: 'kitchen' }
+    ],
+    windows: [{ wall: 'top', position: 0.5, width: 4 }, { wall: 'right', position: 0.5, width: 4 }],
   });
 
   rooms.push({
     id: 'bed-1', type: 'bedroom', label: 'BEDROOM 2',
-    x: 22, y: bottomY, w: 10, h: bottomH,
+    x: 20, y: 20, w: 10, h: 15,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(10, bottomH, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.4, width: 3 }, { wall: 'bottom', position: 0.5, width: 3 }],
+    furniture: bedroomFurniture(10, 15, false, 0),
+    doors: [
+      { wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'sub-hallway' }
+    ],
+    windows: [],
   });
 
   rooms.push({
-    id: 'bath-common-1', type: 'bathroom', label: 'BATH',
-    x: 32, y: bottomY, w: 8, h: bottomH,
-    color: COLORS.bathroom,
-    furniture: bathroomFurniture(8, bottomH, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.5, width: 2 }],
+    id: 'bed-2', type: 'bedroom', label: 'BEDROOM 3',
+    x: 30, y: 20, w: 10, h: 15,
+    color: COLORS.bedroom,
+    furniture: bedroomFurniture(10, 15, false, 0),
+    doors: [
+      { wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'sub-hallway' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 4 }],
   });
 
-  injectAdjacencyDoors(rooms);
-  cleanupDoors(rooms);
-  validateAndFixBathrooms(rooms);
+  rooms.push({
+    id: 'garden', type: 'garden', label: 'GARDEN',
+    x: 20, y: 35, w: 20, h: 5,
+    color: COLORS.garden,
+    furniture: [
+      { type: 'plant', x: 2, y: 1.5, w: 2, h: 2 },
+      { type: 'plant', x: 16, y: 1.5, w: 2, h: 2 },
+    ],
+    doors: [],
+    windows: [],
+  });
 
+  validateAndFixBathrooms(rooms);
   return { width: W, height: H, rooms };
 }
 
 // ── PREMIUM PRESETS (2400 sqft → ~40×60) ─────────────────────────────────
 
 function premiumPresetA(c: ConfigState): Plan {
-  // Grand U-shape with garden at front-left corner
   const W = 48;
   const H = 50;
-  const gardenW = 14;
-  const gardenH = 14;
   const rooms: Room[] = [];
 
-  // Garden at front-left corner
+  // Bottom Balcony
   rooms.push({
-    id: 'garden-0', type: 'garden', label: 'GARDEN',
-    x: 0, y: 0, w: gardenW, h: gardenH,
-    color: COLORS.garden,
-    furniture: gardenFurniture(gardenW, gardenH),
+    id: 'balcony', type: 'balcony', label: 'BALCONY',
+    x: 0, y: 46, w: 48, h: 4,
+    color: COLORS.balcony,
+    furniture: [
+      { type: 'plant', x: 2, y: 1.5, w: 1.5, h: 1.5 },
+      { type: 'plant', x: 46, y: 1.5, w: 1.5, h: 1.5 },
+    ],
     doors: [],
     windows: [],
   });
 
-  // Grand living room
+  // Vertical Hallway
   rooms.push({
-    id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
-    x: gardenW, y: 0, w: 20, h: 22,
-    color: COLORS.living,
-    furniture: livingFurniture(20, 22),
-    doors: [{ wall: 'left', position: 0.85, width: 4, swing: 'in', doorType: 'standard' as const }],
-    windows: [{ wall: 'top', position: 0.3, width: 6 }, { wall: 'top', position: 0.7, width: 5 }],
+    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
+    x: 34, y: 0, w: 4, h: 46,
+    color: COLORS.hallway,
+    openWalls: ['left'],
+    furniture: [],
+    doors: [
+      { wall: 'bottom', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'balcony' }
+    ],
+    windows: [],
   });
 
-  // Kitchen below garden
+  // LEFT ZONE
+  rooms.push({
+    id: 'garden', type: 'garden', label: 'GARDEN',
+    x: 0, y: 0, w: 14, h: 14,
+    color: COLORS.garden,
+    furniture: gardenFurniture(14, 14),
+    doors: [],
+    windows: [],
+  });
+
   rooms.push({
     id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-    x: 0, y: gardenH, w: gardenW, h: 16,
+    x: 0, y: 14, w: 14, h: 16,
     color: COLORS.kitchen,
-    furniture: kitchenFurniture(gardenW, 16, c.kitchen),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.4, width: 4 }],
+    furniture: kitchenFurniture(14, 16, c.kitchen, 3),
+    doors: [
+      { wall: 'bottom', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'dining' },
+      { wall: 'right', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'living' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }],
   });
 
   rooms.push({
     id: 'dining', type: 'dining', label: 'DINING',
-    x: 0, y: gardenH + 16, w: gardenW, h: H - gardenH - 16 - 4,
+    x: 0, y: 30, w: 14, h: 16,
     color: COLORS.dining,
-    furniture: diningFurniture(gardenW, H - gardenH - 16 - 4),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.5, width: 3 }],
+    furniture: [{ type: 'dining_table', x: 2, y: 5, w: 10, h: 6, rotation: 0 }],
+    doors: [
+      { wall: 'top', position: 0.5, width: 3.5, swing: 'in', doorType: 'open', connectsTo: 'kitchen' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }, { wall: 'bottom', position: 0.5, width: 4 }],
   });
 
-  // Hallway vertical
+  // Column 2 (x: 14, w: 20)
   rooms.push({
-    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
-    x: gardenW + 20, y: 0, w: 4, h: H - 4,
-    color: COLORS.hallway,
-    furniture: [],
-    doors: [],
+    id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
+    x: 14, y: 0, w: 20, h: 22,
+    color: COLORS.living,
+    openWalls: ['right'],
+    furniture: livingFurniture(20, 22, 1),
+    doors: [
+      { wall: 'top', position: 0.3, width: 4, swing: 'in', doorType: 'standard', label: 'MAIN DOOR' },
+      { wall: 'left', position: 0.8, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'kitchen' }
+    ],
+    windows: [{ wall: 'top', position: 0.7, width: 5 }],
+  });
+
+  rooms.push({
+    id: 'bed-2', type: 'bedroom', label: 'BEDROOM 3',
+    x: 14, y: 22, w: 20, h: 12,
+    color: COLORS.bedroom,
+    furniture: bedroomFurniture(20, 12, false, 3),
+    doors: [
+      { wall: 'right', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
     windows: [],
   });
 
-  // Private wing - right
-  const bedX = gardenW + 20 + 4;
-  const bedW = W - bedX;
+  rooms.push({
+    id: 'bed-3', type: 'bedroom', label: 'BEDROOM 4',
+    x: 14, y: 34, w: 20, h: 12,
+    color: COLORS.bedroom,
+    furniture: bedroomFurniture(20, 12, false, 3),
+    doors: [
+      { wall: 'right', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [],
+  });
 
+  // RIGHT ZONE (x: 38, w: 10)
   rooms.push({
     id: 'bed-0', type: 'bedroom', label: 'MASTER BEDROOM',
-    x: bedX, y: 0, w: bedW, h: 16,
+    x: 38, y: 0, w: 10, h: 16,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(bedW, 16, true),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.3, width: 4 }, { wall: 'right', position: 0.7, width: 3 }, { wall: 'top', position: 0.5, width: 4 }],
+    furniture: bedroomFurniture(10, 16, true, 1),
+    doors: [
+      { wall: 'left', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'top', position: 0.5, width: 4 }, { wall: 'right', position: 0.5, width: 4 }],
   });
 
   rooms.push({
-    id: 'bath-attached-bed-0', type: 'bathroom', label: 'MASTER BATH',
-    x: bedX, y: 16, w: bedW, h: 9,
+    id: 'bath-master', type: 'bathroom', label: 'MASTER BATH',
+    x: 38, y: 16, w: 10, h: 9,
     color: COLORS.bathroom,
-    furniture: bathroomFurniture(bedW, 9, true),
-    doors: [],
+    furniture: bathroomFurniture(10, 9, true, 1),
+    doors: [
+      { wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'bed-0' }
+    ],
     windows: [{ wall: 'right', position: 0.5, width: 2 }],
   });
 
   rooms.push({
     id: 'bed-1', type: 'bedroom', label: 'BEDROOM 2',
-    x: bedX, y: 25, w: bedW, h: 11,
+    x: 38, y: 25, w: 10, h: 11,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(bedW, 11, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.4, width: 3 }],
+    furniture: bedroomFurniture(10, 11, false, 1),
+    doors: [
+      { wall: 'left', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 4 }],
   });
 
   rooms.push({
     id: 'bath-attached-bed-1', type: 'bathroom', label: 'ENSUITE 2',
-    x: bedX, y: 36, w: bedW, h: 7,
+    x: 38, y: 36, w: 10, h: 7,
     color: COLORS.bathroom,
-    furniture: bathroomFurniture(bedW, 7, false),
-    doors: [],
+    furniture: bathroomFurniture(10, 7, false, 1),
+    doors: [
+      { wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'bed-1' }
+    ],
     windows: [{ wall: 'right', position: 0.5, width: 2 }],
-  });
-
-  rooms.push({
-    id: 'bed-2', type: 'bedroom', label: 'BEDROOM 3',
-    x: gardenW, y: 22, w: 20, h: 12,
-    color: COLORS.bedroom,
-    furniture: bedroomFurniture(20, 12, false),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.5, width: 3 }],
-  });
-
-  rooms.push({
-    id: 'bed-3', type: 'bedroom', label: 'BEDROOM 4',
-    x: gardenW, y: 34, w: 20, h: 12,
-    color: COLORS.bedroom,
-    furniture: bedroomFurniture(20, 12, false),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.5, width: 3 }],
   });
 
   rooms.push({
     id: 'bath-common-1', type: 'bathroom', label: 'BATH',
-    x: bedX, y: 43, w: bedW, h: H - 43 - 4,
+    x: 38, y: 43, w: 10, h: 3,
     color: COLORS.bathroom,
-    furniture: bathroomFurniture(bedW, H - 43 - 4, false),
-    doors: [],
+    furniture: bathroomFurniture(10, 3, false, 1),
+    doors: [
+      { wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
     windows: [{ wall: 'right', position: 0.5, width: 2 }],
   });
 
-  // Balcony
-  rooms.push({
-    id: 'balcony', type: 'balcony', label: 'BALCONY',
-    x: 0, y: H - 4, w: W, h: 4,
-    color: COLORS.balcony,
-    furniture: [
-      { type: 'plant', x: 1, y: 0.8, w: 1.5, h: 1.5 },
-      { type: 'plant', x: W - 3, y: 0.8, w: 1.5, h: 1.5 },
-    ],
-    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out', doorType: 'standard' as const }],
-    windows: [],
-  });
-
-  injectAdjacencyDoors(rooms);
-  cleanupDoors(rooms);
   validateAndFixBathrooms(rooms);
-
   return { width: W, height: H, rooms };
 }
 
 function premiumPresetB(c: ConfigState): Plan {
-  // H-shape layout with garden at front-right
   const W = 50;
   const H = 48;
-  const gardenW = 12;
-  const gardenH = 12;
   const rooms: Room[] = [];
 
-  // Garden at front-right corner (top-right)
+  // Bottom Balcony
   rooms.push({
-    id: 'garden-0', type: 'garden', label: 'GARDEN',
-    x: W - gardenW, y: 0, w: gardenW, h: gardenH,
-    color: COLORS.garden,
-    furniture: gardenFurniture(gardenW, gardenH),
+    id: 'balcony', type: 'balcony', label: 'BALCONY',
+    x: 0, y: 44, w: 50, h: 4,
+    color: COLORS.balcony,
+    furniture: [
+      { type: 'plant', x: 2, y: 1.5, w: 1.5, h: 1.5 },
+      { type: 'plant', x: 48, y: 1.5, w: 1.5, h: 1.5 },
+    ],
     doors: [],
     windows: [],
   });
 
-  // Left wing top: Living
+  // Central Vertical Hallway
+  rooms.push({
+    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
+    x: 22, y: 0, w: 4, h: 44,
+    color: COLORS.hallway,
+    openWalls: ['left'],
+    furniture: [],
+    doors: [
+      { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'standard', connectsTo: 'balcony' }
+    ],
+    windows: [],
+  });
+
+  // LEFT ZONE (x: 0, w: 22)
   rooms.push({
     id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
     x: 0, y: 0, w: 22, h: 20,
     color: COLORS.living,
-    furniture: livingFurniture(22, 20),
-    doors: [{ wall: 'left', position: 0.8, width: 4, swing: 'in', doorType: 'standard' as const }],
-    windows: [{ wall: 'top', position: 0.3, width: 6 }, { wall: 'left', position: 0.35, width: 5 }],
+    openWalls: ['right'],
+    furniture: livingFurniture(22, 20, 4),
+    doors: [
+      { wall: 'top', position: 0.2, width: 4, swing: 'in', doorType: 'standard', label: 'MAIN DOOR' }
+    ],
+    windows: [{ wall: 'top', position: 0.6, width: 5 }, { wall: 'left', position: 0.4, width: 5 }],
   });
 
-  // Kitchen + Dining below living
   rooms.push({
     id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
     x: 0, y: 20, w: 14, h: 14,
     color: COLORS.kitchen,
-    furniture: kitchenFurniture(14, 14, c.kitchen),
-    doors: [],
+    furniture: kitchenFurniture(14, 14, c.kitchen, 3),
+    doors: [
+      { wall: 'right', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'dining' }
+    ],
     windows: [{ wall: 'left', position: 0.5, width: 4 }],
   });
 
@@ -1040,128 +1195,105 @@ function premiumPresetB(c: ConfigState): Plan {
     id: 'dining', type: 'dining', label: 'DINING',
     x: 14, y: 20, w: 8, h: 14,
     color: COLORS.dining,
-    furniture: diningFurniture(8, 14),
-    doors: [],
+    furniture: [{ type: 'dining_table', x: 1, y: 4, w: 6, h: 6, rotation: 0 }],
+    doors: [
+      { wall: 'right', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'main-hallway' }
+    ],
     windows: [],
   });
 
-  // Central hallway
   rooms.push({
-    id: 'main-hallway', type: 'hallway', label: 'HALLWAY',
-    x: 22, y: 0, w: 4, h: H - 4,
-    color: COLORS.hallway,
-    furniture: [],
-    doors: [],
-    windows: [],
+    id: 'study', type: 'bedroom', label: 'STUDY ROOM',
+    x: 0, y: 34, w: 22, h: 10,
+    color: COLORS.bedroom,
+    furniture: [{ type: 'table', x: 2, y: 2, w: 6, h: 3 }, { type: 'chair', x: 4, y: 6, w: 2, h: 2 }],
+    doors: [
+      { wall: 'right', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }, { wall: 'bottom', position: 0.5, width: 4 }],
   });
 
-  // Right wing: Bedrooms
-  const bedX = 26;
-  const bedW = W - bedX;
-
-  // Below garden
+  // RIGHT ZONE (x: 26, w: 24)
   rooms.push({
     id: 'bed-0', type: 'bedroom', label: 'MASTER BEDROOM',
-    x: bedX, y: 0, w: W - gardenW - bedX, h: 16,
+    x: 26, y: 0, w: 12, h: 16,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(W - gardenW - bedX, 16, true),
-    doors: [],
-    windows: [{ wall: 'top', position: 0.4, width: 4 }],
+    furniture: bedroomFurniture(12, 16, true, 0),
+    doors: [
+      { wall: 'left', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'top', position: 0.5, width: 4 }],
   });
 
   rooms.push({
-    id: 'bath-attached-bed-0', type: 'bathroom', label: 'MASTER BATH',
-    x: bedX, y: 16, w: bedW, h: 9,
-    color: COLORS.bathroom,
-    furniture: bathroomFurniture(bedW, 9, true),
+    id: 'garden', type: 'garden', label: 'GARDEN',
+    x: 38, y: 0, w: 12, h: 12,
+    color: COLORS.garden,
+    furniture: gardenFurniture(12, 12),
     doors: [],
-    windows: [{ wall: 'right', position: 0.5, width: 2 }],
+    windows: [],
+  });
+
+  rooms.push({
+    id: 'master-walkin', type: 'hallway', label: 'WALK-IN',
+    x: 38, y: 12, w: 12, h: 4,
+    color: COLORS.hallway,
+    furniture: [],
+    doors: [
+      { wall: 'left', position: 0.5, width: 3, swing: 'out', doorType: 'open', connectsTo: 'bed-0' }
+    ],
+    windows: [],
+  });
+
+  rooms.push({
+    id: 'bath-master', type: 'bathroom', label: 'MASTER BATH',
+    x: 26, y: 16, w: 24, h: 9,
+    color: COLORS.bathroom,
+    furniture: bathroomFurniture(24, 9, true, 1),
+    doors: [
+      { wall: 'top', position: 18/24, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'master-walkin' },
+      { wall: 'top', position: 6/24, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'bed-0' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 3 }],
   });
 
   rooms.push({
     id: 'bed-1', type: 'bedroom', label: 'BEDROOM 2',
-    x: bedX, y: 25, w: bedW, h: 10,
+    x: 26, y: 25, w: 24, h: 10,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(bedW, 10, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.4, width: 3 }],
+    furniture: bedroomFurniture(24, 10, false, 2),
+    doors: [
+      { wall: 'left', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 5 }],
   });
 
   rooms.push({
-    id: 'bath-attached-bed-1', type: 'bathroom', label: 'ENSUITE 2',
-    x: bedX, y: 35, w: bedW * 0.5, h: 7,
+    id: 'bath-common-1', type: 'bathroom', label: 'COMMON BATH',
+    x: 26, y: 35, w: 12, h: 9,
     color: COLORS.bathroom,
-    furniture: bathroomFurniture(bedW * 0.5, 7, false),
-    doors: [],
+    furniture: bathroomFurniture(12, 9, false, 3),
+    doors: [
+      { wall: 'left', position: 0.5, width: 2.5, swing: 'out', doorType: 'standard', connectsTo: 'main-hallway' }
+    ],
     windows: [],
   });
 
   rooms.push({
     id: 'bed-2', type: 'bedroom', label: 'BEDROOM 3',
-    x: bedX + bedW * 0.5, y: 35, w: bedW * 0.5, h: 7,
+    x: 38, y: 35, w: 12, h: 9,
     color: COLORS.bedroom,
-    furniture: bedroomFurniture(bedW * 0.5, 7, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.5, width: 3 }],
-  });
-
-  rooms.push({
-    id: 'bed-3', type: 'bedroom', label: 'BEDROOM 4',
-    x: bedX, y: 42, w: bedW * 0.6, h: H - 42 - 4,
-    color: COLORS.bedroom,
-    furniture: bedroomFurniture(bedW * 0.6, H - 42 - 4, false),
-    doors: [],
-    windows: [{ wall: 'bottom', position: 0.5, width: 3 }],
-  });
-
-  rooms.push({
-    id: 'bath-common-1', type: 'bathroom', label: 'BATH',
-    x: bedX + bedW * 0.6, y: 42, w: bedW * 0.4, h: H - 42 - 4,
-    color: COLORS.bathroom,
-    furniture: bathroomFurniture(bedW * 0.4, H - 42 - 4, false),
-    doors: [],
-    windows: [{ wall: 'right', position: 0.5, width: 2 }],
-  });
-
-  // Extra rooms at bottom-left
-  rooms.push({
-    id: 'bed-extra', type: 'bedroom', label: 'STUDY',
-    x: 0, y: 34, w: 22, h: H - 34 - 4,
-    color: COLORS.bedroom,
-    furniture: bedroomFurniture(22, H - 34 - 4, false),
-    doors: [],
-    windows: [{ wall: 'left', position: 0.4, width: 4 }, { wall: 'bottom', position: 0.5, width: 3 }],
-  });
-
-  // Right of master: room for garden connection
-  rooms.push({
-    id: 'bed-0-ext', type: 'bedroom', label: 'MASTER WALK-IN',
-    x: W - gardenW, y: gardenH, w: gardenW, h: 16 - gardenH + 4,
-    color: COLORS.bedroom,
-    furniture: [{ type: 'wardrobe', x: 1, y: 1, w: gardenW - 2, h: 3 }],
-    doors: [],
-    windows: [{ wall: 'right', position: 0.5, width: 3 }],
-  });
-
-  // Balcony
-  rooms.push({
-    id: 'balcony', type: 'balcony', label: 'BALCONY',
-    x: 0, y: H - 4, w: W, h: 4,
-    color: COLORS.balcony,
-    furniture: [
-      { type: 'plant', x: 1, y: 0.8, w: 1.5, h: 1.5 },
-      { type: 'plant', x: W - 3, y: 0.8, w: 1.5, h: 1.5 },
+    furniture: bedroomFurniture(12, 9, false, 1),
+    doors: [
+      { wall: 'left', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'bath-common-1' }
     ],
-    doors: [{ wall: 'top', position: 0.5, width: 5, swing: 'out', doorType: 'standard' as const }],
-    windows: [],
+    windows: [{ wall: 'right', position: 0.5, width: 4 }, { wall: 'bottom', position: 0.5, width: 4 }],
   });
 
-  injectAdjacencyDoors(rooms);
-  cleanupDoors(rooms);
   validateAndFixBathrooms(rooms);
-
   return { width: W, height: H, rooms };
 }
+
 
 
 // ── Main plan generator ────────────────────────────────────────────────────
