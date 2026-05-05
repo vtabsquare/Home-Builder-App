@@ -1,12 +1,12 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useConfig, RoofType, Material } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { FloorPlanCanvas } from '../FloorPlanCanvas';
 import { ElevationCanvas } from '../ElevationCanvas';
 import { CustomEditorCanvas } from '../CustomEditorCanvas';
-import { Plan } from '@/lib/floorplan';
+import { Plan, splitPlanToFloors } from '@/lib/floorplan';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool } from 'lucide-react';
+import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown } from 'lucide-react';
 
 interface Props {
   plan: Plan;
@@ -46,16 +46,30 @@ function getRoomTabs(plan: Plan): RoomTab[] {
 }
 
 export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
-  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, presetId, setPresetId, homeType, advancedEditorMode, setAdvancedEditorMode } = useConfig();
+  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, presetId, setPresetId, homeType, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan } = useConfig();
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [advanced, setAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [stagedPlan, setStagedPlan] = useState<Plan | null>(null);
   const tabScrollRef = useRef<HTMLDivElement>(null);
 
-  const currentPlan = stagedPlan || plan;
+  // Double storey floor splitting
+  const canDoubleStorey = homeType === 'family' || homeType === 'premium';
+  const floors = useMemo(() => {
+    if (!isDoubleStorey) return null;
+    return splitPlanToFloors(plan);
+  }, [isDoubleStorey, plan]);
 
-  const roomTabs = getRoomTabs(plan);
+  // Determine which plan to show based on floor selection
+  const displayPlan = useMemo(() => {
+    if (!isDoubleStorey || !floors) return plan;
+    if (activeFloor === 0) return floors.ground;
+    return customFirstFloorPlan || floors.first;
+  }, [isDoubleStorey, floors, activeFloor, plan, customFirstFloorPlan]);
+
+  const currentPlan = stagedPlan || displayPlan;
+
+  const roomTabs = getRoomTabs(displayPlan);
 
   // Touch swipe support for tabs
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -80,8 +94,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
   // Get highlighted rooms for the active tab
   const getHighlightedPlan = useCallback((): Plan => {
-    if (activeTab === 'overview') return plan;
-    const filteredRooms = plan.rooms.map((r) => {
+    if (activeTab === 'overview') return displayPlan;
+    const filteredRooms = displayPlan.rooms.map((r) => {
       const match = r.type === activeTab ||
         (activeTab === 'garden' && (r.type === 'garden' || r.type === 'carport'));
       return {
@@ -90,8 +104,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
         furniture: match ? r.furniture : [],
       };
     });
-    return { ...plan, rooms: filteredRooms };
-  }, [activeTab, plan]);
+    return { ...displayPlan, rooms: filteredRooms };
+  }, [activeTab, displayPlan]);
 
   const currentTabLabel = roomTabs.find((t) => t.id === activeTab)?.label || 'OVERVIEW';
 
@@ -186,6 +200,41 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 <PenTool size={12} />
                 Custom Editor
               </button>
+
+              {/* Double Storey Toggle (Family/Premium only) */}
+              {canDoubleStorey && (
+                <button
+                  onClick={() => setDoubleStorey(!isDoubleStorey)}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+                    isDoubleStorey
+                      ? 'border-amber-400 bg-amber-50 text-amber-700'
+                      : 'border-border bg-surface text-muted-foreground hover:bg-white'
+                  }`}
+                >
+                  <Building2 size={12} />
+                  {isDoubleStorey ? 'Double Storey ✓' : 'Double Storey'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Floor Selector (only when double storey is enabled) */}
+          {isDoubleStorey && !advancedEditorMode && (
+            <div className="inline-flex rounded-full bg-amber-50 border border-amber-200 p-0.5">
+              {([0, 1] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setActiveFloor(f)}
+                  className={`rounded-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                    activeFloor === f
+                      ? 'bg-amber-500 text-white shadow-md'
+                      : 'text-amber-700 hover:bg-amber-100'
+                  }`}
+                >
+                  <ArrowUpDown size={10} className="inline mr-1 -mt-0.5" />
+                  {f === 0 ? 'Ground Floor' : 'First Floor'}
+                </button>
+              ))}
             </div>
           )}
 
@@ -233,21 +282,33 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   <CustomEditorCanvas
                     homeType={homeType}
                     onChange={(editorPlan) => {
-                      setCustomPlan(editorPlan);
+                      if (isDoubleStorey && activeFloor === 1) {
+                        setCustomFirstFloorPlan(editorPlan);
+                      } else {
+                        setCustomPlan(editorPlan);
+                      }
                     }}
-                    initialPlan={null}
+                    onSave={(editorPlan) => {
+                      if (isDoubleStorey && activeFloor === 1) {
+                        setCustomFirstFloorPlan(editorPlan);
+                      } else {
+                        setCustomPlan(editorPlan);
+                      }
+                      setAdvancedEditorMode(false);
+                    }}
+                    initialPlan={isDoubleStorey && activeFloor === 1 ? (customFirstFloorPlan || floors?.first || null) : null}
                   />
                 </motion.div>
               ) : view === '2d' ? (
-                <motion.div key="2d" className="h-full w-full"
+                <motion.div key={`2d-${activeFloor}`} className="h-full w-full"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   transition={{ duration: 0.3 }}>
                   <FloorPlanCanvas plan={stagedPlan || getHighlightedPlan()} advanced={advanced} onChange={(updatedHighlightedPlan) => {
                     const newPlan = {
-                      ...(stagedPlan || plan),
+                      ...(stagedPlan || displayPlan),
                       width: updatedHighlightedPlan.width,
                       height: updatedHighlightedPlan.height,
-                      rooms: (stagedPlan || plan).rooms.map(r => {
+                      rooms: (stagedPlan || displayPlan).rooms.map(r => {
                         const updatedR = updatedHighlightedPlan.rooms.find(ur => ur.id === r.id);
                         if (updatedR) {
                           return {
@@ -269,12 +330,12 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                     
                     // History tracking
                     const changedRoom = updatedHighlightedPlan.rooms.find((ur, i) => {
-                      const oldR = (stagedPlan || plan).rooms.find(or => or.id === ur.id);
+                      const oldR = (stagedPlan || displayPlan).rooms.find(or => or.id === ur.id);
                       return oldR && (oldR.x !== ur.x || oldR.y !== ur.y || oldR.w !== ur.w || oldR.h !== ur.h || oldR.doors.length !== ur.doors.length);
                     });
 
                     if (changedRoom) {
-                      const oldR = (stagedPlan || plan).rooms.find(or => or.id === changedRoom.id);
+                      const oldR = (stagedPlan || displayPlan).rooms.find(or => or.id === changedRoom.id);
                       if (oldR) {
                          const existing = planHistory.find(h => h.targetId === changedRoom.id);
                          if (!existing) {
@@ -293,7 +354,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 <motion.div key="3d" className="h-full w-full"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   transition={{ duration: 0.3 }}>
-                  <ElevationCanvas plan={currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} />
+                  <ElevationCanvas plan={currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={isDoubleStorey && floors ? (customFirstFloorPlan || floors.first) : undefined} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -301,7 +362,9 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             {/* Top-left badge (only for non-editor views) */}
             {!advancedEditorMode && (
               <div className="pointer-events-none absolute left-4 top-4 rounded-full glass-panel px-3 py-1.5 text-[10px] font-display font-semibold uppercase tracking-[0.2em]">
-                {view === '2d' ? `${currentPlan.width}′ × ${currentPlan.height}′` : 'Front elevation'}
+                {view === '2d' 
+                  ? `${currentPlan.width}′ × ${currentPlan.height}′${isDoubleStorey ? ` · ${activeFloor === 0 ? 'Ground' : 'First'} Floor` : ''}`
+                  : 'Front elevation'}
               </div>
             )}
             

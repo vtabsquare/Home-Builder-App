@@ -13,10 +13,17 @@ const ADDON_COST: Record<AddOn, { label: string; cost: number }> = {
   smart_home: { label: 'Smart Home Package', cost: 15800 },
 };
 
-const LAND_COST = 65000;
 const BEDROOM_COST = 9500;
 const BATHROOM_COST = 6800;
 const SQFT_RATE = 145;
+
+export const LAND_SQFT_RATE = 75;
+
+export const LAND_PACKAGES: Record<'small' | 'medium' | 'large', { label: string; range: [number, number]; baseArea: number; description: string }> = {
+  small:  { label: '800–1000',  range: [800, 1000],  baseArea: 900,  description: 'Smart starter footprint with everything essential. Perfect first build.' },
+  medium: { label: '1200–1600', range: [1200, 1600], baseArea: 1400, description: 'The benchmark family layout. Open social spaces, generous bedrooms.' },
+  large:  { label: '1800–2400', range: [1800, 2400], baseArea: 2100, description: 'Architectural footprint with multi-zone living and double-height options.' },
+};
 
 export interface CostBreakdown {
   area: number;
@@ -48,7 +55,9 @@ export function computeCost(c: ConfigState, opts: { interestRate?: number; tenur
   const bathroomCost = c.bathrooms * BATHROOM_COST;
   const kitchenCost = KITCHEN_COST[c.kitchen];
   const addonsCost = c.addons.reduce((sum, a) => sum + ADDON_COST[a].cost, 0);
-  const landCost = c.land === 'need' ? LAND_COST : 0;
+  const landCost = c.land === 'need' && c.landSize
+    ? (c.landSize === 'custom' ? c.customLandArea * LAND_SQFT_RATE : LAND_PACKAGES[c.landSize].baseArea * LAND_SQFT_RATE)
+    : 0;
 
   const total = Math.round(baseStructure + bedroomCost + bathroomCost + kitchenCost + addonsCost + landCost);
   const downPayment = Math.round(total * 0.1);

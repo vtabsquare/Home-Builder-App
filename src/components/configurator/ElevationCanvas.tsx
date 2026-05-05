@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows, Html } from '@react-three/drei';
-import { Suspense, useMemo } from 'react';
+import { Suspense, useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { Plan } from '@/lib/floorplan';
 import { Material, RoofType, AddOn } from '@/store/configurator';
@@ -12,6 +12,8 @@ interface Props {
   material: Material;
   addons?: AddOn[];
   activeRoom?: string | null;
+  isDoubleStorey?: boolean;
+  firstFloorPlan?: Plan;
 }
 
 const MATERIAL_COLORS: Record<Material, { wall: string; trim: string; roof: string; window: string; door: string }> = {
@@ -23,44 +25,62 @@ const MATERIAL_COLORS: Record<Material, { wall: string; trim: string; roof: stri
 const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, plan: Plan }) => {
   const W = plan.width;
   const D = plan.height;
+  const prevRoom = useRef<string | null | undefined>(null);
+  const animProgress = useRef(1); // 1 = animation complete (idle)
+  const targetPos = useRef(new THREE.Vector3(45, 25, 45));
+  const targetLookAt = useRef(new THREE.Vector3(0, 0, 0));
+
+  // When activeRoom changes, restart the animation
+  useEffect(() => {
+    if (activeRoom !== prevRoom.current) {
+      prevRoom.current = activeRoom;
+      animProgress.current = 0; // start animation
+
+      if (!activeRoom || activeRoom === 'overview' || activeRoom === 'garden') {
+        targetPos.current.set(45, 25, 45);
+        targetLookAt.current.set(0, 0, 0);
+      } else {
+        const rs = plan.rooms.filter(r => r.type === activeRoom);
+        if (rs.length > 0) {
+          const avgX = rs.reduce((sum, r) => sum + r.x + r.w / 2, 0) / rs.length;
+          const avgY = rs.reduce((sum, r) => sum + r.y + r.h / 2, 0) / rs.length;
+          const center = new THREE.Vector3(avgX - W / 2, 0, avgY - D / 2);
+
+          const minX = Math.min(...rs.map(r => r.x));
+          const maxX = Math.max(...rs.map(r => r.x + r.w));
+          const minY = Math.min(...rs.map(r => r.y));
+          const maxY = Math.max(...rs.map(r => r.y + r.h));
+          const extent = Math.max(maxX - minX, maxY - minY);
+
+          const height = Math.max(35, extent * 1.8);
+          targetPos.current.set(center.x, height, center.z + 10);
+          targetLookAt.current.copy(center);
+        }
+      }
+    }
+  }, [activeRoom, plan, W, D]);
 
   useFrame((state, delta) => {
+    // Only animate while progress < 1
+    if (animProgress.current >= 1) return;
+
     const controls = state.controls as any;
     if (!controls) return;
 
-    if (!activeRoom || activeRoom === 'overview' || activeRoom === 'garden') {
-       controls.target.lerp(new THREE.Vector3(0, 0, 0), delta * 2);
-       if (state.camera.position.length() < 30) {
-         state.camera.position.lerp(new THREE.Vector3(45, 25, 45), delta * 1.5);
-       }
-       return;
-    }
+    // Advance progress (reaches 1 in roughly 0.8-1 seconds)
+    animProgress.current = Math.min(1, animProgress.current + delta * 2.5);
+    const t = animProgress.current;
+    // Smooth ease-out curve
+    const ease = 1 - Math.pow(1 - t, 3);
 
-    const rs = plan.rooms.filter(r => r.type === activeRoom);
-    if (rs.length > 0) {
-      const avgX = rs.reduce((sum, r) => sum + r.x + r.w / 2, 0) / rs.length;
-      const avgY = rs.reduce((sum, r) => sum + r.y + r.h / 2, 0) / rs.length;
-      
-      const targetCenter = new THREE.Vector3(avgX - W / 2, 0, avgY - D / 2);
-      
-      const minX = Math.min(...rs.map(r => r.x));
-      const maxX = Math.max(...rs.map(r => r.x + r.w));
-      const minY = Math.min(...rs.map(r => r.y));
-      const maxY = Math.max(...rs.map(r => r.y + r.h));
-      const extent = Math.max(maxX - minX, maxY - minY);
-      
-      const height = Math.max(35, extent * 1.8);
-      const targetCamPos = new THREE.Vector3(targetCenter.x, height, targetCenter.z + 10);
-
-      state.camera.position.lerp(targetCamPos, delta * 3.5);
-      controls.target.lerp(targetCenter, delta * 3.5);
-    }
+    state.camera.position.lerp(targetPos.current, ease * 0.15);
+    controls.target.lerp(targetLookAt.current, ease * 0.15);
   });
 
   return null;
 };
 
-export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom }: Props) => {
+export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom, isDoubleStorey = false, firstFloorPlan }: Props) => {
   const hideRoof = activeRoom && activeRoom !== 'overview' && activeRoom !== 'garden';
 
   return (
@@ -90,6 +110,11 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom 
           
           <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} />
           
+          {/* Second Floor (Double Storey) */}
+          {isDoubleStorey && firstFloorPlan && (
+            <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} material={material} activeRoom={activeRoom} />
+          )}
+          
           <Pathway planD={plan.height} />
           {addons.includes('carport') && <Carport plan={plan} />}
           
@@ -101,7 +126,8 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom 
           <ContactShadows position={[0, 0.02, 0]} opacity={0.55} scale={120} blur={2.8} far={30} />
           <OrbitControls
             makeDefault
-            enablePan={true} minDistance={5} maxDistance={100}
+            enablePan={true} enableZoom={true} enableRotate={true}
+            minDistance={5} maxDistance={100}
             minPolarAngle={0} maxPolarAngle={Math.PI / 2.1}
             autoRotate={!activeRoom || activeRoom === 'overview' || activeRoom === 'garden'} 
             autoRotateSpeed={0.4}
@@ -110,7 +136,7 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom 
         </Suspense>
       </Canvas>
       <div className="pointer-events-none absolute left-4 top-4 rounded-xl glass-panel px-3 py-2 text-[9px] font-display font-semibold uppercase tracking-[0.2em]">
-        Drag to rotate · Scroll to zoom
+        {activeRoom && activeRoom !== 'overview' ? 'Drag to rotate · Scroll to zoom · Free camera' : 'Drag to rotate · Scroll to zoom'}
       </div>
     </div>
   );
@@ -234,10 +260,10 @@ const House = ({ plan, roof, material, activeRoom, addons }: {
     const rH = room.h;
 
     // Convert relative doors/windows to absolute coordinates
-    const getAbsDoors = (wall: string) => room.doors.filter((d:any) => d.wall === wall).map((d:any) => ({
+    const getAbsDoors = (wall: string) => (room.doors || []).filter((d:any) => d.wall === wall).map((d:any) => ({
       ...d, absPos: (wall === 'top' || wall === 'bottom') ? rX + rW * d.position : rY + rH * d.position
     }));
-    const getAbsWindows = (wall: string) => room.windows.filter((w:any) => w.wall === wall).map((win:any) => ({
+    const getAbsWindows = (wall: string) => (room.windows || []).filter((w:any) => w.wall === wall).map((win:any) => ({
       ...win, absPos: (wall === 'top' || wall === 'bottom') ? rX + rW * win.position : rY + rH * win.position
     }));
 
@@ -705,3 +731,112 @@ const FenceAround = ({ planW, planD }: { planW: number; planD: number }) => {
     </group>
   );
 };
+
+/* ─── Second Floor (Double Storey) ─── */
+const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom }: {
+  plan: Plan; firstFloorPlan: Plan; material: Material; activeRoom?: string | null;
+}) => {
+  const colors = MATERIAL_COLORS[material];
+  const W = plan.width;
+  const D = plan.height;
+  const wallH = 10;
+  const t = 0.4;
+  const floorY = wallH + 0.8; // Height of ground floor walls + foundation
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
+  // Use firstFloorPlan dimensions (may be smaller than ground)
+  const ffW = firstFloorPlan.width;
+  const ffH = firstFloorPlan.height;
+
+  // Extract walls for first floor
+  const extractedWalls: any[] = [];
+  const addWall = (type: 'h'|'v', coord: number, start: number, end: number, doors: any[], windows: any[]) => {
+    coord = round2(coord); start = round2(start); end = round2(end);
+    const existing = extractedWalls.find(w => w.type === type && w.coord === coord &&
+      (Math.max(w.start, start) <= Math.min(w.end, end) + 0.1));
+    if (existing) {
+      existing.start = Math.min(existing.start, start);
+      existing.end = Math.max(existing.end, end);
+      existing.doors.push(...doors); existing.windows.push(...windows);
+    } else {
+      extractedWalls.push({ type, coord, start, end, doors: [...doors], windows: [...windows] });
+    }
+  };
+
+  firstFloorPlan.rooms.forEach(room => {
+    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony') return;
+    const rX = room.x, rY = room.y, rW = room.w, rH = room.h;
+    const getAbsDoors = (wall: string) => (room.doors || []).filter((d:any) => d.wall === wall).map((d:any) => ({
+      ...d, absPos: (wall === 'top' || wall === 'bottom') ? rX + rW * d.position : rY + rH * d.position
+    }));
+    const getAbsWindows = (wall: string) => (room.windows || []).filter((w:any) => w.wall === wall).map((win:any) => ({
+      ...win, absPos: (wall === 'top' || wall === 'bottom') ? rX + rW * win.position : rY + rH * win.position
+    }));
+    addWall('h', rY, rX, rX + rW, getAbsDoors('top'), getAbsWindows('top'));
+    addWall('h', rY + rH, rX, rX + rW, getAbsDoors('bottom'), getAbsWindows('bottom'));
+    addWall('v', rX, rY, rY + rH, getAbsDoors('left'), getAbsWindows('left'));
+    addWall('v', rX + rW, rY, rY + rH, getAbsDoors('right'), getAbsWindows('right'));
+  });
+
+  return (
+    <group position={[0, floorY, 0]}>
+      {/* Floor slab */}
+      <mesh receiveShadow position={[round2((ffW - W) / 2), 0.15, round2((ffH - D) / 2)]}>
+        <boxGeometry args={[ffW + 0.5, 0.3, ffH + 0.5]} />
+        <meshStandardMaterial color="#9a8a78" roughness={0.8} />
+      </mesh>
+
+      <group position={[round2(-W / 2 + (W - ffW) / 2), 0.3, round2(-D / 2 + (D - ffH) / 2)]}>
+        {/* Room floors */}
+        {firstFloorPlan.rooms.map(r => {
+          const cx = round2(r.x + r.w / 2);
+          const cz = round2(r.y + r.h / 2);
+          return (
+            <group key={r.id}>
+              <mesh receiveShadow position={[cx, 0.01, cz]}>
+                <boxGeometry args={[r.w, 0.02, r.h]} />
+                <meshStandardMaterial color={r.color} roughness={0.8} />
+              </mesh>
+              {/* Furniture */}
+              {r.furniture.map((f: any, i: number) => (
+                <group key={`f-${i}`} position={[round2(r.x + f.x + f.w/2), 0.02, round2(r.y + f.y + f.h/2)]}
+                  rotation={[0, f.rotation ? f.rotation * Math.PI / 180 : 0, 0]}>
+                  <Furniture3D item={f} />
+                </group>
+              ))}
+            </group>
+          );
+        })}
+
+        {/* Walls */}
+        {extractedWalls.map((wall, i) => {
+          const len = wall.end - wall.start;
+          const w = len + t;
+          const mappedDoors = wall.doors.map((d:any) => ({...d, relPos: (d.absPos - wall.start + t/2) / w}));
+          const mappedWindows = wall.windows.map((win:any) => ({...win, relPos: (win.absPos - wall.start + t/2) / w}));
+          if (wall.type === 'h') {
+            return <WallSegment key={`w2-${i}`} w={w} h={wallH} t={t} color={colors.wall}
+              doors={mappedDoors} windows={mappedWindows}
+              position={[round2(wall.start + len/2), 0, round2(wall.coord)]} rotation={[0, 0, 0]}
+              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} />;
+          } else {
+            return <WallSegment key={`w2-${i}`} w={w} h={wallH} t={t} color={colors.wall}
+              doors={mappedDoors} windows={mappedWindows}
+              position={[round2(wall.coord), 0, round2(wall.start + len/2)]} rotation={[0, -Math.PI/2, 0]}
+              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} />;
+          }
+        })}
+
+        {/* Room labels */}
+        {firstFloorPlan.rooms.map(r => (
+          <Html key={`label2-${r.id}`} position={[r.x + r.w/2, 3, r.y + r.h/2]} center zIndexRange={[100, 0]}>
+            <div className="pointer-events-none px-3 py-1 rounded-sm bg-white/90 border border-black/10 shadow-lg text-[10px] font-display font-bold tracking-widest whitespace-nowrap">
+              {r.label}
+            </div>
+          </Html>
+        ))}
+      </group>
+    </group>
+  );
+};
+

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Stage, Layer, Rect, Text, Line, Group, Transformer } from 'react-konva';
 import { Plan, Room, FurnitureItem, generateEmptyPlan, regenerateFurniture } from '@/lib/floorplan';
+import { intelligentlyPlaceDoors } from '@/lib/doorPlacer';
 import { useConfig, HomeType } from '@/store/configurator';
 import Konva from 'konva';
 import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed } from 'lucide-react';
@@ -8,6 +9,7 @@ import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, C
 interface Props {
   homeType: HomeType;
   onChange?: (plan: Plan) => void;
+  onSave?: (plan: Plan) => void;
   initialPlan?: Plan | null;
 }
 
@@ -21,7 +23,7 @@ const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaultW: num
   { type: 'garden', label: 'Garden', icon: Trees, defaultW: 10, defaultH: 10, color: 'hsl(120 30% 72%)' },
 ];
 
-export const CustomEditorCanvas = ({ homeType, onChange, initialPlan }: Props) => {
+export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: Props) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -29,7 +31,16 @@ export const CustomEditorCanvas = ({ homeType, onChange, initialPlan }: Props) =
   const config = useConfig();
 
   const [size, setSize] = useState({ w: 600, h: 400 });
-  const [plan, setPlan] = useState<Plan>(() => initialPlan || generateEmptyPlan(homeType));
+  const [plan, setPlan] = useState<Plan>(() => {
+    if (initialPlan) return initialPlan;
+    // Use land dimensions from configurator if available
+    const landArea = config.customLandArea;
+    if (landArea > 0) {
+      const side = Math.round(Math.sqrt(landArea));
+      return { width: side, height: side, rooms: [] };
+    }
+    return generateEmptyPlan(homeType);
+  });
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
@@ -38,7 +49,13 @@ export const CustomEditorCanvas = ({ homeType, onChange, initialPlan }: Props) =
   // Update plan when homeType changes
   useEffect(() => {
     if (!initialPlan) {
-      setPlan(generateEmptyPlan(homeType));
+      const landArea = config.customLandArea;
+      if (landArea > 0) {
+        const side = Math.round(Math.sqrt(landArea));
+        setPlan({ width: side, height: side, rooms: [] });
+      } else {
+        setPlan(generateEmptyPlan(homeType));
+      }
     }
   }, [homeType]);
 
@@ -214,8 +231,37 @@ export const CustomEditorCanvas = ({ homeType, onChange, initialPlan }: Props) =
     onChange?.(updated);
   };
 
+  const addWindowsToRooms = (p: Plan): Plan => {
+    const rooms = p.rooms.map(room => {
+      if (room.windows && room.windows.length > 0) return room;
+      const newWindows: Room['windows'] = [];
+      // Add windows on exterior walls (walls that face the building boundary)
+      const isLeftExterior = room.x <= 1;
+      const isRightExterior = room.x + room.w >= p.width - 1;
+      const isTopExterior = room.y <= 1;
+      const isBottomExterior = room.y + room.h >= p.height - 1;
+      
+      if (room.type === 'garden' || room.type === 'balcony') return room;
+      
+      const windowWidth = room.type === 'bathroom' ? 2 : 3;
+      if (isLeftExterior && room.h > 4) newWindows.push({ wall: 'left', position: 0.4, width: windowWidth });
+      if (isRightExterior && room.h > 4) newWindows.push({ wall: 'right', position: 0.4, width: windowWidth });
+      if (isTopExterior && room.w > 4) newWindows.push({ wall: 'top', position: 0.5, width: windowWidth });
+      if (isBottomExterior && room.w > 4) newWindows.push({ wall: 'bottom', position: 0.5, width: windowWidth });
+      
+      return { ...room, windows: newWindows };
+    });
+    return { ...p, rooms };
+  };
+
   const savePlan = () => {
-    onChange?.(plan);
+    // Intelligently place doors before saving
+    let finalPlan = intelligentlyPlaceDoors(plan);
+    // Add windows on exterior walls
+    finalPlan = addWindowsToRooms(finalPlan);
+    setPlan(finalPlan);
+    onChange?.(finalPlan);
+    onSave?.(finalPlan);
   };
 
   const totalUsedArea = plan.rooms.reduce((sum, r) => sum + r.w * r.h, 0);

@@ -1196,3 +1196,201 @@ export function generateEmptyPlan(homeType: 'starter' | 'family' | 'premium'): P
     rooms: [],
   };
 }
+
+// ── Double Storey Support ─────────────────────────────────────────
+
+/**
+ * Split a plan into ground + first floor for double storey.
+ * Ground: living, kitchen, dining, MASTER BEDROOM + bath, staircase.
+ * First: 2 bedrooms accessible via hallway, common bath, staircase, open terrace.
+ * Both floors share the same footprint — every cell filled, zero gaps.
+ */
+export function splitPlanToFloors(plan: Plan): { ground: Plan; first: Plan } {
+  const W = plan.width;
+  const H = plan.height;
+
+  // ── Dimensions ───────────────────────────────────────────────────
+  const STAIR_W = 6;
+  const STAIR_H = 8;
+
+  // ══════════════════════════════════════════════════════════════════
+  // GROUND FLOOR
+  // ┌──────────────────────┬────────────┐
+  // │                      │            │
+  // │   HALL + LIVING      │  KITCHEN   │  Row 1 (topH)
+  // │                      │            │
+  // ├───────┬──────────────┼─────┬──────┤
+  // │       │              │MSTR │      │
+  // │DINING │ MASTER BED   │BATH │STAIR │  Row 2 (botH)
+  // │       │              │     │  ↑   │
+  // └───────┴──────────────┴─────┴──────┘
+  // ══════════════════════════════════════════════════════════════════
+
+  const gRooms: Room[] = [];
+  const topH = Math.round(H * 0.5);
+  const botH = H - topH;
+  const kitchenW = Math.round(W * 0.32);
+  const livingW = W - kitchenW;
+
+  // Bottom row widths
+  const diningW = Math.round(W * 0.22);
+  const masterBathW = Math.max(7, Math.round(W * 0.15));
+  const masterBedW = W - diningW - masterBathW - STAIR_W;
+
+  // Row 1: Living + Kitchen
+  gRooms.push({
+    id: 'gf-living', type: 'living', label: 'HALL + LIVING ROOM',
+    x: 0, y: 0, w: livingW, h: topH,
+    color: 'hsl(40 30% 87%)',
+    furniture: livingFurniture(livingW, topH),
+    doors: [{ wall: 'left', position: 0.75, width: 3.5, swing: 'in', doorType: 'standard' }],
+    windows: [{ wall: 'left', position: 0.3, width: 5 }, { wall: 'top', position: 0.4, width: 5 }],
+  });
+
+  gRooms.push({
+    id: 'gf-kitchen', type: 'kitchen', label: 'KITCHEN',
+    x: livingW, y: 0, w: kitchenW, h: topH,
+    color: 'hsl(28 38% 72%)',
+    furniture: kitchenFurniture(kitchenW, topH, 'open'),
+    doors: [],
+    windows: [{ wall: 'right', position: 0.4, width: 3 }, { wall: 'top', position: 0.5, width: 3 }],
+  });
+
+  // Row 2: Dining | Master Bedroom | Master Bath | Staircase
+  gRooms.push({
+    id: 'gf-dining', type: 'dining', label: 'DINING',
+    x: 0, y: topH, w: diningW, h: botH,
+    color: 'hsl(36 28% 82%)',
+    furniture: diningFurniture(diningW, botH),
+    doors: [],
+    windows: [{ wall: 'left', position: 0.5, width: 3 }, { wall: 'bottom', position: 0.5, width: 3 }],
+  });
+
+  gRooms.push({
+    id: 'gf-master-bed', type: 'bedroom', label: 'MASTER BEDROOM',
+    x: diningW, y: topH, w: masterBedW, h: botH,
+    color: 'hsl(33 35% 82%)',
+    furniture: bedroomFurniture(masterBedW, botH, true),
+    doors: [],
+    windows: [{ wall: 'bottom', position: 0.5, width: 4 }],
+  });
+
+  gRooms.push({
+    id: 'gf-master-bath', type: 'bathroom', label: 'MASTER\nBATH',
+    x: diningW + masterBedW, y: topH, w: masterBathW, h: botH,
+    color: 'hsl(200 30% 82%)',
+    furniture: bathroomFurniture(masterBathW, botH, true),
+    doors: [],
+    windows: [{ wall: 'bottom', position: 0.5, width: 2 }],
+  });
+
+  gRooms.push({
+    id: 'staircase-gf', type: 'hallway', label: 'STAIRCASE\n↑',
+    x: W - STAIR_W, y: topH, w: STAIR_W, h: botH,
+    color: 'hsl(38 20% 82%)',
+    furniture: [],
+    doors: [],
+    windows: [],
+  });
+
+  injectAdjacencyDoors(gRooms);
+  cleanupDoors(gRooms);
+
+  // ══════════════════════════════════════════════════════════════════
+  // FIRST FLOOR
+  // ┌────────────────┬────────────────┬──────┐
+  // │                │                │      │
+  // │   BEDROOM 2    │   BEDROOM 3    │      │
+  // │                │                │ HALL │  Row 1 (bedsH)
+  // │                │                │ WAY  │
+  // ├────────────────┴───┬────────────┤      │
+  // │                    │            │      │
+  // │   OPEN TERRACE     │ COMMON     ├──────┤
+  // │                    │  BATH      │STAIR │  Row 2 (restH)
+  // │                    │            │  ↓   │
+  // └────────────────────┴────────────┴──────┘
+  // ══════════════════════════════════════════════════════════════════
+
+  const fRooms: Room[] = [];
+  const hallW = Math.max(5, Math.round(W * 0.12));
+  const roomsW = W - hallW;  // Width for bedrooms/terrace/bath
+  const bedsH = Math.round(H * 0.55);
+  const restH = H - bedsH;
+
+  // Row 1: Two bedrooms side by side
+  const bed2W = Math.round(roomsW * 0.5);
+  const bed3W = roomsW - bed2W;
+
+  fRooms.push({
+    id: 'ff-bed-0', type: 'bedroom', label: 'BEDROOM 2',
+    x: 0, y: 0, w: bed2W, h: bedsH,
+    color: 'hsl(33 35% 82%)',
+    furniture: bedroomFurniture(bed2W, bedsH, false),
+    doors: [],
+    windows: [{ wall: 'left', position: 0.4, width: 4 }, { wall: 'top', position: 0.5, width: 4 }],
+  });
+
+  fRooms.push({
+    id: 'ff-bed-1', type: 'bedroom', label: 'BEDROOM 3',
+    x: bed2W, y: 0, w: bed3W, h: bedsH,
+    color: 'hsl(33 35% 82%)',
+    furniture: bedroomFurniture(bed3W, bedsH, false),
+    doors: [],
+    windows: [{ wall: 'top', position: 0.5, width: 4 }],
+  });
+
+  // Hallway (right side, full height minus staircase)
+  fRooms.push({
+    id: 'ff-hallway', type: 'hallway', label: 'HALLWAY',
+    x: roomsW, y: 0, w: hallW, h: H - restH,
+    color: 'hsl(38 20% 88%)',
+    furniture: [],
+    doors: [],
+    windows: [],
+  });
+
+  // Row 2: Terrace + Common Bath + Staircase
+  const bathW = Math.max(7, Math.round(roomsW * 0.35));
+  const terraceW = roomsW - bathW;
+
+  fRooms.push({
+    id: 'ff-terrace', type: 'balcony', label: 'OPEN TERRACE',
+    x: 0, y: bedsH, w: terraceW, h: restH,
+    color: 'hsl(120 18% 78%)',
+    furniture: [
+      { type: 'plant', x: 2, y: restH / 2 - 0.75, w: 1.5, h: 1.5 },
+      { type: 'plant', x: terraceW - 4, y: restH / 2 - 0.75, w: 1.5, h: 1.5 },
+    ],
+    doors: [],
+    windows: [{ wall: 'left', position: 0.5, width: 5 }, { wall: 'bottom', position: 0.5, width: 5 }],
+  });
+
+  fRooms.push({
+    id: 'ff-bath', type: 'bathroom', label: 'COMMON\nBATH',
+    x: terraceW, y: bedsH, w: bathW, h: restH,
+    color: 'hsl(200 30% 82%)',
+    furniture: bathroomFurniture(bathW, restH, false),
+    doors: [],
+    windows: [{ wall: 'bottom', position: 0.5, width: 2 }],
+  });
+
+  // Staircase + landing (bottom-right, aligned with ground floor)
+  fRooms.push({
+    id: 'staircase-ff', type: 'hallway', label: 'STAIRCASE\n↓',
+    x: roomsW, y: bedsH, w: hallW, h: restH,
+    color: 'hsl(38 20% 82%)',
+    furniture: [],
+    doors: [],
+    windows: [],
+  });
+
+  injectAdjacencyDoors(fRooms);
+  cleanupDoors(fRooms);
+
+  return {
+    ground: { width: W, height: H, rooms: gRooms },
+    first: { width: W, height: H, rooms: fRooms },
+  };
+}
+
+

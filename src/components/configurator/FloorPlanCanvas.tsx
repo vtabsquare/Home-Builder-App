@@ -246,7 +246,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
         <Layer listening={true}>
           {localPlan.rooms.map((room) => (
             <Group key={`dw-${room.id}`}>
-              {room.doors.map((d, di) => (
+              {(room.doors || []).map((d, di) => (
                 <DoorShape 
                   key={`d-${di}`} 
                   door={d} 
@@ -293,7 +293,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                   }}
                 />
               ))}
-              {room.windows.map((w, wi) => (
+              {(room.windows || []).map((w, wi) => (
                 <WindowShape key={`w-${wi}`} window={w} room={room} scale={scale} offsetX={offsetX} offsetY={offsetY} />
               ))}
             </Group>
