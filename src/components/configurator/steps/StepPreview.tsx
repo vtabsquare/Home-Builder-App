@@ -46,7 +46,7 @@ function getRoomTabs(plan: Plan): RoomTab[] {
 }
 
 export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
-  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, presetId, setPresetId, homeType, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan } = useConfig();
+  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, saveAsPreset, loadSavedPreset } = useConfig();
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [advanced, setAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -57,15 +57,15 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   const canDoubleStorey = homeType === 'family' || homeType === 'premium';
   const floors = useMemo(() => {
     if (!isDoubleStorey) return null;
-    return splitPlanToFloors(plan);
-  }, [isDoubleStorey, plan]);
+    return splitPlanToFloors(plan, homeType);
+  }, [isDoubleStorey, plan, homeType]);
 
   // Determine which plan to show based on floor selection
   const displayPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return plan;
-    if (activeFloor === 0) return floors.ground;
+    if (activeFloor === 0) return customPlan || floors.ground;
     return customFirstFloorPlan || floors.first;
-  }, [isDoubleStorey, floors, activeFloor, plan, customFirstFloorPlan]);
+  }, [isDoubleStorey, floors, activeFloor, plan, customFirstFloorPlan, customPlan]);
 
   const currentPlan = stagedPlan || displayPlan;
 
@@ -156,6 +156,20 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                     Preset {String.fromCharCode(65 + id)}
                   </button>
                 ))}
+                {savedPresets.map((savedPlan, i) => (
+                  <button
+                    key={`saved-${i}`}
+                    onClick={() => loadSavedPreset(i)}
+                    className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                      presetId === -1 && customPlan === savedPlan
+                        ? 'bg-clay text-white shadow-md'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Layers size={10} className="inline mr-1 -mt-0.5" />
+                    Custom {i + 1}
+                  </button>
+                ))}
               </div>
 
               <button
@@ -178,16 +192,39 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                     Reset
                   </button>
                   {stagedPlan && (
-                    <button
-                      onClick={() => {
-                        onChange?.(stagedPlan);
-                        setStagedPlan(null);
-                        planHistory.forEach(h => removeHistoryRecord(h.id));
-                      }}
-                      className="flex items-center gap-1.5 rounded-full bg-clay px-4 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-clay/90 transition-all active:scale-95"
-                    >
-                      <Save size={14} /> Save Changes
-                    </button>
+                    <>
+                      <button
+                        onClick={() => {
+                          if (isDoubleStorey && activeFloor === 1) {
+                            setCustomFirstFloorPlan(stagedPlan);
+                          } else {
+                            onChange?.(stagedPlan);
+                          }
+                          setStagedPlan(null);
+                          planHistory.forEach(h => removeHistoryRecord(h.id));
+                        }}
+                        className="flex items-center gap-1.5 rounded-full bg-clay px-4 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-clay/90 transition-all active:scale-95"
+                      >
+                        <Save size={14} /> Update Plan
+                      </button>
+                      <button
+                        onClick={() => {
+                          saveAsPreset(stagedPlan);
+                          if (isDoubleStorey && activeFloor === 1) {
+                            setCustomFirstFloorPlan(stagedPlan);
+                          } else {
+                            onChange?.(stagedPlan); // Set it as active
+                          }
+                          loadSavedPreset(savedPresets.length); // Load the one we just saved
+                          setStagedPlan(null);
+                          planHistory.forEach(h => removeHistoryRecord(h.id));
+                          setAdvanced(false); // Can exit advanced mode to see new preset
+                        }}
+                        className="flex items-center gap-1.5 rounded-full bg-blue-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-blue-600 transition-all active:scale-95"
+                      >
+                        <Save size={14} /> Save as Preset
+                      </button>
+                    </>
                   )}
                 </>
               )}

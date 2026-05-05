@@ -4,7 +4,7 @@ import { computeArea } from './cost';
 export interface FurnitureItem {
   type: 'bed' | 'wardrobe' | 'desk' | 'nightstand' | 'toilet' | 'sink' | 'shower' | 'bathtub' |
   'stove' | 'fridge' | 'counter' | 'island' | 'dining_table' | 'sofa' | 'tv' | 'coffee_table' |
-  'plant' | 'rug' | 'bookshelf' | 'washing_machine';
+  'plant' | 'rug' | 'bookshelf' | 'washing_machine' | 'table' | 'chair';
   x: number; // relative to room
   y: number;
   w: number;
@@ -20,6 +20,7 @@ export interface DoorInfo {
   swing?: 'in' | 'out';
   connectsTo?: string; // room id
   doorType?: 'standard' | 'open'; // standard = swinging door, open = archway (no door panel)
+  label?: string;
 }
 
 export interface WindowInfo {
@@ -1331,13 +1332,295 @@ export function generateEmptyPlan(homeType: 'starter' | 'family' | 'premium'): P
 
 // ── Double Storey Support ─────────────────────────────────────────
 
+function familyDoubleStorey(W: number, H: number): { ground: Plan; first: Plan } {
+  // Ground rules for blueprint scale mapping to a standard 40x40 dimension
+  // W=40, H=40. Let's arrange them based on relative coordinates from the image.
+  
+  // X: 0 to W
+  // Y: 0 to H
+  
+  const gRooms: Room[] = [];
+  
+  // Let's formalize the grid logic based on W and H
+  const x1 = Math.round(W * 0.35); // 14
+  const x2 = Math.round(W * 0.60); // 24
+  
+  const y1 = Math.round(H * 0.40); // 16
+  const y2 = Math.round(H * 0.65); // 26
+  
+  // Ground Floor Mapping
+  // TOP ROW (y: 0 to y1)
+  gRooms.push({
+    id: 'gf-bed-0', type: 'bedroom', label: 'BED',
+    x: 0, y: 0, w: x1, h: y1, // Bed matches Staircase width (x1)
+    color: COLORS.bedroom,
+    furniture: bedroomFurniture(x1, y1, true, 1),
+    doors: [],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }, { wall: 'top', position: 0.5, width: 4 }]
+  });
+  
+  const bathW = 5;
+  const bathH = Math.round(y1 * 0.5); // 8
+
+  gRooms.push({
+    id: 'bath-attached-gf-bed-0', type: 'bathroom', label: 'TOILET',
+    x: x1, y: 0, w: bathW, h: bathH, // Back Bath
+    color: COLORS.bathroom,
+    furniture: bathroomFurniture(bathW, bathH, true, 0),
+    doors: [
+      { wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'gf-bed-0' }
+    ],
+    windows: [{ wall: 'top', position: 0.5, width: 2 }]
+  });
+
+  gRooms.push({
+    id: 'gf-bath-common', type: 'bathroom', label: 'TOILET',
+    x: x1, y: bathH, w: bathW, h: y1 - bathH, // Front Bath
+    color: COLORS.bathroom,
+    furniture: bathroomFurniture(bathW, y1 - bathH, false, 2),
+    doors: [
+      { wall: 'bottom', position: 0.5, width: 2.5, swing: 'out', doorType: 'standard', connectsTo: 'gf-dining' }
+    ],
+    windows: []
+  });
+
+  gRooms.push({
+    id: 'gf-kitchen', type: 'kitchen', label: 'KITCHEN',
+    x: x1 + bathW, y: 0, w: W - (x1 + bathW), h: y1, // Reduced kitchen length
+    color: COLORS.kitchen,
+    furniture: kitchenFurniture(W - (x1 + bathW), y1, 'open', 0),
+    doors: [
+      { wall: 'bottom', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'gf-dining' }
+    ],
+    windows: [{ wall: 'top', position: 0.5, width: 4 }, { wall: 'right', position: 0.5, width: 4 }]
+  });
+
+  // MIDDLE ROW (y: y1 to y2)
+  gRooms.push({
+    id: 'gf-staircase', type: 'hallway', label: 'STAIRCASE\n↑',
+    x: 0, y: y1, w: x1, h: y2 - y1,
+    color: COLORS.hallway,
+    furniture: [],
+    doors: [
+      { wall: 'right', position: 0.5, width: 3.5, swing: 'in', doorType: 'open', connectsTo: 'gf-dining' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }]
+  });
+  
+  gRooms.push({
+    id: 'gf-dining', type: 'dining', label: 'DINING',
+    x: x1, y: y1, w: W - x1, h: y2 - y1,
+    color: COLORS.dining,
+    furniture: diningFurniture(W - x1, y2 - y1),
+    doors: [
+      { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'gf-living' },
+      { wall: 'left', position: 0.2, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'gf-bed-0' }
+    ],
+    windows: [{ wall: 'right', position: 0.5, width: 4 }]
+  });
+
+  // BOTTOM ROW (y: y2 to H)
+  gRooms.push({
+    id: 'gf-porch', type: 'carport', label: 'PORCH\n(CAR PARKING)',
+    x: 0, y: y2, w: x1, h: H - y2,
+    color: COLORS.carport,
+    furniture: [],
+    doors: [],
+    windows: []
+  });
+
+  gRooms.push({
+    id: 'gf-sitout', type: 'balcony', label: 'SIT OUT',
+    x: x1, y: y2, w: x2 - x1, h: H - y2,
+    color: COLORS.balcony,
+    furniture: [
+       { type: 'plant', x: 1, y: 1, w: 2, h: 2 },
+       { type: 'plant', x: (x2 - x1) - 3, y: 1, w: 2, h: 2 }
+    ],
+    doors: [
+      { wall: 'left', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'gf-porch' }
+    ],
+    openWalls: ['bottom'], // Sit out is open to outside
+    windows: []
+  });
+
+  gRooms.push({
+    id: 'gf-living', type: 'living', label: 'LIVING',
+    x: x2, y: y2, w: W - x2, h: H - y2,
+    color: COLORS.living, // Ensures correct color
+    furniture: livingFurniture(W - x2, H - y2, 2),
+    doors: [
+      { wall: 'left', position: 0.5, width: 4, swing: 'in', doorType: 'standard', connectsTo: 'gf-sitout', label: 'MAIN DOOR' },
+      { wall: 'bottom', position: 0.8, width: 3.5, swing: 'in', doorType: 'standard', label: 'OUTSIDE ENTRY' } // Extra door for external access as requested
+    ],
+    openWalls: [],
+    windows: [{ wall: 'bottom', position: 0.3, width: 4 }, { wall: 'right', position: 0.5, width: 4 }]
+  });
+  
+  injectAdjacencyDoors(gRooms);
+  cleanupDoors(gRooms);
+
+  // Restore the door from common bath to dining which cleanupDoors incorrectly strips
+  const commonBath = gRooms.find(r => r.id === 'gf-bath-common');
+  if (commonBath && !commonBath.doors.some(d => d.connectsTo === 'gf-dining')) {
+    commonBath.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'out', doorType: 'standard', connectsTo: 'gf-dining' });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // FIRST FLOOR
+  const fRooms: Room[] = [];
+
+  // Above porch: Open Terrace
+  fRooms.push({
+    id: 'ff-open-terrace', type: 'balcony', label: 'OPEN TERRACE',
+    x: 0, y: y2, w: x1, h: H - y2,
+    color: COLORS.garden,
+    furniture: gardenFurniture(x1, H - y2),
+    doors: [],
+    windows: []
+  });
+  
+  // Above sit out: Balcony
+  fRooms.push({
+    id: 'ff-balcony', type: 'balcony', label: 'BALCONY',
+    x: x1, y: y2, w: x2 - x1, h: H - y2,
+    color: COLORS.balcony,
+    furniture: [],
+    doors: [
+      { wall: 'top', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard', connectsTo: 'ff-upper-living' }
+    ],
+    windows: []
+  });
+
+  // Above living: Bed
+  fRooms.push({
+    id: 'ff-bed-1', type: 'bedroom', label: 'BED',
+    x: x2, y: y2, w: W - x2, h: H - y2,
+    color: COLORS.bedroom,
+    furniture: bedroomFurniture(W - x2, H - y2, false, 2),
+    doors: [
+      { wall: 'top', position: 0.2, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'ff-upper-living' }
+    ],
+    windows: [{ wall: 'bottom', position: 0.5, width: 4 }, { wall: 'right', position: 0.5, width: 4 }]
+  });
+
+  // Above Staircase: Staircase
+  fRooms.push({
+    id: 'ff-staircase', type: 'hallway', label: 'STAIRCASE\n↓',
+    x: 0, y: y1, w: x1, h: y2 - y1,
+    color: COLORS.hallway,
+    furniture: [],
+    doors: [
+      { wall: 'right', position: 0.5, width: 3.5, swing: 'in', doorType: 'open', connectsTo: 'ff-upper-living' },
+      { wall: 'bottom', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard', connectsTo: 'ff-open-terrace' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }]
+  });
+
+  // Above Dining: Upper Living
+  fRooms.push({
+    id: 'ff-upper-living', type: 'living', label: 'UPPER LIVING',
+    x: x1, y: y1, w: W - x1, h: y2 - y1,
+    color: COLORS.hallway,
+    furniture: livingFurniture(W - x1, y2 - y1, 3), // some sofas
+    doors: [],
+    windows: []
+  });
+
+  // Above Master Bed: Bed
+  fRooms.push({
+    id: 'ff-bed-2', type: 'bedroom', label: 'BED',
+    x: 0, y: 0, w: x1, h: y1,
+    color: COLORS.bedroom,
+    furniture: bedroomFurniture(x1, y1, false, 1),
+    doors: [
+      { wall: 'bottom', position: 0.2, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'ff-staircase' }
+    ],
+    windows: [{ wall: 'left', position: 0.5, width: 4 }, { wall: 'top', position: 0.5, width: 4 }]
+  });
+  
+  // Above Master Bath: Toilet
+  fRooms.push({
+    id: 'bath-attached-ff-bed-2', type: 'bathroom', label: 'TOILET',
+    x: x1, y: 0, w: bathW, h: bathH,
+    color: COLORS.bathroom,
+    furniture: bathroomFurniture(bathW, bathH, true, 0),
+    doors: [
+      { wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'ff-bed-2' }
+    ],
+    windows: [{ wall: 'top', position: 0.5, width: 2 }]
+  });
+
+  // Above Kitchen: Rear Open Terrace + Common Toilet
+  // Rear Corridor connects Upper Living to the common toilet / rear terrace
+  fRooms.push({
+    id: 'ff-hallway', type: 'hallway', label: 'CORRIDOR',
+    x: x1, y: bathH, w: bathW, h: y1 - bathH,
+    color: COLORS.hallway,
+    furniture: [],
+    doors: [
+      { wall: 'bottom', position: 0.5, width: 3, swing: 'out', doorType: 'open', connectsTo: 'ff-upper-living' }
+    ],
+    windows: []
+  });
+
+  fRooms.push({
+    id: 'ff-bath-common', type: 'bathroom', label: 'TOILET',
+    x: x1 + bathW, y: Math.round(y1 * 0.5), w: 6, h: y1 - bathH,
+    color: COLORS.bathroom,
+    furniture: bathroomFurniture(6, y1 - bathH, false, 1),
+    doors: [
+      { wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'ff-hallway' }
+    ],
+    windows: []
+  });
+
+  fRooms.push({
+    id: 'ff-rear-terrace', type: 'balcony', label: 'OPEN TERRACE',
+    x: x1 + bathW, y: 0, w: W - (x1 + bathW), h: bathH,
+    color: COLORS.garden,
+    furniture: gardenFurniture(W - (x1 + bathW), bathH),
+    doors: [
+      { wall: 'bottom', position: 0.2, width: 3.5, swing: 'in', doorType: 'standard', connectsTo: 'ff-hallway' }
+    ],
+    openWalls: ['top', 'right'],
+    windows: []
+  });
+
+  const terr2X = x1 + bathW + 6;
+  const terr2W = W - terr2X;
+  if (terr2W > 0) {
+    fRooms.push({
+      id: 'ff-rear-terrace-2', type: 'balcony', label: '',
+      x: terr2X, y: bathH, w: terr2W, h: y1 - bathH,
+      color: COLORS.garden,
+      furniture: gardenFurniture(terr2W, y1 - bathH),
+      doors: [],
+      openWalls: ['top', 'right'],
+      windows: []
+    });
+  }
+
+  injectAdjacencyDoors(fRooms);
+  cleanupDoors(fRooms);
+
+  return {
+    ground: { width: W, height: H, rooms: gRooms },
+    first: { width: W, height: H, rooms: fRooms }
+  };
+}
+
 /**
  * Split a plan into ground + first floor for double storey.
  * Ground: living, kitchen, dining, MASTER BEDROOM + bath, staircase.
  * First: 2 bedrooms accessible via hallway, common bath, staircase, open terrace.
  * Both floors share the same footprint — every cell filled, zero gaps.
  */
-export function splitPlanToFloors(plan: Plan): { ground: Plan; first: Plan } {
+export function splitPlanToFloors(plan: Plan, homeType?: string): { ground: Plan; first: Plan } {
+  if (homeType === 'family') {
+    return familyDoubleStorey(plan.width, plan.height);
+  }
+
   const W = plan.width;
   const H = plan.height;
 

@@ -38,6 +38,7 @@ export interface ConfigState {
   isDoubleStorey: boolean;
   activeFloor: 0 | 1;
   customFirstFloorPlan: any | null;
+  savedPresets: any[];
 }
 
 export interface ConfigActions {
@@ -64,6 +65,9 @@ export interface ConfigActions {
   setCustomFirstFloorPlan: (p: any | null) => void;
   addHistoryRecord: (record: { label: string; type: string; targetId: string; original: any }) => void;
   removeHistoryRecord: (id: string) => void;
+  saveAsPreset: (plan: any) => void;
+  deleteSavedPreset: (index: number) => void;
+  loadSavedPreset: (index: number) => void;
   reset: () => void;
 }
 
@@ -97,6 +101,7 @@ const initial: ConfigState = {
   isDoubleStorey: false,
   activeFloor: 0 as 0 | 1,
   customFirstFloorPlan: null,
+  savedPresets: [],
 };
 
 export const useConfig = create<ConfigState & ConfigActions>()(
@@ -135,6 +140,9 @@ export const useConfig = create<ConfigState & ConfigActions>()(
         return { planHistory: [...s.planHistory, { ...record, id }] };
       }),
       removeHistoryRecord: (id) => set((s) => ({ planHistory: s.planHistory.filter(r => r.id !== id) })),
+      saveAsPreset: (plan) => set((s) => ({ savedPresets: [...s.savedPresets, plan] })),
+      deleteSavedPreset: (index) => set((s) => ({ savedPresets: s.savedPresets.filter((_, i) => i !== index) })),
+      loadSavedPreset: (index) => set((s) => ({ customPlan: s.savedPresets[index], presetId: -1 })),
       reset: () => set({ ...initial }),
     }),
     { name: 'gbti-configurator' }
