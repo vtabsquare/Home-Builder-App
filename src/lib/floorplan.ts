@@ -49,6 +49,7 @@ export interface Plan {
   width: number;  // ft
   height: number;
   rooms: Room[];
+  plotEntranceX?: number;
 }
 
 const COLORS: Record<string, string> = {

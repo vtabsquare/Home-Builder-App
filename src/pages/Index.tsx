@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { useConfig } from '@/store/configurator';
+import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, useConfig } from '@/store/configurator';
 import { computeCost } from '@/lib/cost';
 import { generatePlan, Plan } from '@/lib/floorplan';
 import { ProgressHeader } from '@/components/configurator/ProgressHeader';
@@ -16,12 +16,32 @@ import { Maximize2, Minimize2, Sparkles } from 'lucide-react';
 
 const Index = () => {
   const config = useConfig();
-  const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan } = config;
+  const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts } = config;
 
   const cost = useMemo(() => computeCost(config), [config]);
   const basePlan = useMemo(() => generatePlan(config), [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.addons, config.presetId]);
 
-  const plan = customPlan || basePlan;
+  const packageLayout = homeType === 'family' && isDoubleStorey ? packageLayouts[FAMILY_DOUBLE_STOREY_PACKAGE_KEY] : null;
+  const plan = customPlan || packageLayout?.ground || basePlan || { width: 0, height: 0, rooms: [] };
+
+  useEffect(() => {
+    config.fetchSavedPresets();
+    config.fetchPackageLayouts();
+  }, []);
+
+  useEffect(() => {
+    if (homeType !== 'family' || !isDoubleStorey || !packageLayout) return;
+    if (packageLayout.ground?.rooms) setCustomPlan(packageLayout.ground);
+    if (packageLayout.first?.rooms) setCustomFirstFloorPlan(packageLayout.first);
+  }, [homeType, isDoubleStorey, packageLayout, setCustomPlan, setCustomFirstFloorPlan]);
+
+  // Clear custom plan when switching away from Family Double Storey
+  useEffect(() => {
+    if (homeType !== 'family' || !isDoubleStorey) {
+      if (customPlan) setCustomPlan(null);
+      if (customFirstFloorPlan) setCustomFirstFloorPlan(null);
+    }
+  }, [homeType, isDoubleStorey, customPlan, customFirstFloorPlan, setCustomPlan, setCustomFirstFloorPlan]);
 
   // SEO
   useEffect(() => {
@@ -77,14 +97,14 @@ const Index = () => {
               <div className="relative h-[280px] md:h-[320px] overflow-hidden rounded-3xl border border-border shadow-elev bg-gradient-warm">
                 <FloorPlanCanvas plan={plan} onChange={setCustomPlan} />
                 <div className="pointer-events-none absolute left-3 top-3 rounded-full glass-panel px-3 py-1 text-[10px] font-display font-semibold uppercase tracking-[0.2em]">
-                  Live · {plan.width}′×{plan.height}′
+                  Live · {plan?.width || 0}′×{plan?.height || 0}′
                 </div>
                 <div className="pointer-events-none absolute right-3 top-3 flex items-center gap-1 rounded-full bg-ink/85 backdrop-blur px-2.5 py-1 text-[10px] text-ink-foreground font-medium">
                   <Sparkles size={11} className="text-clay" /> Auto-layout
                 </div>
                 {/* Mini room labels */}
                 <div className="pointer-events-none absolute right-3 bottom-3 flex flex-wrap gap-1 max-w-[180px] justify-end">
-                  {plan.rooms.filter(r => !['carport','garden'].includes(r.type)).slice(0, 6).map((r) => (
+                  {(plan.rooms || []).filter(r => !['carport','garden'].includes(r.type)).slice(0, 6).map((r) => (
                     <span key={r.id} className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider"
                       style={{ background: r.color, color: 'hsl(0,0%,15%)' }}>
                       {r.label.split(' ')[0]}

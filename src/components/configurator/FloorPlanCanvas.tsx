@@ -16,7 +16,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
   const stageRef = useRef<Konva.Stage>(null);
   const config = useConfig();
   const [size, setSize] = useState({ w: 600, h: 400 });
-  const [localPlan, setLocalPlan] = useState(plan);
+  const [localPlan, setLocalPlan] = useState(plan || { width: 0, height: 0, rooms: [] });
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
@@ -48,12 +48,22 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
     return () => ro.disconnect();
   }, []);
 
+  const PLOT_PADDING_FT = 2;
   const pad = 60;
-  const scaleX = (size.w - pad * 2) / localPlan.width;
-  const scaleY = (size.h - pad * 2) / localPlan.height;
+  const localW = Math.max(1, localPlan.width || 0);
+  const localH = Math.max(1, localPlan.height || 0);
+  const plotW = localW + PLOT_PADDING_FT * 2;
+  const plotH = localH + PLOT_PADDING_FT * 2;
+  const scaleX = (size.w - pad * 2) / plotW;
+  const scaleY = (size.h - pad * 2) / plotH;
   const scale = Math.max(4, Math.min(scaleX, scaleY));
-  const offsetX = (size.w - localPlan.width * scale) / 2;
-  const offsetY = (size.h - localPlan.height * scale) / 2;
+  const plotOffsetX = (size.w - plotW * scale) / 2;
+  const plotOffsetY = (size.h - plotH * scale) / 2;
+  const buildingOffsetX = plotOffsetX + PLOT_PADDING_FT * scale;
+  const buildingOffsetY = plotOffsetY + PLOT_PADDING_FT * scale;
+  const entrancePos = Math.max(0.1, Math.min(0.9, localPlan.plotEntranceX ?? 0.5));
+  const gateWidthFt = 3.5;
+  const gateHalfPx = (gateWidthFt * scale) / 2;
 
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -72,11 +82,11 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
   }, []);
 
   const handleDragEnd = (id: string, e: Konva.KonvaEventObject<DragEvent>) => {
-    const newX = Math.round((e.target.x() - offsetX) / scale);
-    const newY = Math.round((e.target.y() - offsetY) / scale);
+    const newX = Math.round((e.target.x() - buildingOffsetX) / scale);
+    const newY = Math.round((e.target.y() - buildingOffsetY) / scale);
     const updated: Plan = {
       ...localPlan,
-      rooms: localPlan.rooms.map((r) => (r.id === id ? { ...r, x: Math.max(0, newX), y: Math.max(0, newY) } : r)),
+      rooms: (localPlan.rooms || []).map((r) => (r.id === id ? { ...r, x: Math.max(0, newX), y: Math.max(0, newY) } : r)),
     };
     setLocalPlan(updated);
     onChange?.(updated);
@@ -85,7 +95,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
   const handleRotateRoom = (id: string) => {
     const updated: Plan = {
       ...localPlan,
-      rooms: localPlan.rooms.map((r) => {
+      rooms: (localPlan.rooms || []).map((r) => {
         if (r.id !== id) return r;
         const newOrient = ((r.orientation || 0) + 1) % 4;
         const newRoom = { ...r, orientation: newOrient };
@@ -100,7 +110,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
   const handleAddDoor = (roomId: string) => {
     const updated: Plan = {
       ...localPlan,
-      rooms: localPlan.rooms.map((r) => {
+      rooms: (localPlan.rooms || []).map((r) => {
         if (r.id !== roomId) return r;
         const newDoor: DoorInfo = { wall: 'top', position: 0.5, width: 3, swing: 'in' };
         return { ...r, doors: [...r.doors, newDoor] };
@@ -108,6 +118,25 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
     };
     setLocalPlan(updated);
     onChange?.(updated);
+  };
+
+  const handleDeleteRoom = (roomId: string) => {
+    const updated: Plan = {
+      ...localPlan,
+      rooms: (localPlan.rooms || []).filter((r) => r.id !== roomId),
+    };
+    setLocalPlan(updated);
+    setSelectedRoomId(null);
+    onChange?.(updated);
+  };
+
+  const setPlotEntrance = (pos: number, commit: boolean) => {
+    const clamped = Math.max(0.1, Math.min(0.9, pos));
+    setLocalPlan((prev) => {
+      const updated = { ...prev, plotEntranceX: clamped };
+      if (commit) onChange?.(updated);
+      return updated;
+    });
   };
 
   return (
@@ -131,6 +160,15 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
             <Plus size={14} className="text-clay" />
             Add Door
           </button>
+          <div className="h-6 w-px bg-border" />
+          <button
+            onClick={() => handleDeleteRoom(selectedRoomId)}
+            className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-red-600 hover:bg-red-50 transition-all active:scale-95"
+            title="Delete Room"
+          >
+            <Trash2 size={14} className="text-red-500" />
+            Delete
+          </button>
         </div>
       )}
       <Stage
@@ -151,18 +189,18 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
         draggable
       >
         <Layer listening={false}>
-          {Array.from({ length: localPlan.width + 1 }).map((_, i) => (
+          {Array.from({ length: Math.floor(plotW) + 1 }).map((_, i) => (
             <Line
               key={`v-${i}`}
-              points={[offsetX + i * scale, offsetY, offsetX + i * scale, offsetY + localPlan.height * scale]}
+              points={[plotOffsetX + i * scale, plotOffsetY, plotOffsetX + i * scale, plotOffsetY + plotH * scale]}
               stroke={i % 5 === 0 ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.03)'}
               strokeWidth={i % 5 === 0 ? 1 : 0.5}
             />
           ))}
-          {Array.from({ length: localPlan.height + 1 }).map((_, i) => (
+          {Array.from({ length: Math.floor(plotH) + 1 }).map((_, i) => (
             <Line
               key={`h-${i}`}
-              points={[offsetX, offsetY + i * scale, offsetX + localPlan.width * scale, offsetY + i * scale]}
+              points={[plotOffsetX, plotOffsetY + i * scale, plotOffsetX + plotW * scale, plotOffsetY + i * scale]}
               stroke={i % 5 === 0 ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.03)'}
               strokeWidth={i % 5 === 0 ? 1 : 0.5}
             />
@@ -170,13 +208,13 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
         </Layer>
 
         <Layer>
-          {localPlan.rooms.map((room) => (
+          {(localPlan.rooms || []).map((room) => (
             <RoomShape
               key={room.id}
               room={room}
               scale={scale}
-              offsetX={offsetX}
-              offsetY={offsetY}
+              offsetX={buildingOffsetX}
+              offsetY={buildingOffsetY}
               draggable={advanced}
               onPointerDown={() => {
                 if (advanced) {
@@ -193,22 +231,22 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                 const scaleX = node.scaleX();
                 const scaleY = node.scaleY();
                 
-                const newX = Math.max(0, Math.round((node.x() - offsetX) / scale));
-                const newY = Math.max(0, Math.round((node.y() - offsetY) / scale));
+                const newX = Math.max(0, Math.round((node.x() - buildingOffsetX) / scale));
+                const newY = Math.max(0, Math.round((node.y() - buildingOffsetY) / scale));
                 const newW = Math.max(2, Math.round(room.w * scaleX));
                 const newH = Math.max(2, Math.round(room.h * scaleY));
                 
                 node.scaleX(1);
                 node.scaleY(1);
-                node.x(offsetX + newX * scale);
-                node.y(offsetY + newY * scale);
+                node.x(buildingOffsetX + newX * scale);
+                node.y(buildingOffsetY + newY * scale);
 
                 const newRoom = { ...room, x: newX, y: newY, w: newW, h: newH };
                 newRoom.furniture = regenerateFurniture(newRoom, config.kitchen);
                 
                 const updatedPlan = {
                   ...localPlan,
-                  rooms: localPlan.rooms.map(r => r.id === room.id ? newRoom : r)
+                  rooms: (localPlan.rooms || []).map(r => r.id === room.id ? newRoom : r)
                 };
                 setLocalPlan(updatedPlan);
                 onChange?.(updatedPlan);
@@ -228,7 +266,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
         </Layer>
 
         <Layer listening={false}>
-          {localPlan.rooms.map((room) =>
+          {(localPlan.rooms || []).map((room) =>
             room.furniture.map((f, fi) => (
               <FurnitureShape
                 key={`${room.id}-f-${fi}`}
@@ -236,15 +274,15 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                 roomX={room.x}
                 roomY={room.y}
                 scale={scale}
-                offsetX={offsetX}
-                offsetY={offsetY}
+                offsetX={buildingOffsetX}
+                offsetY={buildingOffsetY}
               />
             ))
           )}
         </Layer>
 
         <Layer listening={true}>
-          {localPlan.rooms.map((room) => (
+          {(localPlan.rooms || []).map((room) => (
             <Group key={`dw-${room.id}`}>
               {(room.doors || []).map((d, di) => {
                 // Prevent rendering duplicate doors for connected rooms
@@ -256,8 +294,8 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                     door={d} 
                     room={room} 
                     scale={scale} 
-                    offsetX={offsetX} 
-                    offsetY={offsetY} 
+                    offsetX={buildingOffsetX} 
+                    offsetY={buildingOffsetY} 
                     doorIndex={di}
                     selected={selectedDoor?.roomId === room.id && selectedDoor?.doorIndex === di}
                     onSelect={() => {
@@ -267,7 +305,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                       }
                     }}
                     onDragMove={(newWall: string, newPos: number) => {
-                      const updatedRooms = localPlan.rooms.map(r => {
+                      const updatedRooms = (localPlan.rooms || []).map(r => {
                         if (r.id === room.id) {
                           const newDoors = [...r.doors];
                           newDoors[di] = { ...newDoors[di], wall: newWall as any, position: newPos };
@@ -283,7 +321,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                     }}
                     onDelete={() => {
                       if (advanced) {
-                        const updatedRooms = localPlan.rooms.map(r => {
+                        const updatedRooms = (localPlan.rooms || []).map(r => {
                           if (r.id === room.id) {
                             return { ...r, doors: r.doors.filter((_, idx) => idx !== di) };
                           }
@@ -303,35 +341,62 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                 );
               })}
               {(room.windows || []).map((w, wi) => (
-                <WindowShape key={`w-${wi}`} window={w} room={room} scale={scale} offsetX={offsetX} offsetY={offsetY} />
+                <WindowShape key={`w-${wi}`} window={w} room={room} scale={scale} offsetX={buildingOffsetX} offsetY={buildingOffsetY} />
               ))}
             </Group>
           ))}
         </Layer>
 
+        <Layer listening={true}>
+          <Group
+            x={plotOffsetX + entrancePos * plotW * scale}
+            y={plotOffsetY}
+            draggable={advanced}
+            dragBoundFunc={(pos) => ({
+              x: Math.max(plotOffsetX + gateHalfPx, Math.min(plotOffsetX + plotW * scale - gateHalfPx, pos.x)),
+              y: plotOffsetY,
+            })}
+            onDragMove={(e) => {
+              const x = e.target.x();
+              setPlotEntrance((x - plotOffsetX) / (plotW * scale), false);
+            }}
+            onDragEnd={(e) => {
+              const x = e.target.x();
+              setPlotEntrance((x - plotOffsetX) / (plotW * scale), true);
+            }}
+          >
+            <Rect x={-gateHalfPx} y={-3} width={gateHalfPx * 2} height={6} fill="#3f2f1f" cornerRadius={2} shadowBlur={4} shadowOpacity={0.2} />
+            <Rect x={-2} y={-10} width={4} height={18} fill="#6b4f30" />
+            <Circle x={0} y={0} radius={3} fill="#d6b37a" />
+            {advanced && (
+              <Text x={-30} y={-24} width={60} align="center" text="ENTRANCE" fontFamily="Urbanist" fontSize={9} fill="#6b4f30" fontStyle="700" />
+            )}
+          </Group>
+        </Layer>
+
         <Layer listening={false}>
-          {localPlan.rooms.map(room => (
+          {(localPlan.rooms || []).map(room => (
              <Text key={`label-${room.id}`}
                 text={room.label} 
                 fontFamily="Urbanist" fontStyle="800" 
                 fontSize={Math.max(10, Math.min(14, room.w * scale * 0.08))}
                 fill="rgba(0,0,0,0.75)" 
                 align="center" verticalAlign="middle"
-                x={offsetX + room.x * scale} 
-                y={offsetY + room.y * scale + (room.h * scale)/2 - 10} 
+                x={buildingOffsetX + room.x * scale} 
+                y={buildingOffsetY + room.y * scale + (room.h * scale)/2 - 10} 
                 width={room.w * scale} 
                 shadowColor="white" shadowBlur={6} shadowOpacity={1} shadowOffset={{x:0, y:0}}
                 letterSpacing={1.2} />
           ))}
-          {localPlan.rooms.map(room => (
+          {(localPlan.rooms || []).map(room => (
              <Text key={`dim-${room.id}`}
                 text={`${Math.round(room.w)}′ × ${Math.round(room.h)}′`} 
                 fontFamily="Epilogue" fontStyle="600" 
                 fontSize={9}
                 fill="rgba(0,0,0,0.55)" 
                 align="center" verticalAlign="middle"
-                x={offsetX + room.x * scale} 
-                y={offsetY + room.y * scale + (room.h * scale)/2 + 6} 
+                x={buildingOffsetX + room.x * scale} 
+                y={buildingOffsetY + room.y * scale + (room.h * scale)/2 + 6} 
                 width={room.w * scale} 
                 shadowColor="white" shadowBlur={4} shadowOpacity={1} shadowOffset={{x:0, y:0}} />
           ))}
@@ -339,18 +404,77 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
 
         <Layer listening={false}>
           <Rect
-            x={offsetX}
-            y={offsetY}
-            width={localPlan.width * scale}
-            height={localPlan.height * scale}
+            x={plotOffsetX}
+            y={plotOffsetY}
+            width={plotW * scale}
+            height={PLOT_PADDING_FT * scale}
+            fill="#98c58b"
+            opacity={0.4}
+          />
+          <Rect
+            x={plotOffsetX}
+            y={plotOffsetY + (PLOT_PADDING_FT + localH) * scale}
+            width={plotW * scale}
+            height={PLOT_PADDING_FT * scale}
+            fill="#98c58b"
+            opacity={0.4}
+          />
+          <Rect
+            x={plotOffsetX}
+            y={plotOffsetY + PLOT_PADDING_FT * scale}
+            width={PLOT_PADDING_FT * scale}
+            height={localH * scale}
+            fill="#98c58b"
+            opacity={0.4}
+          />
+          <Rect
+            x={plotOffsetX + (PLOT_PADDING_FT + localW) * scale}
+            y={plotOffsetY + PLOT_PADDING_FT * scale}
+            width={PLOT_PADDING_FT * scale}
+            height={localH * scale}
+            fill="#98c58b"
+            opacity={0.4}
+          />
+          {/* Front garden beds (top side) */}
+          <Rect
+            x={plotOffsetX + scale * 0.6}
+            y={plotOffsetY + scale * 0.25}
+            width={Math.max(12, entrancePos * plotW * scale - gateHalfPx - scale * 1.2)}
+            height={Math.max(6, PLOT_PADDING_FT * scale - scale * 0.4)}
+            fill="#7fb06a"
+            opacity={0.45}
+            cornerRadius={4}
+          />
+          <Rect
+            x={plotOffsetX + entrancePos * plotW * scale + gateHalfPx + scale * 0.6}
+            y={plotOffsetY + scale * 0.25}
+            width={Math.max(12, plotOffsetX + plotW * scale - (plotOffsetX + entrancePos * plotW * scale + gateHalfPx + scale * 1.2))}
+            height={Math.max(6, PLOT_PADDING_FT * scale - scale * 0.4)}
+            fill="#7fb06a"
+            opacity={0.45}
+            cornerRadius={4}
+          />
+          {/* Front trees */}
+          <Circle x={plotOffsetX + Math.max(scale * 1.2, entrancePos * plotW * scale - gateHalfPx - scale * 1.6)} y={plotOffsetY + PLOT_PADDING_FT * scale * 0.52} radius={Math.max(4, scale * 0.32)} fill="#3e6f3e" opacity={0.85} />
+          <Circle x={plotOffsetX + Math.min(plotW * scale - scale * 1.2, entrancePos * plotW * scale + gateHalfPx + scale * 1.6)} y={plotOffsetY + PLOT_PADDING_FT * scale * 0.52} radius={Math.max(4, scale * 0.32)} fill="#3e6f3e" opacity={0.85} />
+          <Line points={[plotOffsetX, plotOffsetY + plotH * scale, plotOffsetX + plotW * scale, plotOffsetY + plotH * scale]} stroke="#4b5a39" strokeWidth={5} />
+          <Line points={[plotOffsetX, plotOffsetY, plotOffsetX, plotOffsetY + plotH * scale]} stroke="#4b5a39" strokeWidth={5} />
+          <Line points={[plotOffsetX + plotW * scale, plotOffsetY, plotOffsetX + plotW * scale, plotOffsetY + plotH * scale]} stroke="#4b5a39" strokeWidth={5} />
+          <Line points={[plotOffsetX, plotOffsetY, plotOffsetX + entrancePos * plotW * scale - gateHalfPx, plotOffsetY]} stroke="#4b5a39" strokeWidth={5} />
+          <Line points={[plotOffsetX + entrancePos * plotW * scale + gateHalfPx, plotOffsetY, plotOffsetX + plotW * scale, plotOffsetY]} stroke="#4b5a39" strokeWidth={5} />
+          <Rect
+            x={buildingOffsetX}
+            y={buildingOffsetY}
+            width={localW * scale}
+            height={localH * scale}
             stroke="#1a1a1a"
             strokeWidth={5}
             cornerRadius={2}
           />
-          <Text x={offsetX + localPlan.width * scale / 2 - 20} y={offsetY + localPlan.height * scale + 16}
-            text={`${localPlan.width} ft`} fontFamily="Urbanist" fontSize={12} fill="#666" fontStyle="700" />
-          <Text x={offsetX - 32} y={offsetY + localPlan.height * scale / 2}
-            text={`${localPlan.height} ft`} fontFamily="Urbanist" fontSize={12} fill="#666" fontStyle="700" rotation={-90} />
+          <Text x={plotOffsetX + plotW * scale / 2 - 24} y={plotOffsetY + plotH * scale + 16}
+            text={`${Math.round(plotW)} ft`} fontFamily="Urbanist" fontSize={12} fill="#466040" fontStyle="700" />
+          <Text x={plotOffsetX - 32} y={plotOffsetY + plotH * scale / 2}
+            text={`${Math.round(plotH)} ft`} fontFamily="Urbanist" fontSize={12} fill="#466040" fontStyle="700" rotation={-90} />
         </Layer>
       </Stage>
 

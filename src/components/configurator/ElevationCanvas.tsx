@@ -16,6 +16,8 @@ interface Props {
   firstFloorPlan?: Plan;
 }
 
+const PLOT_PADDING_FT = 2;
+
 const MATERIAL_COLORS: Record<Material, { wall: string; trim: string; roof: string; window: string; door: string; accent: string; facade: string }> = {
   budget: { wall: '#e7decf', trim: '#8a8478', roof: '#6b5b4e', window: '#9ec3d4', door: '#6b5040', accent: '#9a8a78', facade: '#d4cbb8' },
   modern: { wall: '#f0ebe3', trim: '#1a1a1a', roof: '#2c2c2c', window: '#a8d4e6', door: '#2a2a2a', accent: '#3a3a3a', facade: '#e2dbd0' },
@@ -23,8 +25,8 @@ const MATERIAL_COLORS: Record<Material, { wall: string; trim: string; roof: stri
 };
 
 const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, plan: Plan }) => {
-  const W = plan.width;
-  const D = plan.height;
+  const W = plan.width || 0;
+  const D = plan.height || 0;
   const prevRoom = useRef<string | null | undefined>(null);
   const animProgress = useRef(1); // 1 = animation complete (idle)
   const targetPos = useRef(new THREE.Vector3(45, 25, 45));
@@ -40,7 +42,7 @@ const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, pl
         targetPos.current.set(45, 25, 45);
         targetLookAt.current.set(0, 0, 0);
       } else {
-        const rs = plan.rooms.filter(r => r.type === activeRoom);
+        const rs = (plan.rooms || []).filter(r => r.type === activeRoom);
         if (rs.length > 0) {
           const avgX = rs.reduce((sum, r) => sum + r.x + r.w / 2, 0) / rs.length;
           const avgY = rs.reduce((sum, r) => sum + r.y + r.h / 2, 0) / rs.length;
@@ -82,6 +84,12 @@ const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, pl
 
 export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom, isDoubleStorey = false, firstFloorPlan }: Props) => {
   const hideRoof = activeRoom && activeRoom !== 'overview' && activeRoom !== 'garden';
+  const safeW = plan.width || 0;
+  const safeD = plan.height || 0;
+  const plotW = safeW + PLOT_PADDING_FT * 2;
+  const plotD = safeD + PLOT_PADDING_FT * 2;
+  const gatePos = Math.max(0.1, Math.min(0.9, plan.plotEntranceX ?? 0.5));
+  const gateX = -plotW / 2 + gatePos * plotW;
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-2xl bg-gradient-to-b from-[hsl(210,35%,22%)] to-[hsl(210,30%,12%)]">
@@ -110,7 +118,7 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           
           <Environment preset="sunset" />
           <Ground />
-          <GrassField planW={plan.width} planD={plan.height} />
+          <GrassField planW={safeW} planD={safeD} />
           
           <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} />
           
@@ -119,12 +127,12 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
             <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} material={material} activeRoom={activeRoom} />
           )}
           
-          <Pathway planD={plan.height} />
+          <Pathway planD={plotD} gateX={gateX} />
           {addons.includes('carport') && <Carport plan={plan} />}
           
-          <Trees planW={plan.width} planD={plan.height} />
-          <Bushes planW={plan.width} planD={plan.height} />
-          {addons.includes('smart_home') && <FenceAround planW={plan.width} planD={plan.height} />}
+          <Trees planW={plotW} planD={plotD} />
+          <Bushes planW={plotW} planD={plotD} />
+          <FenceAround planW={plotW} planD={plotD} gateX={gateX} />
           
           <CameraController activeRoom={activeRoom} plan={plan} />
           <ContactShadows position={[0, 0.02, 0]} opacity={0.55} scale={120} blur={2.8} far={30} />
@@ -193,6 +201,27 @@ const GrassField = ({ planW, planD }: { planW: number; planD: number }) => {
           <meshStandardMaterial color={p.c} roughness={1} />
         </mesh>
       ))}
+      {/* Front featured trees */}
+      <group position={[-planW * 0.18, 0, planD / 2 - 1.4]}>
+        <mesh castShadow position={[0, 2.8, 0]}>
+          <cylinderGeometry args={[0.24, 0.34, 5.4, 7]} />
+          <meshStandardMaterial color="#3a2a1a" roughness={0.9} />
+        </mesh>
+        <mesh castShadow position={[0, 5.8, 0]}>
+          <sphereGeometry args={[2.3, 10, 8]} />
+          <meshStandardMaterial color="#2f5f2f" roughness={0.85} />
+        </mesh>
+      </group>
+      <group position={[planW * 0.18, 0, planD / 2 - 1.3]}>
+        <mesh castShadow position={[0, 2.7, 0]}>
+          <cylinderGeometry args={[0.22, 0.33, 5.2, 7]} />
+          <meshStandardMaterial color="#3a2a1a" roughness={0.9} />
+        </mesh>
+        <mesh castShadow position={[0, 5.6, 0]}>
+          <sphereGeometry args={[2.2, 10, 8]} />
+          <meshStandardMaterial color="#366836" roughness={0.85} />
+        </mesh>
+      </group>
     </group>
   );
 };
@@ -243,7 +272,7 @@ const House = ({ plan, roof, material, activeRoom, addons }: {
   }, []);
 
   // 1. & 4. Compute exact bounding box for the structure
-  const mainRooms = plan.rooms.filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony');
+  const mainRooms = (plan.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony');
   const minX = Math.min(...mainRooms.map(r => r.x));
   const maxX = Math.max(...mainRooms.map(r => r.x + r.w));
   const minZ = Math.min(...mainRooms.map(r => r.y));
@@ -275,7 +304,7 @@ const House = ({ plan, roof, material, activeRoom, addons }: {
     }
   };
 
-  plan.rooms.forEach(room => {
+  (plan.rooms || []).forEach(room => {
     // Only extract solid walls for enclosed rooms
     if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony') return;
 
@@ -292,7 +321,7 @@ const House = ({ plan, roof, material, activeRoom, addons }: {
       } else if (room.type === 'bathroom') {
         doorCategory = 'bathroom';
       } else {
-        const connRoom = plan.rooms.find(r => r.id === d.connectsTo);
+        const connRoom = (plan.rooms || []).find(r => r.id === d.connectsTo);
         if (connRoom?.type === 'bathroom') doorCategory = 'bathroom';
       }
       return {
@@ -337,7 +366,7 @@ const House = ({ plan, roof, material, activeRoom, addons }: {
 
       {/* Render Room Floors & Furniture */}
       <group position={[0, 0.8, 0]}>
-        {plan.rooms.map(r => {
+        {(plan.rooms || []).map(r => {
           // 3. Consistent Coordinate System centered translation
           const cx = round2(r.x + r.w / 2 - W / 2);
           const cz = round2(r.y + r.h / 2 - D / 2);
@@ -492,7 +521,7 @@ const House = ({ plan, roof, material, activeRoom, addons }: {
       {addons.includes('water_tank') && !hideRoof && <WaterTank maxX={maxX - W/2} maxZ={maxZ - D/2} wallH={wallH} roofType={roof} />}
 
       {/* Floating Labels */}
-      {plan.rooms.map(r => {
+      {(plan.rooms || []).map(r => {
         if (r.type === 'garden' || r.type === 'carport') return null;
         const isActive = activeRoom === r.type;
         return (
@@ -904,7 +933,7 @@ const WaterTank = ({ maxX, maxZ, wallH, roofType }: any) => {
 };
 
 const Carport = ({ plan }: any) => {
-  const c = plan.rooms.find((r:any) => r.type === 'carport');
+  const c = (plan.rooms || []).find((r:any) => r.type === 'carport');
   if (!c) return null;
   const rx = c.x - plan.width/2 + c.w/2;
   const rz = c.y - plan.height/2 + c.h/2;
@@ -953,18 +982,18 @@ const Balcony = ({ W, D, wallH, trimColor }: any) => (
   </group>
 );
 
-const Pathway = ({ planD }: { planD: number }) => (
+const Pathway = ({ planD, gateX }: { planD: number; gateX: number }) => (
   <group>
     {/* Main pathway stones */}
     {Array.from({ length: 10 }).map((_, i) => (
       <group key={i}>
-        <mesh receiveShadow position={[0, 0.05, planD / 2 + 6 + i * 2.2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh receiveShadow position={[gateX, 0.05, planD / 2 + 6 + i * 2.2]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[4, 1.8]} />
           <meshStandardMaterial color={i % 2 === 0 ? '#c0b0a0' : '#b0a090'} roughness={0.8} />
         </mesh>
         {/* Stone border edges */}
         {[-2.2, 2.2].map((ox, bi) => (
-          <mesh key={bi} receiveShadow position={[ox, 0.06, planD / 2 + 6 + i * 2.2]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh key={bi} receiveShadow position={[gateX + ox, 0.06, planD / 2 + 6 + i * 2.2]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[0.3, 1.8]} />
             <meshStandardMaterial color="#8a7a68" roughness={0.85} />
           </mesh>
@@ -975,7 +1004,7 @@ const Pathway = ({ planD }: { planD: number }) => (
     {[0, 4, 8].map((i) => (
       <group key={`plight-${i}`}>
         {[-2.5, 2.5].map((ox, li) => (
-          <group key={li} position={[ox, 0.2, planD / 2 + 8 + i * 2.2]}>
+          <group key={li} position={[gateX + ox, 0.2, planD / 2 + 8 + i * 2.2]}>
             <mesh><boxGeometry args={[0.15, 0.4, 0.15]} />
               <meshStandardMaterial color="#555" roughness={0.4} metalness={0.3} /></mesh>
             <pointLight intensity={0.2} distance={4} color="#ffe8c0" position={[0, 0.3, 0]} />
@@ -1035,6 +1064,11 @@ const Bushes = ({ planW, planD }: { planW: number; planD: number }) => {
     for (let z = -planD / 2 + 3; z < planD / 2; z += 4) arr.push({ x: -planW / 2 - 2.5, z, s: 0.9 + (Math.abs(z) % 3) * 0.12, c: colors[(Math.abs(Math.floor(z)) + 1) % colors.length] });
     // Right side
     for (let z = -planD / 2 + 3; z < planD / 2; z += 4) arr.push({ x: planW / 2 + 2.5, z, s: 0.9 + (Math.abs(z) % 3) * 0.12, c: colors[(Math.abs(Math.floor(z)) + 2) % colors.length] });
+    // Front side landscaping band (skip center gate approach)
+    for (let x = -planW / 2 + 2; x < planW / 2; x += 2.8) {
+      if (Math.abs(x) < 3.2) continue;
+      arr.push({ x, z: planD / 2 - 1.6, s: 0.85 + (Math.abs(x) % 2) * 0.2, c: colors[(Math.abs(Math.floor(x)) + 3) % colors.length] });
+    }
     return arr;
   }, [planW, planD]);
   return (
@@ -1055,14 +1089,17 @@ const Bushes = ({ planW, planD }: { planW: number; planD: number }) => {
   );
 };
 
-const FenceAround = ({ planW, planD }: { planW: number; planD: number }) => {
-  const fenceOffset = 14;
-  const hw = planW / 2 + fenceOffset;
-  const hd = planD / 2 + fenceOffset;
+const FenceAround = ({ planW, planD, gateX }: { planW: number; planD: number; gateX: number }) => {
+  const hw = planW / 2;
+  const hd = planD / 2;
+  const gateHalf = 2.2;
   // Corner pillars and intermediate posts
   const pillars: [number, number][] = [[-hw, -hd], [-hw, hd], [hw, -hd], [hw, hd]];
   const posts: [number, number][] = [];
-  for (let x = -hw; x <= hw; x += 3) { posts.push([x, -hd]); posts.push([x, hd]); }
+  for (let x = -hw; x <= hw; x += 3) {
+    posts.push([x, -hd]);
+    if (x < gateX - gateHalf || x > gateX + gateHalf) posts.push([x, hd]);
+  }
   for (let z = -hd + 3; z < hd; z += 3) { posts.push([-hw, z]); posts.push([hw, z]); }
 
   return (
@@ -1091,11 +1128,31 @@ const FenceAround = ({ planW, planD }: { planW: number; planD: number }) => {
       {[0.6, 1.4, 2.2].map((y) => (
         <group key={y}>
           <mesh position={[0, y, -hd]}><boxGeometry args={[hw * 2, 0.08, 0.06]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
-          <mesh position={[0, y, hd]}><boxGeometry args={[hw * 2, 0.08, 0.06]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
+          <mesh position={[(gateX - gateHalf - hw) / 2, y, hd]}><boxGeometry args={[Math.max(0, gateX - gateHalf - (-hw)), 0.08, 0.06]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
+          <mesh position={[(hw + gateX + gateHalf) / 2, y, hd]}><boxGeometry args={[Math.max(0, hw - (gateX + gateHalf)), 0.08, 0.06]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
           <mesh position={[-hw, y, 0]}><boxGeometry args={[0.06, 0.08, hd * 2]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
           <mesh position={[hw, y, 0]}><boxGeometry args={[0.06, 0.08, hd * 2]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
         </group>
       ))}
+      {/* Entrance gate on top side */}
+      <group position={[gateX, 0, hd]}>
+        <mesh castShadow position={[-gateHalf, 1.5, 0]}>
+          <boxGeometry args={[0.24, 3, 0.24]} />
+          <meshStandardMaterial color="#6b4f30" roughness={0.55} metalness={0.1} />
+        </mesh>
+        <mesh castShadow position={[gateHalf, 1.5, 0]}>
+          <boxGeometry args={[0.24, 3, 0.24]} />
+          <meshStandardMaterial color="#6b4f30" roughness={0.55} metalness={0.1} />
+        </mesh>
+        <mesh castShadow position={[-gateHalf / 2, 1.4, 0.02]}>
+          <boxGeometry args={[gateHalf, 2.1, 0.08]} />
+          <meshStandardMaterial color="#3f2f1f" roughness={0.6} metalness={0.05} />
+        </mesh>
+        <mesh castShadow position={[gateHalf / 2, 1.4, 0.02]}>
+          <boxGeometry args={[gateHalf, 2.1, 0.08]} />
+          <meshStandardMaterial color="#3f2f1f" roughness={0.6} metalness={0.05} />
+        </mesh>
+      </group>
     </group>
   );
 };
@@ -1131,7 +1188,7 @@ const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom }: {
     }
   };
 
-  firstFloorPlan.rooms.forEach(room => {
+  (firstFloorPlan?.rooms || []).forEach(room => {
     if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony') return;
     const rX = room.x, rY = room.y, rW = room.w, rH = room.h;
     const getAbsDoors = (wall: string) => (room.doors || []).filter((d:any) => d.wall === wall).map((d:any) => {
@@ -1141,7 +1198,7 @@ const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom }: {
       } else if (room.type === 'bathroom') {
         doorCategory = 'bathroom';
       } else {
-        const connRoom = firstFloorPlan.rooms.find(r => r.id === d.connectsTo);
+        const connRoom = (firstFloorPlan?.rooms || []).find(r => r.id === d.connectsTo);
         if (connRoom?.type === 'bathroom') doorCategory = 'bathroom';
       }
       return {
@@ -1168,7 +1225,7 @@ const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom }: {
 
       <group position={[round2(-W / 2 + (W - ffW) / 2), 0.3, round2(-D / 2 + (D - ffH) / 2)]}>
         {/* Room floors */}
-        {firstFloorPlan.rooms.map(r => {
+        {(firstFloorPlan?.rooms || []).map(r => {
           const cx = round2(r.x + r.w / 2);
           const cz = round2(r.y + r.h / 2);
           return (
@@ -1208,7 +1265,7 @@ const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom }: {
         })}
 
         {/* Room labels */}
-        {firstFloorPlan.rooms.map(r => (
+        {(firstFloorPlan?.rooms || []).map(r => (
           <Html key={`label2-${r.id}`} position={[r.x + r.w/2, 3, r.y + r.h/2]} center zIndexRange={[100, 0]}>
             <div className="pointer-events-none px-3 py-1 rounded-sm bg-white/90 border border-black/10 shadow-lg text-[10px] font-display font-bold tracking-widest whitespace-nowrap">
               {r.label}

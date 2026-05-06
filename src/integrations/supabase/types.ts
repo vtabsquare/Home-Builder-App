@@ -47,6 +47,45 @@ export type Database = {
         }
         Relationships: []
       }
+      presets: {
+        Row: {
+          id: string
+          name: string
+          plan_data: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          plan_data: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          plan_data?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
+      package_layouts: {
+        Row: {
+          package_key: string
+          plan_data: Json
+          updated_at: string
+        }
+        Insert: {
+          package_key: string
+          plan_data?: Json
+          updated_at?: string
+        }
+        Update: {
+          package_key?: string
+          plan_data?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

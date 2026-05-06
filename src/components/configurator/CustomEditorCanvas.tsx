@@ -14,7 +14,7 @@ interface Props {
 }
 
 // Room block templates
-const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaultW: number; defaultH: number; color: string }[] = [
+export const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaultW: number; defaultH: number; color: string }[] = [
   { type: 'bedroom', label: 'Bedroom', icon: BedDouble, defaultW: 12, defaultH: 10, color: 'hsl(33 35% 82%)' },
   { type: 'living', label: 'Hall/Living', icon: Sofa, defaultW: 16, defaultH: 14, color: 'hsl(40 30% 87%)' },
   { type: 'bathroom', label: 'Bathroom', icon: Bath, defaultW: 7, defaultH: 7, color: 'hsl(200 30% 82%)' },
