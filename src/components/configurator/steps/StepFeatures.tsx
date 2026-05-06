@@ -1,7 +1,7 @@
 import { useConfig, AddOn, KitchenType } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { ADDON_META, formatMoney } from '@/lib/cost';
-import { Minus, Plus, Sun, Car, Droplets, Cpu, Check } from 'lucide-react';
+import { Minus, Plus, Sun, Car, Droplets, Cpu, Check, Fence, Trees } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const ADDON_ICON: Record<AddOn, any> = {
@@ -9,6 +9,8 @@ const ADDON_ICON: Record<AddOn, any> = {
   carport: Car,
   water_tank: Droplets,
   smart_home: Cpu,
+  fence: Fence,
+  landscaping: Trees,
 };
 
 const KITCHENS: { id: KitchenType; label: string; desc: string }[] = [

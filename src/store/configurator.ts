@@ -6,7 +6,7 @@ export type LandChoice = 'own' | 'need' | null;
 export type LandSize = 'small' | 'medium' | 'large' | 'custom' | null;
 export type HomeType = 'starter' | 'family' | 'premium';
 export type KitchenType = 'standard' | 'open' | 'galley';
-export type AddOn = 'solar' | 'carport' | 'water_tank' | 'smart_home';
+export type AddOn = 'solar' | 'carport' | 'water_tank' | 'smart_home' | 'fence' | 'landscaping';
 export type RoofType = 'gable' | 'flat';
 export type Material = 'budget' | 'modern' | 'luxury';
 export const FAMILY_DOUBLE_STOREY_PACKAGE_KEY = 'family-double-storey';
@@ -128,11 +128,13 @@ export const useConfig = create<ConfigState & ConfigActions>()(
         const d = HOME_TYPE_DEFAULTS[homeType];
         set({ homeType, bedrooms: d.bedrooms, bathrooms: d.bathrooms, presetId: 0, loadedPresetId: null, customPlan: null, isDoubleStorey: false, activeFloor: 0, customFirstFloorPlan: null });
       },
-      setBedrooms: (bedrooms) => set({ bedrooms: Math.max(1, Math.min(6, bedrooms)) }),
-      setBathrooms: (bathrooms) => set({ bathrooms: Math.max(1, Math.min(5, bathrooms)) }),
+      setBedrooms: (bedrooms) => set({ bedrooms: Math.max(1, Math.min(6, bedrooms)), customPlan: null, customFirstFloorPlan: null }),
+      setBathrooms: (bathrooms) => set({ bathrooms: Math.max(1, Math.min(5, bathrooms)), customPlan: null, customFirstFloorPlan: null }),
       setKitchen: (kitchen) => set({ kitchen }),
       toggleAddon: (a) => set((s) => ({
         addons: s.addons.includes(a) ? s.addons.filter((x) => x !== a) : [...s.addons, a],
+        customPlan: null,
+        customFirstFloorPlan: null,
       })),
       setRoof: (roof) => set({ roof }),
       setMaterial: (material) => set({ material }),

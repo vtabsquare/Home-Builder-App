@@ -11,6 +11,8 @@ const ADDON_COST: Record<AddOn, { label: string; cost: number }> = {
   carport: { label: 'Carport', cost: 8500 },
   water_tank: { label: 'Water Tank', cost: 4200 },
   smart_home: { label: 'Smart Home Package', cost: 15800 },
+  fence: { label: 'Perimeter Fence', cost: 15000 },
+  landscaping: { label: 'Landscaping', cost: 10000 },
 };
 
 const BEDROOM_COST = 9500;

@@ -118,7 +118,7 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           
           <Environment preset="sunset" />
           <Ground />
-          <GrassField planW={safeW} planD={safeD} />
+          {addons.includes('landscaping') && <GrassField planW={safeW} planD={safeD} />}
           
           <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} />
           
@@ -130,9 +130,13 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           <Pathway planD={plotD} gateX={gateX} />
           {addons.includes('carport') && <Carport plan={plan} />}
           
-          <Trees planW={plotW} planD={plotD} />
-          <Bushes planW={plotW} planD={plotD} />
-          <FenceAround planW={plotW} planD={plotD} gateX={gateX} />
+          {addons.includes('landscaping') && (
+            <>
+              <Trees planW={plotW} planD={plotD} />
+              <Bushes planW={plotW} planD={plotD} />
+            </>
+          )}
+          {addons.includes('fence') && <FenceAround planW={plotW} planD={plotD} gateX={gateX} />}
           
           <CameraController activeRoom={activeRoom} plan={plan} />
           <ContactShadows position={[0, 0.02, 0]} opacity={0.55} scale={120} blur={2.8} far={30} />
@@ -578,9 +582,9 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
     });
 
     windows.forEach((win: any) => {
-      const ww = win.width;
-      const wh = 5;
-      const wy = 4.5;
+      const ww = 3.2;
+      const wh = 3.2;
+      const wy = 5.5;
       const wx = w * win.relPos - w/2 - ww/2;
       const hole = new THREE.Path();
       hole.moveTo(wx, wy);
@@ -727,34 +731,41 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
 
       {/* ── Windows — proportioned for taller walls ── */}
       {windows.map((win: any, i: number) => {
-        const ww = win.width;
-        const wh = 5;
-        const wy = 4.5 + wh/2;
+        const ww = 3.2;
+        const wh = 3.2;
+        const wy = 5.5 + wh/2;
         const wx = w * win.relPos - w/2;
+        // Wall front face is at z = t/2 (approx 0.2)
         return (
-          <group key={`w-${i}`} position={[wx, wy, 0]}>
-            <mesh>
-              <boxGeometry args={[ww + 0.4, wh + 0.4, t + 0.1]} />
-              <meshStandardMaterial color={frameColor} roughness={0.6} />
+          <group key={`w-${i}`} position={[wx, wy, 0.2]}>
+            {/* 1. Main outer casing (Thick architectural molding) */}
+            <mesh position={[0, 0, 0.08]}>
+              <boxGeometry args={[ww + 0.8, wh + 0.8, 0.15]} />
+              <meshStandardMaterial color="#ffffff" roughness={0.3} metalness={0.1} />
             </mesh>
-            {/* Window cross dividers */}
-            <mesh position={[0, 0, 0.01]}>
-              <boxGeometry args={[0.08, wh, 0.06]} />
-              <meshStandardMaterial color={frameColor} roughness={0.5} />
+            {/* 2. Window frame (Recessed inside the hole) */}
+            <mesh position={[0, 0, -0.1]}>
+              <boxGeometry args={[ww + 0.1, wh + 0.1, 0.3]} />
+              <meshStandardMaterial color="#e8e8e8" roughness={0.5} />
             </mesh>
-            <mesh position={[0, 0, 0.01]}>
-              <boxGeometry args={[ww, 0.08, 0.06]} />
-              <meshStandardMaterial color={frameColor} roughness={0.5} />
+            {/* 3. Window cross dividers (4-pane style) - Bold detail */}
+            <mesh position={[0, 0, 0.02]}>
+              <boxGeometry args={[0.15, wh, 0.15]} />
+              <meshStandardMaterial color="#cccccc" roughness={0.4} />
             </mesh>
-            {/* Glass pane */}
-            <mesh>
-              <boxGeometry args={[ww, wh, 0.05]} />
-              <meshStandardMaterial color={glassColor} roughness={0.1} metalness={0.4} transparent opacity={0.55} depthWrite={false} />
+            <mesh position={[0, 0, 0.02]}>
+              <boxGeometry args={[ww, 0.15, 0.15]} />
+              <meshStandardMaterial color="#cccccc" roughness={0.4} />
             </mesh>
-            {/* Window sill */}
-            <mesh position={[0, -wh/2 - 0.15, 0.1]}>
-              <boxGeometry args={[ww + 0.6, 0.15, 0.4]} />
-              <meshStandardMaterial color={frameColor} roughness={0.6} />
+            {/* 4. High-transparency Glass - Deeply recessed */}
+            <mesh position={[0, 0, -0.15]}>
+              <boxGeometry args={[ww, wh, 0.02]} />
+              <meshStandardMaterial color="#ffffff" roughness={0} metalness={1} transparent opacity={0.15} envMapIntensity={2} />
+            </mesh>
+            {/* 5. Heavy architectural window sill */}
+            <mesh position={[0, -wh/2 - 0.25, 0.2]}>
+              <boxGeometry args={[ww + 1.2, 0.25, 0.5]} />
+              <meshStandardMaterial color="#ffffff" roughness={0.3} />
             </mesh>
           </group>
         );
@@ -787,19 +798,40 @@ const GableRoof = ({ W, D, cx, cz, wallH, color, trimColor, transparent, opacity
         <meshStandardMaterial color={color} roughness={0.7} side={THREE.DoubleSide} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
       </mesh>
       {/* Ridge cap */}
-      <mesh position={[0, roofH + 0.12, hd]}>
-        <boxGeometry args={[0.35, 0.25, hd * 2 + 0.5]} />
-        <meshStandardMaterial color={trimColor} roughness={0.4} metalness={0.15} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
+      <mesh position={[0, roofH + 0.15, hd]}>
+        <boxGeometry args={[0.5, 0.3, hd * 2 + 0.6]} />
+        <meshStandardMaterial color={trimColor} roughness={0.4} metalness={0.3} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
       </mesh>
+      {/* Standing Seam Ribs (High-detail architectural feature) */}
+      {Array.from({ length: Math.floor(hd * 2 / 3) }).map((_, i) => (
+        <group key={`rib-${i}`} position={[0, 0, i * 3 + 1.5]}>
+          {[-1, 1].map((side) => {
+            const angle = Math.atan2(roofH, hw) * -side;
+            const len = Math.hypot(hw, roofH);
+            return (
+              <mesh key={side} position={[side * hw / 2, roofH / 2 + 0.05, 0]} rotation={[0, 0, angle]}>
+                <boxGeometry args={[len, 0.08, 0.08]} />
+                <meshStandardMaterial color={trimColor} roughness={0.3} metalness={0.2} transparent={transparent} opacity={0.6} depthWrite={!transparent} />
+              </mesh>
+            );
+          })}
+        </group>
+      ))}
       {/* Fascia boards (front & back gable edges) */}
-      <mesh position={[0, roofH * 0.48, -0.08]}>
-        <boxGeometry args={[hw * 2 + 0.3, 0.2, 0.18]} />
-        <meshStandardMaterial color={trimColor} roughness={0.5} metalness={0.1} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
-      </mesh>
-      <mesh position={[0, roofH * 0.48, hd * 2 + 0.08]}>
-        <boxGeometry args={[hw * 2 + 0.3, 0.2, 0.18]} />
-        <meshStandardMaterial color={trimColor} roughness={0.5} metalness={0.1} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
-      </mesh>
+      {[0, hd * 2].map((zPos, zi) => (
+        <group key={zi} position={[0, 0, zPos + (zi === 0 ? -0.08 : 0.08)]}>
+          {[-1, 1].map((side, si) => {
+            const angle = Math.atan2(roofH, hw) * -side;
+            const len = Math.hypot(hw, roofH);
+            return (
+              <mesh key={si} position={[side * hw / 2, roofH / 2, 0]} rotation={[0, 0, angle]}>
+                <boxGeometry args={[len + 0.1, 0.4, 0.15]} />
+                <meshStandardMaterial color={trimColor} roughness={0.5} metalness={0.1} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
+              </mesh>
+            );
+          })}
+        </group>
+      ))}
       {/* Eave / soffit trim (left & right overhangs) */}
       {[-1, 1].map((side, ei) => (
         <mesh key={`eave-${ei}`} position={[side * hw, -0.1, hd]}>
@@ -887,25 +919,46 @@ const SolarPanels = ({ minX, maxX, minZ, maxZ, roofType, wallH }: any) => {
       }
     }
   } else {
-    // Gable Roof
-    const centerZ = (minZ + maxZ) / 2;
+    // Gable Roof (Ridge along Z)
+    const centerX = (minX + maxX) / 2;
     const roofH = 6;
-    const slopeLen = Math.hypot((maxZ - minZ)/2 + 2, roofH); 
-    const angle = Math.atan2(roofH, (maxZ - minZ)/2 + 2);
+    const overhang = 2.5;
+    const run = (maxX - minX) / 2 + overhang;
+    const angle = Math.atan2(roofH, run);
     
-    // Front slope
-    const pz = centerZ + (maxZ - centerZ) / 2;
-    const py = wallH + roofH / 2 + 1; 
-    const rotX = - (Math.PI / 2 - angle);
+    const depthAvailable = (maxZ - minZ) - margin * 2;
+    const rows = Math.max(1, Math.floor(depthAvailable / (panelD + gap)));
 
-    for (let c = 0; c < cols; c++) {
-        const px = startX + c * (panelW + gap) + panelW/2;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const px_raw = startX + c * (panelW + gap) + panelW/2;
+        const pz = startZ + r * (panelD + gap) + panelD/2;
+        
+        const isLeft = px_raw < centerX;
+        let px = px_raw;
+        if (isLeft) {
+          px = Math.min(px, centerX - 3);
+        } else {
+          px = Math.max(px, centerX + 3);
+        }
+
+        const distFromCenter = Math.abs(px - centerX);
+        const heightOnSlope = (1 - distFromCenter / run) * roofH;
+        const py = wallH + 0.8 + heightOnSlope + 0.15; 
+
+        // Tilt angle for the group
+        const rotZ = isLeft ? angle : -angle;
+
         panels.push(
-          <mesh key={`g-${c}`} position={[px, py, pz]} rotation={[rotX, 0, 0]} castShadow>
-            <boxGeometry args={[panelW, panelD, 0.2]} />
-            <meshStandardMaterial color="#1a2a4a" metalness={0.8} roughness={0.2} />
-          </mesh>
+          <group key={`g-${r}-${c}`} position={[px, py, pz]} rotation={[0, 0, rotZ]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} castShadow>
+              {/* Swap W and D: 5 units along the slope (X), 3.5 units along the ridge (Z) */}
+              <boxGeometry args={[5, 3.5, 0.12]} />
+              <meshStandardMaterial color="#0a1224" metalness={0.95} roughness={0.05} />
+            </mesh>
+          </group>
         );
+      }
     }
   }
 
@@ -956,23 +1009,13 @@ const Carport = ({ plan }: any) => {
 /* ─── Decor ─── */
 const Balcony = ({ W, D, wallH, trimColor }: any) => (
   <group position={[0, 0.6, D / 2]}>
+    {/* Balcony deck slab */}
     <mesh receiveShadow position={[0, 0, 2.5]}>
       <boxGeometry args={[W * 0.6, 0.3, 5]} />
       <meshStandardMaterial color="#8a7a68" roughness={0.8} />
     </mesh>
-    {Array.from({ length: 8 }).map((_, i) => {
-      const x = -W * 0.3 + (W * 0.6 / 7) * i;
-      return (
-        <mesh key={i} position={[x, 1.8, 4.9]} castShadow>
-          <boxGeometry args={[0.2, 3, 0.2]} />
-          <meshStandardMaterial color={trimColor} roughness={0.5} metalness={0.2} />
-        </mesh>
-      );
-    })}
-    <mesh position={[0, 3.3, 4.9]}>
-      <boxGeometry args={[W * 0.6 + 0.3, 0.15, 0.25]} />
-      <meshStandardMaterial color={trimColor} roughness={0.5} metalness={0.2} />
-    </mesh>
+    
+    {/* Stairs leading to garden */}
     {[0, 1, 2].map((s) => (
       <mesh key={s} receiveShadow position={[0, -s * 0.35, 5 + s * 1.2]}>
         <boxGeometry args={[4, 0.3, 1.2]} />

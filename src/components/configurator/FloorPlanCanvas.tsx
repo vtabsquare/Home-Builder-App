@@ -375,31 +375,43 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
         </Layer>
 
         <Layer listening={false}>
-          {(localPlan.rooms || []).map(room => (
-             <Text key={`label-${room.id}`}
+          {(localPlan.rooms || []).map(room => {
+            const isRooftop = room.id.startsWith('addon-solar') || room.id.startsWith('addon-tank');
+            const isFence = room.id === 'addon-fence';
+            
+            const labelY = isFence 
+              ? buildingOffsetY + room.y * scale - 22 
+              : buildingOffsetY + room.y * scale + (room.h * scale)/2 - (isRooftop ? 0 : 10);
+
+            return (
+              <Text key={`label-${room.id}`}
                 text={room.label} 
-                fontFamily="Urbanist" fontStyle="800" 
-                fontSize={Math.max(10, Math.min(14, room.w * scale * 0.08))}
-                fill="rgba(0,0,0,0.75)" 
+                fontFamily="Urbanist" fontStyle={(isRooftop || isFence) ? "600 italic" : "800"} 
+                fontSize={(isRooftop || isFence) ? 9 : Math.max(10, Math.min(14, room.w * scale * 0.08))}
+                fill={(isRooftop || isFence) ? "rgba(26, 42, 74, 0.7)" : "rgba(0,0,0,0.75)"} 
                 align="center" verticalAlign="middle"
                 x={buildingOffsetX + room.x * scale} 
-                y={buildingOffsetY + room.y * scale + (room.h * scale)/2 - 10} 
+                y={labelY} 
                 width={room.w * scale} 
                 shadowColor="white" shadowBlur={6} shadowOpacity={1} shadowOffset={{x:0, y:0}}
-                letterSpacing={1.2} />
-          ))}
-          {(localPlan.rooms || []).map(room => (
-             <Text key={`dim-${room.id}`}
-                text={`${Math.round(room.w)}′ × ${Math.round(room.h)}′`} 
-                fontFamily="Epilogue" fontStyle="600" 
-                fontSize={9}
-                fill="rgba(0,0,0,0.55)" 
-                align="center" verticalAlign="middle"
-                x={buildingOffsetX + room.x * scale} 
-                y={buildingOffsetY + room.y * scale + (room.h * scale)/2 + 6} 
-                width={room.w * scale} 
-                shadowColor="white" shadowBlur={4} shadowOpacity={1} shadowOffset={{x:0, y:0}} />
-          ))}
+                letterSpacing={(isRooftop || isFence) ? 0.5 : 1.2} />
+            );
+          })}
+          {(localPlan.rooms || []).map(room => {
+            if (room.id === 'addon-fence') return null; // Don't show dimensions for fence
+            return (
+              <Text key={`dim-${room.id}`}
+                 text={`${Math.round(room.w)}′ × ${Math.round(room.h)}′`} 
+                 fontFamily="Epilogue" fontStyle="600" 
+                 fontSize={9}
+                 fill="rgba(0,0,0,0.55)" 
+                 align="center" verticalAlign="middle"
+                 x={buildingOffsetX + room.x * scale} 
+                 y={buildingOffsetY + room.y * scale + (room.h * scale)/2 + 6} 
+                 width={room.w * scale} 
+                 shadowColor="white" shadowBlur={4} shadowOpacity={1} shadowOffset={{x:0, y:0}} />
+            );
+          })}
         </Layer>
 
         <Layer listening={false}>
@@ -501,6 +513,10 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
   const rw = room.w * scale;
   const rh = room.h * scale;
 
+  const isRooftop = room.id.startsWith('addon-solar') || room.id.startsWith('addon-tank');
+  const isFence = room.id === 'addon-fence';
+  const isTree = room.id.startsWith('addon-tree');
+  
   return (
     <Group 
       x={rx} y={ry} 
@@ -510,15 +526,23 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
       onTransformEnd={onTransformEnd}
       ref={innerRef}
     >
-      <Rect width={rw} height={rh} fill={room.color} opacity={1} />
+      <Rect 
+        width={rw} height={rh} 
+        fill={isTree ? 'rgba(34, 197, 94, 0.4)' : room.color} 
+        cornerRadius={isTree ? rw / 2 : 0}
+        opacity={(isRooftop || isFence) ? 0.6 : 1} 
+        dash={(isRooftop || isFence) ? [5, 5] : undefined}
+        stroke={(isRooftop || isFence) ? (isFence ? '#4a6741' : 'rgba(0,0,0,0.4)') : undefined}
+        strokeWidth={(isRooftop || isFence) ? (isFence ? 4 : 1) : 0}
+      />
       {/* Explicitly draw individual walls to support open floor plans */}
-      {(!room.openWalls || !room.openWalls.includes('top')) && <Line points={[0, 0, rw, 0]} stroke="#2c2c2c" strokeWidth={3} />}
-      {(!room.openWalls || !room.openWalls.includes('bottom')) && <Line points={[0, rh, rw, rh]} stroke="#2c2c2c" strokeWidth={3} />}
-      {(!room.openWalls || !room.openWalls.includes('left')) && <Line points={[0, 0, 0, rh]} stroke="#2c2c2c" strokeWidth={3} />}
-      {(!room.openWalls || !room.openWalls.includes('right')) && <Line points={[rw, 0, rw, rh]} stroke="#2c2c2c" strokeWidth={3} />}
+      {!isRooftop && !isFence && !isTree && (!room.openWalls || !room.openWalls.includes('top')) && <Line points={[0, 0, rw, 0]} stroke="#2c2c2c" strokeWidth={3} />}
+      {!isRooftop && !isFence && !isTree && (!room.openWalls || !room.openWalls.includes('bottom')) && <Line points={[0, rh, rw, rh]} stroke="#2c2c2c" strokeWidth={3} />}
+      {!isRooftop && !isFence && !isTree && (!room.openWalls || !room.openWalls.includes('left')) && <Line points={[0, 0, 0, rh]} stroke="#2c2c2c" strokeWidth={3} />}
+      {!isRooftop && !isFence && !isTree && (!room.openWalls || !room.openWalls.includes('right')) && <Line points={[rw, 0, rw, rh]} stroke="#2c2c2c" strokeWidth={3} />}
       
       {/* Floor Textures */}
-      {room.type === 'bathroom' && (
+      {!isRooftop && !isFence && !isTree && room.type === 'bathroom' && (
         <Group opacity={0.15}>
           {Array.from({ length: Math.ceil(rw / (1.5*scale)) }).map((_, i) => (
             <Line key={`v-${i}`} points={[i * 1.5 * scale, 0, i * 1.5 * scale, rh]} stroke="#000" strokeWidth={1} />

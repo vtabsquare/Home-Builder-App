@@ -166,26 +166,42 @@ function bathroomFurniture(w: number, h: number, isMaster: boolean, orient: numb
 function kitchenFurniture(w: number, h: number, kitchenType: string, orient: number = 0): FurnitureItem[] {
   const items: FurnitureItem[] = [];
   const G = 0.4;
-  const cW = w - 2 * G - 2.2; // Leave space for fridge
-  const cH = h - 2 * G - 2.2;
-  const cD = 2;
+  
+  if (kitchenType === 'open') {
+    // OPEN: Island + Back Counter
+    items.push({ type: 'counter', x: G, y: G, w: w - 2*G, h: 2, rotation: 0 });
+    items.push({ type: 'stove', x: w * 0.2, y: G + 0.1, w: 2.5, h: 1.6, rotation: 0 });
+    items.push({ type: 'fridge', x: w - 2.5 - G, y: G + 0.1, w: 2.2, h: 2.2, rotation: 0 });
+    items.push({ type: 'island', x: (w - 6) / 2, y: h * 0.4, w: 6, h: 3, rotation: 0 });
+  } else if (kitchenType === 'galley') {
+    // GALLEY: Two parallel vertical counters
+    items.push({ type: 'counter', x: G, y: G, w: 2, h: h - 2*G, rotation: 0 });
+    items.push({ type: 'counter', x: w - 2 - G, y: G, w: 2, h: h - 2*G, rotation: 0 });
+    items.push({ type: 'stove', x: G + 0.1, y: h * 0.3, w: 1.6, h: 2.5, rotation: 0 });
+    items.push({ type: 'fridge', x: w - G - 2.1, y: h * 0.6, w: 2.2, h: 2.2, rotation: 0 });
+  } else {
+    // STANDARD (based on orientation)
+    const cW = w - 2 * G - 2.2;
+    const cH = h - 2 * G - 2.2;
+    const cD = 2;
 
-  if (orient === 0) {
-    items.push({ type: 'counter', x: G, y: G, w: cW, h: cD, rotation: 0 });
-    items.push({ type: 'stove',   x: G + cW * 0.4, y: G + 0.1, w: 2.5, h: 1.6, rotation: 0 });
-    items.push({ type: 'fridge',  x: w - 2.2 - G, y: G + 0.1, w: 2.2, h: 2.2, rotation: 0 });
-  } else if (orient === 1) {
-    items.push({ type: 'counter', x: w - G - cD, y: G, w: cD, h: cH, rotation: 0 }); // Wait, counter is vertical! So w=cD, h=cH
-    items.push({ type: 'stove',   x: w - G - 1.6 - 0.1, y: G + cH * 0.4, w: 1.6, h: 2.5, rotation: 0 });
-    items.push({ type: 'fridge',  x: w - G - 2.2 - 0.1, y: h - G - 2.2, w: 2.2, h: 2.2, rotation: 0 });
-  } else if (orient === 2) {
-    items.push({ type: 'counter', x: G, y: h - G - cD, w: cW, h: cD, rotation: 0 }); // Don't use 180, just draw it normally
-    items.push({ type: 'stove',   x: G + cW * 0.4, y: h - G - 1.6 - 0.1, w: 2.5, h: 1.6, rotation: 0 });
-    items.push({ type: 'fridge',  x: w - 2.2 - G, y: h - G - 2.2 - 0.1, w: 2.2, h: 2.2, rotation: 0 });
-  } else if (orient === 3) {
-    items.push({ type: 'counter', x: G, y: G, w: cD, h: cH, rotation: 0 });
-    items.push({ type: 'stove',   x: G + 0.1, y: G + cH * 0.4, w: 1.6, h: 2.5, rotation: 0 });
-    items.push({ type: 'fridge',  x: G + 0.1, y: h - G - 2.2, w: 2.2, h: 2.2, rotation: 0 });
+    if (orient === 0) {
+      items.push({ type: 'counter', x: G, y: G, w: cW, h: cD, rotation: 0 });
+      items.push({ type: 'stove',   x: G + cW * 0.4, y: G + 0.1, w: 2.5, h: 1.6, rotation: 0 });
+      items.push({ type: 'fridge',  x: w - 2.2 - G, y: G + 0.1, w: 2.2, h: 2.2, rotation: 0 });
+    } else if (orient === 1) {
+      items.push({ type: 'counter', x: w - G - cD, y: G, w: cD, h: cH, rotation: 0 });
+      items.push({ type: 'stove',   x: w - G - 1.6 - 0.1, y: G + cH * 0.4, w: 1.6, h: 2.5, rotation: 0 });
+      items.push({ type: 'fridge',  x: w - G - 2.2 - 0.1, y: h - G - 2.2, w: 2.2, h: 2.2, rotation: 0 });
+    } else if (orient === 2) {
+      items.push({ type: 'counter', x: G, y: h - G - cD, w: cW, h: cD, rotation: 0 });
+      items.push({ type: 'stove',   x: G + cW * 0.4, y: h - G - 1.6 - 0.1, w: 2.5, h: 1.6, rotation: 0 });
+      items.push({ type: 'fridge',  x: w - 2.2 - G, y: h - G - 2.2 - 0.1, w: 2.2, h: 2.2, rotation: 0 });
+    } else if (orient === 3) {
+      items.push({ type: 'counter', x: G, y: G, w: cD, h: cH, rotation: 0 });
+      items.push({ type: 'stove',   x: G + 0.1, y: G + cH * 0.4, w: 1.6, h: 2.5, rotation: 0 });
+      items.push({ type: 'fridge',  x: G + 0.1, y: h - G - 2.2, w: 2.2, h: 2.2, rotation: 0 });
+    }
   }
   return items;
 }
@@ -1302,17 +1318,290 @@ function premiumPresetB(c: ConfigState): Plan {
 
 export function generatePlan(c: ConfigState): Plan {
   const presetId = c.presetId || 0;
+  let plan: Plan;
   
   switch (c.homeType) {
     case 'starter':
-      return presetId === 0 ? starterPresetA(c) : starterPresetB(c);
+      plan = presetId === 0 ? starterPresetA(c) : starterPresetB(c);
+      break;
     case 'family':
-      return presetId === 0 ? familyPresetA(c) : familyPresetB(c);
+      plan = presetId === 0 ? familyPresetA(c) : familyPresetB(c);
+      break;
     case 'premium':
-      return presetId === 0 ? premiumPresetA(c) : premiumPresetB(c);
+      plan = presetId === 0 ? premiumPresetA(c) : premiumPresetB(c);
+      break;
     default:
-      return starterPresetA(c);
+      plan = starterPresetA(c);
   }
+
+  return applyDynamicChanges(plan, c);
+}
+
+function applyDynamicChanges(plan: Plan, c: ConfigState): Plan {
+  let rooms = [...plan.rooms];
+  let currentWidth = plan.width;
+  let currentHeight = plan.height;
+  
+  // 1. Handle Bedrooms
+  const beds = rooms.filter(r => r.type === 'bedroom');
+  if (beds.length < c.bedrooms) {
+    for (let i = beds.length; i < c.bedrooms; i++) {
+      const lastBed = beds[beds.length - 1] || rooms[rooms.length - 1];
+      rooms.push({
+        id: `dynamic-bed-${i}`,
+        type: 'bedroom',
+        label: `BEDROOM ${i + 1}`,
+        x: lastBed.x,
+        y: lastBed.y + lastBed.h + 2,
+        w: 10,
+        h: 12,
+        color: COLORS.bedroom,
+        furniture: bedroomFurniture(10, 12, false),
+        doors: [{ wall: 'top', position: 0.5, width: 3, swing: 'in' }],
+        windows: [{ wall: 'right', position: 0.5, width: 4 }],
+      });
+    }
+  } else if (beds.length > c.bedrooms) {
+    let toRemove = beds.length - c.bedrooms;
+    for (let i = rooms.length - 1; i >= 0 && toRemove > 0; i--) {
+      if (rooms[i].type === 'bedroom' && !rooms[i].label.toLowerCase().includes('master')) {
+        rooms.splice(i, 1);
+        toRemove--;
+      }
+    }
+  }
+
+  // 2. Handle Bathrooms
+  const baths = rooms.filter(r => r.type === 'bathroom');
+  if (baths.length < c.bathrooms) {
+    for (let i = baths.length; i < c.bathrooms; i++) {
+      const lastBath = baths[baths.length - 1] || rooms[rooms.length - 1];
+      rooms.push({
+        id: `dynamic-bath-${i}`,
+        type: 'bathroom',
+        label: `BATH ${i + 1}`,
+        x: lastBath.x + lastBath.w + 2,
+        y: lastBath.y,
+        w: 8,
+        h: 6,
+        color: COLORS.bathroom,
+        furniture: bathroomFurniture(8, 6, false),
+        doors: [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in' }],
+        windows: [],
+      });
+    }
+  } else if (baths.length > c.bathrooms) {
+    let toRemove = baths.length - c.bathrooms;
+    for (let i = rooms.length - 1; i >= 0 && toRemove > 0; i--) {
+      if (rooms[i].type === 'bathroom' && !rooms[i].label.toLowerCase().includes('master')) {
+        rooms.splice(i, 1);
+        toRemove--;
+      }
+    }
+  }
+
+  // 3. Handle Kitchen Layout
+  const kitchenRoom = rooms.find(r => r.id === 'kitchen');
+  const diningRoom = rooms.find(r => r.id === 'dining');
+
+  if (kitchenRoom && diningRoom) {
+    if (c.kitchen === 'open') {
+      // MERGE: Combine kitchen and dining into one large space
+      const startY = Math.min(kitchenRoom.y, diningRoom.y);
+      const totalH = kitchenRoom.h + diningRoom.h;
+      const combinedW = Math.max(kitchenRoom.w, diningRoom.w);
+      
+      kitchenRoom.y = startY;
+      kitchenRoom.h = totalH;
+      kitchenRoom.w = combinedW;
+      kitchenRoom.label = 'OPEN KITCHEN + DINING';
+      kitchenRoom.color = COLORS.kitchen;
+      
+      // Add a standard door to the hallway
+      kitchenRoom.doors = [
+        ...(kitchenRoom.doors || []).filter(d => d.connectsTo !== 'dining'), // Clean up old links
+        { wall: 'right', position: 0.2, width: 2.8, swing: 'in', doorType: 'standard', connectsTo: 'main-hallway' }
+      ];
+      
+      // Add shared furniture
+      kitchenRoom.furniture = [
+        ...kitchenFurniture(combinedW, totalH * 0.5, 'open'),
+        { type: 'dining_table', x: combinedW * 0.2, y: totalH * 0.6, w: 6, h: 4, rotation: 0 }
+      ];
+      
+      // Remove the separate dining room
+      rooms = rooms.filter(r => r.id !== 'dining');
+    } else if (c.kitchen === 'galley') {
+      // GALLEY: Side-by-side vertical rooms filling the original combined area
+      const startX = Math.min(kitchenRoom.x, diningRoom.x);
+      const startY = Math.min(kitchenRoom.y, diningRoom.y);
+      const endY = Math.max(kitchenRoom.y + kitchenRoom.h, diningRoom.y + diningRoom.h);
+      const totalW = Math.max(kitchenRoom.w, diningRoom.w);
+      const totalH = endY - startY;
+
+      kitchenRoom.x = startX;
+      kitchenRoom.y = startY;
+      kitchenRoom.w = totalW * 0.6;
+      kitchenRoom.h = totalH;
+      kitchenRoom.label = 'KITCHEN (GALLEY)';
+      kitchenRoom.furniture = kitchenFurniture(kitchenRoom.w, kitchenRoom.h, 'galley');
+      
+      diningRoom.x = startX + kitchenRoom.w;
+      diningRoom.y = startY;
+      diningRoom.w = totalW * 0.4;
+      diningRoom.h = totalH;
+      diningRoom.label = 'DINING';
+      diningRoom.furniture = diningFurniture(diningRoom.w, diningRoom.h);
+    } else {
+      // STANDARD: Stacked horizontally (original layout)
+      // Ensure they are separate and labeled
+      kitchenRoom.label = 'KITCHEN';
+      diningRoom.label = 'DINING';
+      // Reset to original positions if they were modified
+      // (The preset defines these, so we just ensure they aren't merged)
+    }
+  }
+
+  // 4. Handle Carport
+  const livingRooms = rooms.filter(r => r.type !== 'carport' && r.type !== 'garden' && r.id !== 'addon-carport');
+  const buildingHeight = Math.max(plan.height, ...livingRooms.map(r => r.y + r.h));
+  
+  const hasCarport = rooms.some(r => r.type === 'carport' || r.id === 'addon-carport');
+  const wantCarport = c.addons.includes('carport');
+  if (wantCarport && !hasCarport) {
+    const carportW = 12;
+    rooms.push({
+      id: 'addon-carport',
+      type: 'carport',
+      label: 'CARPORT',
+      x: -carportW - 2, // Place on the left
+      y: 0,
+      w: carportW,
+      h: buildingHeight, // Match full height
+      color: COLORS.carport,
+      furniture: [],
+      doors: [],
+      windows: [],
+    });
+  } else if (!wantCarport && hasCarport) {
+    const idx = rooms.findIndex(r => r.type === 'carport' || r.id === 'addon-carport');
+    if (idx !== -1) rooms.splice(idx, 1);
+  } else if (wantCarport && hasCarport) {
+    // Update existing carport height if it changed
+    const cp = rooms.find(r => r.type === 'carport' || r.id === 'addon-carport');
+    if (cp) cp.h = buildingHeight;
+  }
+
+  // 4. Solar Panels & Water Tank (Visual markers in 2D)
+  // We place them INSIDE the house bounds in 2D so they don't take extra land space
+  const mainHouseRooms = rooms.filter(r => r.type !== 'carport' && r.type !== 'garden' && !r.id.startsWith('addon-'));
+  const houseX = Math.min(...mainHouseRooms.map(r => r.x));
+  const houseY = Math.min(...mainHouseRooms.map(r => r.y));
+
+  const hasSolar = rooms.some(r => r.id === 'addon-solar');
+  const wantSolar = c.addons.includes('solar');
+  if (wantSolar && !hasSolar) {
+    rooms.push({
+      id: 'addon-solar',
+      type: 'garden',
+      label: 'SOLAR PANELS (ROOF)',
+      x: houseX + 2,
+      y: houseY + 2,
+      w: 10,
+      h: 4,
+      color: 'rgba(26, 42, 74, 0.4)',
+      furniture: [],
+      doors: [],
+      windows: [],
+    });
+  } else if (!wantSolar && hasSolar) {
+    const idx = rooms.findIndex(r => r.id === 'addon-solar');
+    if (idx !== -1) rooms.splice(idx, 1);
+  }
+
+  const hasTank = rooms.some(r => r.id === 'addon-tank');
+  const wantTank = c.addons.includes('water_tank');
+  if (wantTank && !hasTank) {
+    rooms.push({
+      id: 'addon-tank',
+      type: 'garden',
+      label: 'WATER TANK (ROOF)',
+      x: houseX + 14,
+      y: houseY + 2,
+      w: 4,
+      h: 4,
+      color: 'rgba(0, 0, 255, 0.2)',
+      furniture: [],
+      doors: [],
+      windows: [],
+    });
+  } else if (!wantTank && hasTank) {
+    const idx = rooms.findIndex(r => r.id === 'addon-tank');
+    if (idx !== -1) rooms.splice(idx, 1);
+  }
+
+  // 5. Fence & Landscaping
+  const wantFence = c.addons.includes('fence');
+  const hasFenceMarker = rooms.some(r => r.id === 'addon-fence');
+  if (wantFence && !hasFenceMarker) {
+    rooms.push({
+      id: 'addon-fence',
+      type: 'garden',
+      label: 'PERIMETER FENCE',
+      x: -4,
+      y: -4,
+      w: currentWidth + 8,
+      h: buildingHeight + 8,
+      color: 'transparent',
+      furniture: [],
+      doors: [],
+      windows: [],
+      openWalls: ['top', 'bottom', 'left', 'right'], // Custom styling in canvas
+    });
+  } else if (!wantFence && hasFenceMarker) {
+    const idx = rooms.findIndex(r => r.id === 'addon-fence');
+    if (idx !== -1) rooms.splice(idx, 1);
+  }
+
+  const wantLandscaping = c.addons.includes('landscaping');
+  const hasLandscaping = rooms.some(r => r.id.startsWith('addon-tree'));
+  if (wantLandscaping && !hasLandscaping) {
+    // Add some tree markers in the garden areas
+    [
+      { id: 'addon-tree-1', x: currentWidth + 2, y: 2 },
+      { id: 'addon-tree-2', x: currentWidth + 4, y: 15 },
+      { id: 'addon-tree-3', x: -6, y: 10 },
+    ].forEach(t => {
+      rooms.push({
+        ...t,
+        type: 'garden',
+        label: 'TREE',
+        w: 3,
+        h: 3,
+        color: 'rgba(34, 197, 94, 0.2)',
+        furniture: [],
+        doors: [],
+        windows: [],
+      });
+    });
+  } else if (!wantLandscaping && hasLandscaping) {
+    for (let i = rooms.length - 1; i >= 0; i--) {
+      if (rooms[i].id.startsWith('addon-tree')) rooms.splice(i, 1);
+    }
+  }
+
+  // Final Bounds Calculation & Normalization
+  const minX = Math.min(0, ...rooms.map(r => r.x));
+  const minY = Math.min(0, ...rooms.map(r => r.y));
+  
+  if (minX < 0 || minY < 0) {
+    rooms = rooms.map(r => ({ ...r, x: r.x - minX, y: r.y - minY }));
+  }
+  
+  const maxX = Math.max(1, ...rooms.map(r => r.x + r.w));
+  const maxY = Math.max(1, ...rooms.map(r => r.y + r.h));
+
+  return { ...plan, width: maxX, height: maxY, rooms };
 }
 
 // ── Generate empty plan for custom editor ─────────────────────────
