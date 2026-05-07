@@ -12,8 +12,8 @@ export type Material = 'budget' | 'modern' | 'luxury';
 export const FAMILY_DOUBLE_STOREY_PACKAGE_KEY = 'family-double-storey';
 const BUILT_IN_PRESET_PREFIX = '__builtin_floor_plan__';
 
-export const getBuiltInPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>, presetId: number) =>
-  `${BUILT_IN_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_${presetId}`;
+export const getBuiltInPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>, presetId: number) =>
+  `${BUILT_IN_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_addons_${[...(state.addons || [])].sort().join('-') || 'none'}_${presetId}`;
 
 export const getFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>) =>
   `${FAMILY_DOUBLE_STOREY_PACKAGE_KEY}_${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}`;
@@ -162,11 +162,16 @@ export const useConfig = create<ConfigState & ConfigActions>()(
         };
       }),
       setKitchen: (kitchen) => set({ kitchen }),
-      toggleAddon: (a) => set((s) => ({
-        addons: s.addons.includes(a) ? s.addons.filter((x) => x !== a) : [...s.addons, a],
-        customPlan: null,
-        customFirstFloorPlan: null,
-      })),
+      toggleAddon: (a) => set((s) => {
+        const newAddons = s.addons.includes(a) ? s.addons.filter((x) => x !== a) : [...s.addons, a];
+        // presetOverrides are keyed per addon combination, so no need to clear them.
+        // Each addon combo (e.g. with-carport vs without) has its own saved layout.
+        return {
+          addons: newAddons,
+          customPlan: null,
+          customFirstFloorPlan: null,
+        };
+      }),
       setRoof: (roof) => set({ roof }),
       setMaterial: (material) => set({ material }),
       setLead: (p) => set((s) => ({ ...s, ...p })),

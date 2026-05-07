@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getFamilyDoubleStoreyPackageKey, useConfig, RoofType, Material } from '@/store/configurator';
+import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getFamilyDoubleStoreyPackageKey, useConfig, RoofType, Material } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { FloorPlanCanvas } from '../FloorPlanCanvas';
 import { ElevationCanvas } from '../ElevationCanvas';
@@ -47,7 +47,7 @@ function getRoomTabs(plan: Plan): RoomTab[] {
 }
 
 export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
-  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset } = useConfig();
+  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset, presetOverrides } = useConfig();
   const isCustomPreset = presetId === -1;
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [advanced, setAdvanced] = useState(false);
@@ -63,11 +63,22 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     if (!(homeType === 'family' && isDoubleStorey && presetId !== -1)) return null;
     return packageLayouts[familyPackageKey] || packageLayouts[FAMILY_DOUBLE_STOREY_PACKAGE_KEY] || null;
   }, [homeType, isDoubleStorey, presetId, packageLayouts, familyPackageKey]);
+
+  // Check preset overrides for a saved double storey layout (ground + first floor)
+  const builtInOverride = useMemo(() => {
+    if (presetId < 0 || !isDoubleStorey) return null;
+    const key = getBuiltInPresetKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }, presetId);
+    const override = presetOverrides[key];
+    return override?.ground?.rooms ? override : null;
+  }, [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, presetId, presetOverrides]);
+
   const floors = useMemo(() => {
     if (!isDoubleStorey) return null;
+    // Preset override takes priority (user's saved alignment for this addon/storey combo)
+    if (builtInOverride) return builtInOverride;
     if (familyPackageLayout) return familyPackageLayout;
     return splitPlanToFloors(plan, homeType);
-  }, [isDoubleStorey, plan, homeType, familyPackageLayout]);
+  }, [isDoubleStorey, plan, homeType, familyPackageLayout, builtInOverride]);
 
   // Determine which plan to show based on floor selection
   const displayPlan = useMemo(() => {

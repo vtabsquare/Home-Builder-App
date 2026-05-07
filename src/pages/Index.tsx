@@ -31,7 +31,11 @@ const Index = () => {
     ? packageLayouts[getFamilyDoubleStoreyPackageKey(config)] || packageLayouts[FAMILY_DOUBLE_STOREY_PACKAGE_KEY]
     : null;
   const selectedPlan = (config.presetId === -1 ? customPlan : null) || packageLayout?.ground || basePlan || { width: 0, height: 0, rooms: [] };
-  const plan = useMemo(() => applyAddOnsToPlan(selectedPlan, config), [selectedPlan, config.addons]);
+  // If a preset override exists for the current addon combination, the rooms are already
+  // correctly positioned (including any carport/addon adjustments the user manually aligned).
+  // Skip applyAddOnsToPlan to avoid double-shifting room positions.
+  const hasActiveOverride = config.presetId !== -1 && !!presetOverrides[getBuiltInPresetKey(config, config.presetId)]?.ground?.rooms;
+  const plan = useMemo(() => hasActiveOverride ? selectedPlan : applyAddOnsToPlan(selectedPlan, config), [selectedPlan, config.addons, hasActiveOverride]);
 
   useEffect(() => {
     config.fetchSavedPresets();
