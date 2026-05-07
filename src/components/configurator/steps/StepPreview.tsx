@@ -232,7 +232,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             <div className="flex items-center gap-2">
               {/* Preset selector */}
               <div className="inline-flex rounded-full bg-surface/80 p-0.5 border border-border">
-                {[0, 1].map((id) => (
+                {[0].map((id) => (
                   <button
                     key={id}
                     onClick={() => setPresetId(id)}
@@ -243,7 +243,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                     }`}
                   >
                     <Layers size={10} className="inline mr-1 -mt-0.5" />
-                    Preset {String.fromCharCode(65 + id)}
+                    Preset A
                   </button>
                 ))}
                 {savedPresets.map((savedPresetObj, i) => (
@@ -312,9 +312,9 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                             } else if (presetId === -1 && loadedPresetId) {
                               await updateSavedPreset(committed.newGround, committed.newFirst);
                               toast({ title: 'Preset updated', description: 'Your saved preset has been updated.' });
-                            } else if (presetId === 0 || presetId === 1) {
+                            } else if (presetId === 0) {
                               await saveBuiltInPreset(presetId, committed.newGround, committed.newFirst);
-                              toast({ title: 'Preset updated', description: `${presetId === 0 ? 'Preset A' : 'Preset B'} has been updated.` });
+                              toast({ title: 'Preset updated', description: 'Preset A has been updated.' });
                             } else {
                               toast({ title: 'Preset updated', description: 'Changes have been applied locally.' });
                             }
@@ -335,7 +335,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                           const committed = commitStagedPlan();
                           if (!committed) return;
 
-                          const fallbackName = presetId === 0 ? 'Preset A Copy' : presetId === 1 ? 'Preset B Copy' : 'Custom Preset';
+                          const fallbackName = presetId === 0 ? 'Preset A Copy' : 'Custom Preset';
                           const name = window.prompt('Enter a name for this preset', fallbackName);
                           if (!name || !name.trim()) {
                             toast({ title: 'Save cancelled', description: 'Preset name is required to save a new preset.' });
@@ -482,7 +482,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       try {
                         if (isFamilyDoubleStoreyPackage) {
                           await savePackageLayout(familyPackageKey, newGround, newFirst);
-                        } else if (!isCustomPreset && (presetId === 0 || presetId === 1)) {
+                        } else if (!isCustomPreset && presetId === 0) {
                           await saveBuiltInPreset(presetId, newGround, newFirst);
                         } else if (isCustomPreset && loadedPresetId) {
                           await updateSavedPreset(newGround, newFirst);

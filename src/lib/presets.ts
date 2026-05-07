@@ -31,18 +31,6 @@ export function starterPresetA(c:ConfigState):Plan{
   return{width:W,height:H,rooms};
 }
 
-// ══ STARTER B: 1 master bedroom + attached bathroom ══
-export function starterPresetB(c:ConfigState):Plan{
-  const W=30,H=34;const rooms:Room[]=[];
-  rooms.push({id:'living',type:'living',label:'HALL + LIVING ROOM',x:0,y:0,w:18,h:17,color:C.living,furniture:lf(18,17),doors:[{wall:'top',position:.3,width:3.5,swing:'in',doorType:'standard'}],windows:[{wall:'top',position:.65,width:5},{wall:'left',position:.4,width:4}]});
-  rooms.push({id:'kitchen',type:'kitchen',label:'KITCHEN',x:18,y:0,w:12,h:17,color:C.kitchen,furniture:kf(12,17,c.kitchen),doors:[],windows:[{wall:'right',position:.5,width:3},{wall:'top',position:.5,width:3}]});
-  rooms.push({id:'bed-0',type:'bedroom',label:'MASTER BEDROOM',x:0,y:17,w:16,h:17,color:C.bedroom,furniture:bf(16,17,true),doors:[],windows:[{wall:'left',position:.5,width:4},{wall:'bottom',position:.5,width:3}]});
-  rooms.push({id:'bath-attached-bed-0',type:'bathroom',label:'MASTER BATH',x:16,y:17,w:8,h:9,color:C.bathroom,furniture:bathF(8,9,true),doors:[],windows:[{wall:'right',position:.5,width:2}]});
-  rooms.push({id:'dining',type:'dining',label:'DINING',x:16,y:26,w:14,h:8,color:C.dining,furniture:df(14,8),doors:[],windows:[{wall:'right',position:.5,width:3}]});
-  rooms.push({id:'garden-0',type:'garden',label:'GARDEN',x:24,y:17,w:6,h:9,color:C.garden,furniture:gf(6,9),doors:[],windows:[]});
-  return{width:W,height:H,rooms};
-}
-
 // ══ FAMILY A: 1 master+attached bath, 2 bedrooms+common bath (3BHK) ══
 export function familyPresetA(c:ConfigState):Plan{
   const W=40,H=40;const rooms:Room[]=[];
@@ -56,23 +44,6 @@ export function familyPresetA(c:ConfigState):Plan{
   rooms.push({id:'bed-1',type:'bedroom',label:'BEDROOM 2',x:bX,y:22,w:bW,h:10,color:C.bedroom,furniture:bf(bW,10,false),doors:[],windows:[{wall:'right',position:.4,width:3}]});
   rooms.push({id:'bath-common-1',type:'bathroom',label:'COMMON BATH',x:bX,y:32,w:bW,h:8,color:C.bathroom,furniture:bathF(bW,8,false),doors:[],windows:[{wall:'right',position:.5,width:2}]});
   rooms.push({id:'bed-2',type:'bedroom',label:'BEDROOM 3',x:10,y:20,w:22,h:20,color:C.bedroom,furniture:bf(22,20,false),doors:[],windows:[{wall:'bottom',position:.5,width:3}]});
-  return{width:W,height:H,rooms};
-}
-
-// ══ FAMILY B: 2 master bedrooms + attached bathrooms ══
-export function familyPresetB(c:ConfigState):Plan{
-  const W=40,H=40;const rooms:Room[]=[];
-  rooms.push({id:'garden-0',type:'garden',label:'GARDEN',x:W-10,y:0,w:10,h:10,color:C.garden,furniture:gf(10,10),doors:[],windows:[]});
-  rooms.push({id:'living',type:'living',label:'HALL + LIVING ROOM',x:0,y:0,w:W-10,h:16,color:C.living,furniture:lf(W-10,16),doors:[{wall:'left',position:.7,width:3.5,swing:'in',doorType:'standard'}],windows:[{wall:'top',position:.3,width:6},{wall:'left',position:.3,width:4}]});
-  rooms.push({id:'kitchen',type:'kitchen',label:'KITCHEN',x:0,y:16,w:16,h:12,color:C.kitchen,furniture:kf(16,12,c.kitchen),doors:[],windows:[{wall:'left',position:.5,width:4}]});
-  rooms.push({id:'dining',type:'dining',label:'DINING',x:16,y:16,w:14,h:12,color:C.dining,furniture:df(14,12),doors:[],windows:[]});
-  rooms.push({id:'bed-2',type:'bedroom',label:'BEDROOM 3',x:W-10,y:10,w:10,h:18,color:C.bedroom,furniture:bf(10,18,false),doors:[],windows:[{wall:'right',position:.4,width:3}]});
-  // Master 1 bottom-left
-  rooms.push({id:'bed-0',type:'bedroom',label:'MASTER BEDROOM 1',x:0,y:28,w:14,h:12,color:C.bedroom,furniture:bf(14,12,true),doors:[],windows:[{wall:'left',position:.4,width:4},{wall:'bottom',position:.5,width:3}]});
-  rooms.push({id:'bath-attached-bed-0',type:'bathroom',label:'MASTER BATH 1',x:14,y:28,w:7,h:12,color:C.bathroom,furniture:bathF(7,12,true),doors:[],windows:[{wall:'bottom',position:.5,width:2}]});
-  // Master 2 bottom-right
-  rooms.push({id:'bed-1',type:'bedroom',label:'MASTER BEDROOM 2',x:29,y:28,w:11,h:12,color:C.bedroom,furniture:bf(11,12,true),doors:[],windows:[{wall:'right',position:.4,width:3},{wall:'bottom',position:.5,width:3}]});
-  rooms.push({id:'bath-attached-bed-1',type:'bathroom',label:'MASTER BATH 2',x:21,y:28,w:8,h:12,color:C.bathroom,furniture:bathF(8,12,true),doors:[],windows:[{wall:'bottom',position:.5,width:2}]});
   return{width:W,height:H,rooms};
 }
 
@@ -96,34 +67,6 @@ export function premiumPresetA(c:ConfigState):Plan{
   rooms.push({id:'bed-3',type:'bedroom',label:'BEDROOM 4',x:14,y:34,w:20,h:12,color:C.bedroom,furniture:bf(20,12,false),doors:[],windows:[{wall:'left',position:.5,width:3}]});
   // Common bath
   rooms.push({id:'bath-common-1',type:'bathroom',label:'COMMON BATH',x:bX,y:40,w:bW,h:6,color:C.bathroom,furniture:bathF(bW,6,false),doors:[],windows:[{wall:'right',position:.5,width:2}]});
-  // Balcony
-  rooms.push({id:'balcony',type:'balcony',label:'BALCONY',x:0,y:H-4,w:W,h:4,color:C.balcony,furniture:[{type:'plant',x:1,y:.8,w:1.5,h:1.5},{type:'plant',x:W-3,y:.8,w:1.5,h:1.5}],doors:[{wall:'top',position:.5,width:5,swing:'out',doorType:'standard'}],windows:[]});
-  return{width:W,height:H,rooms};
-}
-
-// ══ PREMIUM B: 1 master+attached bath, 3 bedrooms+2 common bath ══
-export function premiumPresetB(c:ConfigState):Plan{
-  const W=50,H=48;const rooms:Room[]=[];
-  rooms.push({id:'garden-0',type:'garden',label:'GARDEN',x:W-12,y:0,w:12,h:12,color:C.garden,furniture:gf(12,12),doors:[],windows:[]});
-  rooms.push({id:'living',type:'living',label:'HALL + LIVING ROOM',x:0,y:0,w:22,h:20,color:C.living,furniture:lf(22,20),doors:[{wall:'left',position:.8,width:4,swing:'in',doorType:'standard'}],windows:[{wall:'top',position:.3,width:6},{wall:'left',position:.35,width:5}]});
-  rooms.push({id:'kitchen',type:'kitchen',label:'KITCHEN',x:0,y:20,w:14,h:14,color:C.kitchen,furniture:kf(14,14,c.kitchen),doors:[],windows:[{wall:'left',position:.5,width:4}]});
-  rooms.push({id:'dining',type:'dining',label:'DINING',x:14,y:20,w:8,h:14,color:C.dining,furniture:df(8,14),doors:[],windows:[]});
-  rooms.push({id:'main-hallway',type:'hallway',label:'HALLWAY',x:22,y:0,w:4,h:H-4,color:C.hallway,furniture:[],doors:[],windows:[]});
-  const bX=26,bW=W-bX;
-  // Master bedroom
-  rooms.push({id:'bed-0',type:'bedroom',label:'MASTER BEDROOM',x:bX,y:0,w:W-12-bX,h:16,color:C.bedroom,furniture:bf(W-12-bX,16,true),doors:[],windows:[{wall:'top',position:.4,width:4}]});
-  rooms.push({id:'bath-attached-bed-0',type:'bathroom',label:'MASTER BATH',x:bX,y:16,w:bW,h:8,color:C.bathroom,furniture:bathF(bW,8,true),doors:[],windows:[{wall:'right',position:.5,width:2}]});
-  // 3 bedrooms
-  rooms.push({id:'bed-1',type:'bedroom',label:'BEDROOM 2',x:bX,y:24,w:bW,h:10,color:C.bedroom,furniture:bf(bW,10,false),doors:[],windows:[{wall:'right',position:.4,width:3}]});
-  rooms.push({id:'bed-2',type:'bedroom',label:'BEDROOM 3',x:bX,y:34,w:Math.floor(bW/2),h:10,color:C.bedroom,furniture:bf(Math.floor(bW/2),10,false),doors:[],windows:[]});
-  rooms.push({id:'bed-3',type:'bedroom',label:'BEDROOM 4',x:bX+Math.floor(bW/2),y:34,w:bW-Math.floor(bW/2),h:10,color:C.bedroom,furniture:bf(bW-Math.floor(bW/2),10,false),doors:[],windows:[{wall:'right',position:.5,width:3}]});
-  // 2 common baths
-  rooms.push({id:'bath-common-1',type:'bathroom',label:'COMMON BATH 1',x:bX,y:H-4,w:Math.floor(bW/2),h:4,color:C.bathroom,furniture:bathF(Math.floor(bW/2),4,false),doors:[],windows:[]});
-  rooms.push({id:'bath-common-2',type:'bathroom',label:'COMMON BATH 2',x:bX+Math.floor(bW/2),y:H-4,w:bW-Math.floor(bW/2),h:4,color:C.bathroom,furniture:bathF(bW-Math.floor(bW/2),4,false),doors:[],windows:[{wall:'right',position:.5,width:2}]});
-  // Study bottom-left
-  rooms.push({id:'bed-extra',type:'bedroom',label:'STUDY',x:0,y:34,w:22,h:H-34-4,color:C.bedroom,furniture:bf(22,H-34-4,false),doors:[],windows:[{wall:'left',position:.4,width:4},{wall:'bottom',position:.5,width:3}]});
-  // Garden extension
-  rooms.push({id:'bed-0-ext',type:'bedroom',label:'MASTER WALK-IN',x:W-12,y:12,w:12,h:8,color:C.bedroom,furniture:[{type:'wardrobe',x:1,y:1,w:10,h:3}],doors:[],windows:[{wall:'right',position:.5,width:3}]});
   // Balcony
   rooms.push({id:'balcony',type:'balcony',label:'BALCONY',x:0,y:H-4,w:W,h:4,color:C.balcony,furniture:[{type:'plant',x:1,y:.8,w:1.5,h:1.5},{type:'plant',x:W-3,y:.8,w:1.5,h:1.5}],doors:[{wall:'top',position:.5,width:5,swing:'out',doorType:'standard'}],windows:[]});
   return{width:W,height:H,rooms};
