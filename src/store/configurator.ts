@@ -94,13 +94,13 @@ export interface ConfigActions {
 }
 
 export const HOME_TYPE_DEFAULTS: Record<HomeType, { bedrooms: number; bathrooms: number; baseArea: number; baseCost: number; label: string; areaRange: [number, number] }> = {
-  starter: { bedrooms: 2, bathrooms: 2, baseArea: 900, baseCost: 135000, label: 'Starter', areaRange: [800, 1000] },
+  starter: { bedrooms: 2, bathrooms: 1, baseArea: 900, baseCost: 135000, label: 'Starter', areaRange: [800, 1000] },
   family: { bedrooms: 3, bathrooms: 2, baseArea: 1400, baseCost: 245000, label: 'Family', areaRange: [1200, 1600] },
   premium: { bedrooms: 4, bathrooms: 3, baseArea: 2100, baseCost: 410000, label: 'Premium', areaRange: [1800, 2400] },
 };
 
 export const HOME_TYPE_LIMITS: Record<HomeType, { bedrooms: { min: number; max: number }; bathrooms: { min: number; max: number } }> = {
-  starter: { bedrooms: { min: 1, max: 2 }, bathrooms: { min: 2, max: 2 } },
+  starter: { bedrooms: { min: 1, max: 2 }, bathrooms: { min: 1, max: 1 } },
   family: { bedrooms: { min: 2, max: 3 }, bathrooms: { min: 2, max: 3 } },
   premium: { bedrooms: { min: 2, max: 4 }, bathrooms: { min: 2, max: 4 } },
 };

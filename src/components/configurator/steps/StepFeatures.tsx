@@ -23,7 +23,6 @@ export const StepFeatures = () => {
   const { homeType, bedrooms, bathrooms, kitchen, addons, setBedrooms, setBathrooms, setKitchen, toggleAddon, next, prev } = useConfig();
   const bedroomLimits = HOME_TYPE_LIMITS[homeType].bedrooms;
   const bathroomLimits = HOME_TYPE_LIMITS[homeType].bathrooms;
-  const bathroomLocked = bathroomLimits.min === bathroomLimits.max;
 
   return (
     <StepShell
@@ -42,7 +41,7 @@ export const StepFeatures = () => {
             min={bedroomLimits.min}
             max={bedroomLimits.max}
             hint="Min 10×10 ft each"
-            note={homeType === 'starter' ? 'Starter allows 1–2 bedrooms' : `Allowed: ${bedroomLimits.min}–${bedroomLimits.max}`}
+            note={bedroomLimits.min === bedroomLimits.max ? `Fixed at ${bedroomLimits.min}` : `Range: ${bedroomLimits.min}–${bedroomLimits.max}`}
           />
           <Stepper
             label="Bathrooms"
@@ -51,7 +50,7 @@ export const StepFeatures = () => {
             min={bathroomLimits.min}
             max={bathroomLimits.max}
             hint="Min 5×7 ft each"
-            note={bathroomLocked ? 'Starter bathrooms are fixed at 2' : `Allowed: ${bathroomLimits.min}–${bathroomLimits.max}`}
+            note={bathroomLimits.min === bathroomLimits.max ? `Fixed at ${bathroomLimits.min}` : `Range: ${bathroomLimits.min}–${bathroomLimits.max}`}
           />
         </div>
 

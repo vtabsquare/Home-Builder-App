@@ -18,10 +18,10 @@ interface Props {
 
 const PLOT_PADDING_FT = 2;
 
-const MATERIAL_COLORS: Record<Material, { wall: string; trim: string; roof: string; window: string; door: string; accent: string; facade: string }> = {
-  budget: { wall: '#e7decf', trim: '#8a8478', roof: '#6b5b4e', window: '#9ec3d4', door: '#6b5040', accent: '#9a8a78', facade: '#d4cbb8' },
-  modern: { wall: '#f0ebe3', trim: '#1a1a1a', roof: '#2c2c2c', window: '#a8d4e6', door: '#2a2a2a', accent: '#3a3a3a', facade: '#e2dbd0' },
-  luxury: { wall: '#1f1d1a', trim: '#c9a84c', roof: '#0d0d0d', window: '#7ab0c8', door: '#8b6914', accent: '#6a4a1a', facade: '#2a2520' },
+const MATERIAL_COLORS: Record<Material, { wall: string; trim: string; roof: string; window: string; door: string; accent: string; facade: string; rod: string }> = {
+  budget: { wall: '#ffffff', trim: '#8a8478', roof: '#2e4a62', window: '#b8ddec', door: '#b5835a', accent: '#9a8a78', facade: '#d4cbb8', rod: '#4682B4' },
+  modern: { wall: '#f0ebe3', trim: '#1a1a1a', roof: '#2c2c2c', window: '#a8d4e6', door: '#2a2a2a', accent: '#3a3a3a', facade: '#e2dbd0', rod: '#1a1a1a' },
+  luxury: { wall: '#1f1d1a', trim: '#c9a84c', roof: '#0d0d0d', window: '#7ab0c8', door: '#8b6914', accent: '#6a4a1a', facade: '#2a2520', rod: '#c9a84c' },
 };
 
 const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, plan: Plan }) => {
@@ -515,7 +515,7 @@ const House = ({ plan, roof, material, activeRoom, addons }: {
 
       {/* Roof */}
       {roof === 'gable' ? (
-        <GableRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
+        <GableRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
       ) : (
         <FlatRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
       )}
@@ -775,7 +775,7 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
 };
 
 /* ─── Roofs ─── */
-const GableRoof = ({ W, D, cx, cz, wallH, color, trimColor, transparent, opacity }: any) => {
+const GableRoof = ({ W, D, cx, cz, wallH, color, trimColor, rodColor, transparent, opacity }: any) => {
   const roofH = 6;
   const overhang = 2.5;
   const hw = W / 2 + overhang;
@@ -811,7 +811,7 @@ const GableRoof = ({ W, D, cx, cz, wallH, color, trimColor, transparent, opacity
             return (
               <mesh key={side} position={[side * hw / 2, roofH / 2 + 0.05, 0]} rotation={[0, 0, angle]}>
                 <boxGeometry args={[len, 0.08, 0.08]} />
-                <meshStandardMaterial color={trimColor} roughness={0.3} metalness={0.2} transparent={transparent} opacity={0.6} depthWrite={!transparent} />
+                <meshStandardMaterial color={rodColor || trimColor} roughness={0.3} metalness={0.2} transparent={transparent} opacity={0.6} depthWrite={!transparent} />
               </mesh>
             );
           })}
