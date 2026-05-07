@@ -16,6 +16,7 @@ interface Props {
 export const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaultW: number; defaultH: number; color: string }[] = [
   { type: 'bedroom', label: 'Bedroom', icon: BedDouble, defaultW: 12, defaultH: 10, color: 'hsl(33 35% 82%)' },
   { type: 'living', label: 'Hall/Living', icon: Sofa, defaultW: 16, defaultH: 14, color: 'hsl(40 30% 87%)' },
+  { type: 'hallway', label: 'Hallway', icon: Move, defaultW: 10, defaultH: 4, color: 'hsl(38 20% 88%)' },
   { type: 'bathroom', label: 'Bathroom', icon: Bath, defaultW: 7, defaultH: 7, color: 'hsl(200 30% 82%)' },
   { type: 'kitchen', label: 'Kitchen', icon: CookingPot, defaultW: 12, defaultH: 10, color: 'hsl(28 38% 72%)' },
   { type: 'dining', label: 'Dining', icon: UtensilsCrossed, defaultW: 10, defaultH: 10, color: 'hsl(36 28% 82%)' },
@@ -410,6 +411,88 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                     shadowOpacity={isSelected ? 0.3 : 0.15}
                     shadowOffsetY={2}
                   />
+
+                  {/* Individual Walls for Hall/Hallway */}
+                  {(room.type === 'living' || room.type === 'hallway') && (
+                    <>
+                      {/* Top Wall */}
+                      <Line 
+                        points={[0, 0, rw, 0]} 
+                        stroke={room.openWalls?.includes('top') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
+                        strokeWidth={3} 
+                        hitStrokeWidth={10}
+                        onClick={(e) => {
+                          e.cancelBubble = true;
+                          const openWalls = room.openWalls || [];
+                          const newOpenWalls = openWalls.includes('top')
+                            ? openWalls.filter(w => w !== 'top')
+                            : [...openWalls, 'top' as any];
+                          const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
+                          setPlan(updated);
+                          onChange?.(updated);
+                        }}
+                        onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
+                        onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
+                      />
+                      {/* Bottom Wall */}
+                      <Line 
+                        points={[0, rh, rw, rh]} 
+                        stroke={room.openWalls?.includes('bottom') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
+                        strokeWidth={3} 
+                        hitStrokeWidth={10}
+                        onClick={(e) => {
+                          e.cancelBubble = true;
+                          const openWalls = room.openWalls || [];
+                          const newOpenWalls = openWalls.includes('bottom')
+                            ? openWalls.filter(w => w !== 'bottom')
+                            : [...openWalls, 'bottom' as any];
+                          const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
+                          setPlan(updated);
+                          onChange?.(updated);
+                        }}
+                        onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
+                        onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
+                      />
+                      {/* Left Wall */}
+                      <Line 
+                        points={[0, 0, 0, rh]} 
+                        stroke={room.openWalls?.includes('left') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
+                        strokeWidth={3} 
+                        hitStrokeWidth={10}
+                        onClick={(e) => {
+                          e.cancelBubble = true;
+                          const openWalls = room.openWalls || [];
+                          const newOpenWalls = openWalls.includes('left')
+                            ? openWalls.filter(w => w !== 'left')
+                            : [...openWalls, 'left' as any];
+                          const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
+                          setPlan(updated);
+                          onChange?.(updated);
+                        }}
+                        onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
+                        onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
+                      />
+                      {/* Right Wall */}
+                      <Line 
+                        points={[rw, 0, rw, rh]} 
+                        stroke={room.openWalls?.includes('right') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
+                        strokeWidth={3} 
+                        hitStrokeWidth={10}
+                        onClick={(e) => {
+                          e.cancelBubble = true;
+                          const openWalls = room.openWalls || [];
+                          const newOpenWalls = openWalls.includes('right')
+                            ? openWalls.filter(w => w !== 'right')
+                            : [...openWalls, 'right' as any];
+                          const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
+                          setPlan(updated);
+                          onChange?.(updated);
+                        }}
+                        onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
+                        onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
+                      />
+                    </>
+                  )}
 
                   {/* Floor textures */}
                   {room.type === 'bathroom' && (

@@ -102,7 +102,7 @@ export const HOME_TYPE_DEFAULTS: Record<HomeType, { bedrooms: number; bathrooms:
 export const HOME_TYPE_LIMITS: Record<HomeType, { bedrooms: { min: number; max: number }; bathrooms: { min: number; max: number } }> = {
   starter: { bedrooms: { min: 1, max: 2 }, bathrooms: { min: 1, max: 1 } },
   family: { bedrooms: { min: 2, max: 3 }, bathrooms: { min: 2, max: 3 } },
-  premium: { bedrooms: { min: 2, max: 4 }, bathrooms: { min: 2, max: 4 } },
+  premium: { bedrooms: { min: 3, max: 4 }, bathrooms: { min: 3, max: 4 } },
 };
 
 const initial: ConfigState = {

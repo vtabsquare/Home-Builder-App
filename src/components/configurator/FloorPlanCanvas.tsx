@@ -219,8 +219,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
         </Layer>
 
         <Layer>
-          {(localPlan.rooms || []).map((room) => (
-            <RoomShape
+          {(localPlan.rooms || []).map((room) => (            <RoomShape
               key={room.id}
               room={room}
               scale={scale}
@@ -232,6 +231,20 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                   setSelectedRoomId(room.id);
                   setSelectedDoor(null);
                 }
+              }}
+              onWallToggle={(wall: string) => {
+                if (!advanced) return;
+                const updatedRooms = (localPlan.rooms || []).map(r => {
+                  if (r.id === room.id) {
+                    const openWalls = r.openWalls || [];
+                    const newOpenWalls = openWalls.includes(wall as any)
+                      ? openWalls.filter(w => w !== wall)
+                      : [...openWalls, wall as any];
+                    return { ...r, openWalls: newOpenWalls };
+                  }
+                  return r;
+                });
+                commitLocalPlan({ ...localPlan, rooms: updatedRooms });
               }}
               innerRef={(node: any) => {
                 if (node) roomRefs.current[room.id] = node;
@@ -251,7 +264,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                 node.scaleY(1);
                 node.x(buildingOffsetX + newX * scale);
                 node.y(buildingOffsetY + newY * scale);
-
+ 
                 const newRoom = { ...room, x: newX, y: newY, w: newW, h: newH };
                 newRoom.furniture = regenerateFurniture(newRoom, config.kitchen);
                 
@@ -516,7 +529,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
 };
 
 /* ─── Room Shape ─── */
-const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPointerDown, onTransformEnd, innerRef }: any) => {
+const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPointerDown, onTransformEnd, onWallToggle, innerRef }: any) => {
   const rx = offsetX + room.x * scale;
   const ry = offsetY + room.y * scale;
   const rw = room.w * scale;
@@ -545,10 +558,66 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
         strokeWidth={(isRooftop || isFence) ? (isFence ? 4 : 1) : 0}
       />
       {/* Explicitly draw individual walls to support open floor plans */}
-      {!isRooftop && !isFence && !isTree && (!room.openWalls || !room.openWalls.includes('top')) && <Line points={[0, 0, rw, 0]} stroke="#2c2c2c" strokeWidth={3} />}
-      {!isRooftop && !isFence && !isTree && (!room.openWalls || !room.openWalls.includes('bottom')) && <Line points={[0, rh, rw, rh]} stroke="#2c2c2c" strokeWidth={3} />}
-      {!isRooftop && !isFence && !isTree && (!room.openWalls || !room.openWalls.includes('left')) && <Line points={[0, 0, 0, rh]} stroke="#2c2c2c" strokeWidth={3} />}
-      {!isRooftop && !isFence && !isTree && (!room.openWalls || !room.openWalls.includes('right')) && <Line points={[rw, 0, rw, rh]} stroke="#2c2c2c" strokeWidth={3} />}
+      {!isRooftop && !isFence && !isTree && (
+        <>
+          {/* Top Wall */}
+          <Line 
+            points={[0, 0, rw, 0]} 
+            stroke={room.openWalls?.includes('top') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
+            strokeWidth={3} 
+            hitStrokeWidth={10}
+            onClick={() => (room.type === 'living' || room.type === 'hallway') && onWallToggle('top')}
+            onMouseEnter={(e) => {
+              if (room.type === 'living' || room.type === 'hallway') e.target.getStage()!.container().style.cursor = 'pointer';
+            }}
+            onMouseLeave={(e) => {
+              e.target.getStage()!.container().style.cursor = 'default';
+            }}
+          />
+          {/* Bottom Wall */}
+          <Line 
+            points={[0, rh, rw, rh]} 
+            stroke={room.openWalls?.includes('bottom') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
+            strokeWidth={3} 
+            hitStrokeWidth={10}
+            onClick={() => (room.type === 'living' || room.type === 'hallway') && onWallToggle('bottom')}
+            onMouseEnter={(e) => {
+              if (room.type === 'living' || room.type === 'hallway') e.target.getStage()!.container().style.cursor = 'pointer';
+            }}
+            onMouseLeave={(e) => {
+              e.target.getStage()!.container().style.cursor = 'default';
+            }}
+          />
+          {/* Left Wall */}
+          <Line 
+            points={[0, 0, 0, rh]} 
+            stroke={room.openWalls?.includes('left') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
+            strokeWidth={3} 
+            hitStrokeWidth={10}
+            onClick={() => (room.type === 'living' || room.type === 'hallway') && onWallToggle('left')}
+            onMouseEnter={(e) => {
+              if (room.type === 'living' || room.type === 'hallway') e.target.getStage()!.container().style.cursor = 'pointer';
+            }}
+            onMouseLeave={(e) => {
+              e.target.getStage()!.container().style.cursor = 'default';
+            }}
+          />
+          {/* Right Wall */}
+          <Line 
+            points={[rw, 0, rw, rh]} 
+            stroke={room.openWalls?.includes('right') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
+            strokeWidth={3} 
+            hitStrokeWidth={10}
+            onClick={() => (room.type === 'living' || room.type === 'hallway') && onWallToggle('right')}
+            onMouseEnter={(e) => {
+              if (room.type === 'living' || room.type === 'hallway') e.target.getStage()!.container().style.cursor = 'pointer';
+            }}
+            onMouseLeave={(e) => {
+              e.target.getStage()!.container().style.cursor = 'default';
+            }}
+          />
+        </>
+      )}
       
       {/* Floor Textures */}
       {!isRooftop && !isFence && !isTree && room.type === 'bathroom' && (
