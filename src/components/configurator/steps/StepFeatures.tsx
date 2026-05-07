@@ -1,4 +1,4 @@
-import { useConfig, AddOn, KitchenType } from '@/store/configurator';
+import { useConfig, AddOn, KitchenType, HOME_TYPE_LIMITS } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { ADDON_META, formatMoney } from '@/lib/cost';
 import { Minus, Plus, Sun, Car, Droplets, Cpu, Check, Fence, Trees } from 'lucide-react';
@@ -20,7 +20,10 @@ const KITCHENS: { id: KitchenType; label: string; desc: string }[] = [
 ];
 
 export const StepFeatures = () => {
-  const { bedrooms, bathrooms, kitchen, addons, setBedrooms, setBathrooms, setKitchen, toggleAddon, next, prev } = useConfig();
+  const { homeType, bedrooms, bathrooms, kitchen, addons, setBedrooms, setBathrooms, setKitchen, toggleAddon, next, prev } = useConfig();
+  const bedroomLimits = HOME_TYPE_LIMITS[homeType].bedrooms;
+  const bathroomLimits = HOME_TYPE_LIMITS[homeType].bathrooms;
+  const bathroomLocked = bathroomLimits.min === bathroomLimits.max;
 
   return (
     <StepShell
@@ -32,8 +35,24 @@ export const StepFeatures = () => {
     >
       <div className="space-y-7">
         <div className="grid gap-4 md:grid-cols-2">
-          <Stepper label="Bedrooms" value={bedrooms} onChange={setBedrooms} min={1} max={6} hint="Min 10×10 ft each" />
-          <Stepper label="Bathrooms" value={bathrooms} onChange={setBathrooms} min={1} max={5} hint="Min 5×7 ft each" />
+          <Stepper
+            label="Bedrooms"
+            value={bedrooms}
+            onChange={setBedrooms}
+            min={bedroomLimits.min}
+            max={bedroomLimits.max}
+            hint="Min 10×10 ft each"
+            note={homeType === 'starter' ? 'Starter allows 1–2 bedrooms' : `Allowed: ${bedroomLimits.min}–${bedroomLimits.max}`}
+          />
+          <Stepper
+            label="Bathrooms"
+            value={bathrooms}
+            onChange={setBathrooms}
+            min={bathroomLimits.min}
+            max={bathroomLimits.max}
+            hint="Min 5×7 ft each"
+            note={bathroomLocked ? 'Starter bathrooms are fixed at 2' : `Allowed: ${bathroomLimits.min}–${bathroomLimits.max}`}
+          />
         </div>
 
         <div>
@@ -105,8 +124,8 @@ export const StepFeatures = () => {
 };
 
 const Stepper = ({
-  label, value, onChange, min, max, hint,
-}: { label: string; value: number; onChange: (n: number) => void; min: number; max: number; hint?: string }) => (
+  label, value, onChange, min, max, hint, note,
+}: { label: string; value: number; onChange: (n: number) => void; min: number; max: number; hint?: string; note?: string }) => (
   <div className="rounded-2xl border border-border bg-card p-4">
     <div className="flex items-baseline justify-between">
       <span className="font-display font-bold">{label}</span>
@@ -136,5 +155,10 @@ const Stepper = ({
         <Plus size={18} />
       </button>
     </div>
+    {note && (
+      <div className="mt-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {value <= min ? `Minimum reached · ${note}` : value >= max ? `Maximum reached · ${note}` : note}
+      </div>
+    )}
   </div>
 );
