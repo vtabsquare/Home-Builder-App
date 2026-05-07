@@ -10,6 +10,13 @@ export type AddOn = 'solar' | 'carport' | 'water_tank' | 'smart_home' | 'fence' 
 export type RoofType = 'gable' | 'flat';
 export type Material = 'budget' | 'modern' | 'luxury';
 export const FAMILY_DOUBLE_STOREY_PACKAGE_KEY = 'family-double-storey';
+const BUILT_IN_PRESET_PREFIX = '__builtin_floor_plan__';
+
+export const getBuiltInPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>, presetId: number) =>
+  `${BUILT_IN_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_${presetId}`;
+
+export const getFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>) =>
+  `${FAMILY_DOUBLE_STOREY_PACKAGE_KEY}_${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}`;
 
 export interface ConfigState {
   step: number;
@@ -43,6 +50,7 @@ export interface ConfigState {
   customFirstFloorPlan: any | null;
   savedPresets: any[];
   packageLayouts: Record<string, any>;
+  presetOverrides: Record<string, { ground: any; first: any | null }>;
 }
 
 export interface ConfigActions {
@@ -67,9 +75,11 @@ export interface ConfigActions {
   setDoubleStorey: (v: boolean) => void;
   setActiveFloor: (f: 0 | 1) => void;
   setCustomFirstFloorPlan: (p: any | null) => void;
+  setPresetOverride: (presetId: number, groundPlan: any, firstFloorPlan: any | null) => void;
+  saveBuiltInPreset: (presetId: number, groundPlan: any, firstFloorPlan: any | null) => Promise<void>;
   addHistoryRecord: (record: { label: string; type: string; targetId: string; original: any }) => void;
   removeHistoryRecord: (id: string) => void;
-  saveAsPreset: (groundPlan: any, firstFloorPlan: any) => Promise<void>;
+  saveAsPreset: (name: string, groundPlan: any, firstFloorPlan: any) => Promise<any | null>;
   updateSavedPreset: (groundPlan: any, firstFloorPlan: any) => Promise<void>;
   deleteSavedPreset: (index: number) => Promise<void>;
   loadSavedPreset: (index: number) => void;
@@ -80,9 +90,15 @@ export interface ConfigActions {
 }
 
 export const HOME_TYPE_DEFAULTS: Record<HomeType, { bedrooms: number; bathrooms: number; baseArea: number; baseCost: number; label: string; areaRange: [number, number] }> = {
-  starter: { bedrooms: 2, bathrooms: 1, baseArea: 900, baseCost: 135000, label: 'Starter', areaRange: [800, 1000] },
+  starter: { bedrooms: 2, bathrooms: 2, baseArea: 900, baseCost: 135000, label: 'Starter', areaRange: [800, 1000] },
   family: { bedrooms: 3, bathrooms: 2, baseArea: 1400, baseCost: 245000, label: 'Family', areaRange: [1200, 1600] },
   premium: { bedrooms: 4, bathrooms: 3, baseArea: 2100, baseCost: 410000, label: 'Premium', areaRange: [1800, 2400] },
+};
+
+export const HOME_TYPE_LIMITS: Record<HomeType, { bedrooms: { min: number; max: number }; bathrooms: { min: number; max: number } }> = {
+  starter: { bedrooms: { min: 1, max: 2 }, bathrooms: { min: 2, max: 2 } },
+  family: { bedrooms: { min: 2, max: 3 }, bathrooms: { min: 2, max: 3 } },
+  premium: { bedrooms: { min: 2, max: 4 }, bathrooms: { min: 2, max: 4 } },
 };
 
 const initial: ConfigState = {
@@ -112,6 +128,7 @@ const initial: ConfigState = {
   customFirstFloorPlan: null,
   savedPresets: [],
   packageLayouts: {},
+  presetOverrides: {},
 };
 
 export const useConfig = create<ConfigState & ConfigActions>()(
@@ -128,8 +145,22 @@ export const useConfig = create<ConfigState & ConfigActions>()(
         const d = HOME_TYPE_DEFAULTS[homeType];
         set({ homeType, bedrooms: d.bedrooms, bathrooms: d.bathrooms, presetId: 0, loadedPresetId: null, customPlan: null, isDoubleStorey: false, activeFloor: 0, customFirstFloorPlan: null });
       },
-      setBedrooms: (bedrooms) => set({ bedrooms: Math.max(1, Math.min(6, bedrooms)), customPlan: null, customFirstFloorPlan: null }),
-      setBathrooms: (bathrooms) => set({ bathrooms: Math.max(1, Math.min(5, bathrooms)), customPlan: null, customFirstFloorPlan: null }),
+      setBedrooms: (bedrooms) => set((state) => {
+        const limits = HOME_TYPE_LIMITS[state.homeType].bedrooms;
+        return {
+          bedrooms: Math.max(limits.min, Math.min(limits.max, bedrooms)),
+          customPlan: null,
+          customFirstFloorPlan: null,
+        };
+      }),
+      setBathrooms: (bathrooms) => set((state) => {
+        const limits = HOME_TYPE_LIMITS[state.homeType].bathrooms;
+        return {
+          bathrooms: Math.max(limits.min, Math.min(limits.max, bathrooms)),
+          customPlan: null,
+          customFirstFloorPlan: null,
+        };
+      }),
       setKitchen: (kitchen) => set({ kitchen }),
       toggleAddon: (a) => set((s) => ({
         addons: s.addons.includes(a) ? s.addons.filter((x) => x !== a) : [...s.addons, a],
@@ -146,6 +177,47 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       setDoubleStorey: (isDoubleStorey) => set({ isDoubleStorey, activeFloor: 0, customPlan: null, customFirstFloorPlan: null }),
       setActiveFloor: (activeFloor) => set({ activeFloor }),
       setCustomFirstFloorPlan: (customFirstFloorPlan) => set({ customFirstFloorPlan }),
+      setPresetOverride: (presetId, groundPlan, firstFloorPlan) => set((s) => ({
+        ...s,
+        presetOverrides: {
+          ...s.presetOverrides,
+          [getBuiltInPresetKey(s, presetId)]: { ground: groundPlan, first: firstFloorPlan },
+        },
+      })),
+      saveBuiltInPreset: async (presetId, groundPlan, firstFloorPlan) => {
+        const state = get();
+        const key = getBuiltInPresetKey(state, presetId);
+        const fullPlan = { ground: groundPlan, first: firstFloorPlan };
+        set((s) => ({
+          presetOverrides: {
+            ...s.presetOverrides,
+            [key]: { ground: groundPlan, first: firstFloorPlan },
+          },
+        }));
+
+        const { data: existing, error: selectError } = await supabase
+          .from('presets')
+          .select('id')
+          .eq('name', key)
+          .maybeSingle();
+
+        if (selectError) {
+          throw selectError;
+        }
+
+        if (existing?.id) {
+          const { error } = await supabase
+            .from('presets')
+            .update({ plan_data: fullPlan as any })
+            .eq('id', existing.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('presets')
+            .insert({ name: key, plan_data: fullPlan as any });
+          if (error) throw error;
+        }
+      },
       addHistoryRecord: (record) => set((s) => {
         // Prevent duplicate history for same target/type if possible, or just append
         const id = Math.random().toString(36).substr(2, 9);
@@ -155,7 +227,17 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       fetchSavedPresets: async () => {
         const { data, error } = await supabase.from('presets').select('*').order('created_at', { ascending: true });
         if (!error && data) {
-          set({ savedPresets: data });
+          const state = get();
+          const builtInRows = data.filter((row) => row.name?.startsWith(BUILT_IN_PRESET_PREFIX));
+          const presetOverrides = builtInRows.reduce<Record<string, { ground: any; first: any | null }>>((acc, row) => {
+            const presetId = Number(row.name.slice(row.name.lastIndexOf('_') + 1));
+            const planData = row.plan_data as any;
+            if ((presetId === 0 || presetId === 1) && planData?.ground?.rooms) {
+              acc[row.name] = { ground: planData.ground, first: planData.first || null };
+            }
+            return acc;
+          }, {});
+          set({ savedPresets: data.filter((row) => !row.name?.startsWith(BUILT_IN_PRESET_PREFIX)), presetOverrides });
         }
       },
       fetchPackageLayouts: async () => {
@@ -184,17 +266,29 @@ export const useConfig = create<ConfigState & ConfigActions>()(
           updated_at: new Date().toISOString(),
         });
       },
-      saveAsPreset: async (groundPlan, firstFloorPlan) => {
+      saveAsPreset: async (name, groundPlan, firstFloorPlan) => {
         const fullPlan = { ground: groundPlan, first: firstFloorPlan };
-        set((s) => ({ savedPresets: [...s.savedPresets, { name: `Custom Preset ${s.savedPresets.length + 1}`, plan_data: fullPlan }] }));
-        const { data } = await supabase.from('presets').insert({
-          name: `Custom Preset ${get().savedPresets.length}`,
-          plan_data: fullPlan as any
+        const presetName = name.trim() || `Custom Preset ${get().savedPresets.length + 1}`;
+        const { data, error } = await supabase.from('presets').insert({
+          name: presetName,
+          plan_data: fullPlan as any,
         }).select().single();
+
+        if (error) {
+          throw error;
+        }
+
         if (data) {
-          set({ loadedPresetId: data.id });
+          set({
+            presetId: -1,
+            loadedPresetId: data.id,
+            customPlan: groundPlan,
+            customFirstFloorPlan: firstFloorPlan,
+          });
           await get().fetchSavedPresets();
         }
+
+        return data ?? null;
       },
       updateSavedPreset: async (groundPlan, firstFloorPlan) => {
         const state = get();
@@ -205,7 +299,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
           await supabase.from('presets').update({ plan_data: fullPlan as any }).eq('id', state.loadedPresetId);
           await state.fetchSavedPresets();
         } else {
-          await state.saveAsPreset(groundPlan, firstFloorPlan);
+          await state.saveAsPreset('Updated Preset', groundPlan, firstFloorPlan);
         }
       },
       deleteSavedPreset: async (index) => {

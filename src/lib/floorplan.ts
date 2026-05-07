@@ -504,6 +504,85 @@ function validateAndFixBathrooms(rooms: Room[]): void {
   }
 }
 
+type AbsorbDirection = 'left' | 'right' | 'top' | 'bottom';
+
+function overlapLength(a0: number, a1: number, b0: number, b1: number): number {
+  return Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+}
+
+function findAbsorptionDirection(candidate: Room, removed: Room): AbsorbDirection | null {
+  const EPS = 0.75;
+  const xOverlap = overlapLength(candidate.x, candidate.x + candidate.w, removed.x, removed.x + removed.w);
+  const yOverlap = overlapLength(candidate.y, candidate.y + candidate.h, removed.y, removed.y + removed.h);
+
+  if (Math.abs((candidate.x + candidate.w) - removed.x) <= EPS && yOverlap > 0.5) return 'right';
+  if (Math.abs(candidate.x - (removed.x + removed.w)) <= EPS && yOverlap > 0.5) return 'left';
+  if (Math.abs((candidate.y + candidate.h) - removed.y) <= EPS && xOverlap > 0.5) return 'bottom';
+  if (Math.abs(candidate.y - (removed.y + removed.h)) <= EPS && xOverlap > 0.5) return 'top';
+  return null;
+}
+
+function absorbRemovedRoomSpace(rooms: Room[], removedRoom: Room, c: ConfigState): void {
+  const typePriority: Partial<Record<Room['type'], Partial<Record<Room['type'], number>>>> = {
+    bedroom:   { bedroom: 5, hallway: 4, living: 3, dining: 2, kitchen: 2, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    bathroom:  { bathroom: 5, hallway: 4, bedroom: 3, living: 2, kitchen: 1, dining: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    kitchen:   { kitchen: 5, dining: 4, living: 3, hallway: 2, bedroom: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    living:    { living: 5, dining: 4, hallway: 3, kitchen: 3, bedroom: 2, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    dining:    { dining: 5, kitchen: 4, living: 3, hallway: 2, bedroom: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    balcony:   { balcony: 5, garden: 4, living: 3, hallway: 2, bedroom: 1, bathroom: 1, kitchen: 1, carport: 0, entry: 0, dining: 0 },
+    carport:   { carport: 5, garden: 4, hallway: 2, living: 1, bedroom: 0, bathroom: 0, kitchen: 0, dining: 0, balcony: 0, entry: 0 },
+    garden:    { garden: 5, balcony: 4, carport: 3, living: 2, hallway: 2, bedroom: 1, bathroom: 1, kitchen: 1, dining: 1, entry: 0 },
+    entry:     { entry: 5, hallway: 4, living: 3, bedroom: 2, bathroom: 1, kitchen: 1, dining: 1, balcony: 0, carport: 0, garden: 0 },
+    hallway:   { hallway: 5, living: 4, dining: 3, kitchen: 3, bedroom: 2, bathroom: 2, balcony: 1, carport: 1, garden: 1, entry: 3 },
+  };
+
+  let bestCandidate: Room | null = null;
+  let bestDirection: AbsorbDirection | null = null;
+  let bestScore = -1;
+
+  for (const candidate of rooms) {
+    if (candidate.id === removedRoom.id) continue;
+    const direction = findAbsorptionDirection(candidate, removedRoom);
+    if (!direction) continue;
+
+    const overlap = direction === 'left' || direction === 'right'
+      ? overlapLength(candidate.y, candidate.y + candidate.h, removedRoom.y, removedRoom.y + removedRoom.h)
+      : overlapLength(candidate.x, candidate.x + candidate.w, removedRoom.x, removedRoom.x + removedRoom.w);
+
+    const baseScore = typePriority[removedRoom.type]?.[candidate.type] ?? 0;
+    const score = baseScore * 100 + overlap;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestCandidate = candidate;
+      bestDirection = direction;
+    }
+  }
+
+  if (!bestCandidate || !bestDirection) return;
+
+  switch (bestDirection) {
+    case 'left':
+      bestCandidate.x = Math.min(bestCandidate.x, removedRoom.x);
+      bestCandidate.w = Math.max(bestCandidate.x + bestCandidate.w, removedRoom.x + removedRoom.w) - bestCandidate.x;
+      break;
+    case 'right':
+      bestCandidate.w = Math.max(bestCandidate.x + bestCandidate.w, removedRoom.x + removedRoom.w) - bestCandidate.x;
+      break;
+    case 'top':
+      bestCandidate.y = Math.min(bestCandidate.y, removedRoom.y);
+      bestCandidate.h = Math.max(bestCandidate.y + bestCandidate.h, removedRoom.y + removedRoom.h) - bestCandidate.y;
+      break;
+    case 'bottom':
+      bestCandidate.h = Math.max(bestCandidate.y + bestCandidate.h, removedRoom.y + removedRoom.h) - bestCandidate.y;
+      break;
+  }
+
+  if (['bedroom', 'bathroom', 'kitchen', 'living', 'dining', 'balcony', 'garden'].includes(bestCandidate.type)) {
+    bestCandidate.furniture = regenerateFurniture(bestCandidate, c.kitchen);
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // ── PRESET-BASED PLAN GENERATION ──────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1337,10 +1416,205 @@ export function generatePlan(c: ConfigState): Plan {
   return applyDynamicChanges(plan, c);
 }
 
+const ADDON_ROOM_PREFIXES = ['addon-'];
+
+export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): Plan {
+  const W = plan.width;
+  const H = plan.height;
+  const baseRooms = (plan.rooms || []).filter((r) => !ADDON_ROOM_PREFIXES.some((prefix) => r.id.startsWith(prefix)));
+
+  const wantCarport = c.addons.includes('carport');
+  const wantTrees = c.addons.includes('landscaping');
+  const wantFence = c.addons.includes('fence');
+  const wantSolar = c.addons.includes('solar');
+  const wantTank = c.addons.includes('water_tank');
+
+  // ── 1. Reserve perimeter space for ground-level add-ons ──────────────
+  // Carport gets a strip on the LEFT, trees get a strip on the RIGHT + BOTTOM,
+  // fence adds a thin buffer on every side. Solar/tank are roof-only, no strip.
+  const carportStrip = wantCarport ? Math.min(13, Math.max(9, Math.round(W * 0.25))) : 0;
+  const treeStrip = wantTrees ? 4 : 0;
+  const fenceBuffer = wantFence ? 1 : 0;
+
+  const reserveLeft = carportStrip + fenceBuffer;
+  const reserveRight = treeStrip + fenceBuffer;
+  const reserveTop = fenceBuffer;
+  const reserveBottom = treeStrip + fenceBuffer;
+
+  const buildX = reserveLeft;
+  const buildY = reserveTop;
+  const buildW = Math.max(8, W - reserveLeft - reserveRight);
+  const buildH = Math.max(8, H - reserveTop - reserveBottom);
+
+  // ── 2. Reshape the building rooms to fit inside the build zone ───────
+  const mainHouse = baseRooms.filter((r) => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony');
+  const needsReshape = (reserveLeft + reserveRight + reserveTop + reserveBottom) > 0 && mainHouse.length > 0;
+
+  let rooms: Room[];
+  if (needsReshape) {
+    const minX = Math.min(...mainHouse.map((r) => r.x));
+    const minY = Math.min(...mainHouse.map((r) => r.y));
+    const maxX = Math.max(...mainHouse.map((r) => r.x + r.w));
+    const maxY = Math.max(...mainHouse.map((r) => r.y + r.h));
+    const curW = Math.max(1, maxX - minX);
+    const curH = Math.max(1, maxY - minY);
+    const sX = buildW / curW;
+    const sY = buildH / curH;
+
+    rooms = baseRooms
+      // garden/carport/balcony zones from the original plan are dropped — the new
+      // reserved yard strips replace them. Doors/windows use 0..1 wall positions
+      // so they stay aligned after scaling.
+      .filter((r) => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony')
+      .map((r) => {
+        const nx = Math.round(buildX + (r.x - minX) * sX);
+        const ny = Math.round(buildY + (r.y - minY) * sY);
+        const nw = Math.max(4, Math.round(r.w * sX));
+        const nh = Math.max(4, Math.round(r.h * sY));
+        const newRoom: Room = { ...r, x: nx, y: ny, w: nw, h: nh };
+        if (newRoom.furniture && newRoom.furniture.length > 0) {
+          try {
+            newRoom.furniture = regenerateFurniture(newRoom);
+          } catch {
+            /* keep old furniture if regeneration fails */
+          }
+        }
+        return newRoom;
+      });
+  } else {
+    rooms = [...baseRooms];
+  }
+
+  // ── 3. Place reserved-strip add-ons inside the plan boundary ─────────
+  if (wantCarport && carportStrip > 0) {
+    rooms.push({
+      id: 'addon-carport',
+      type: 'carport',
+      label: 'CARPORT',
+      x: fenceBuffer,
+      y: buildY,
+      w: Math.max(6, carportStrip - 1),
+      h: buildH,
+      color: COLORS.carport,
+      furniture: [],
+      doors: [],
+      windows: [],
+    });
+  }
+
+  if (wantTrees && treeStrip > 0) {
+    // Right-side garden strip
+    rooms.push({
+      id: 'addon-yard-right',
+      type: 'garden',
+      label: 'GARDEN',
+      x: W - treeStrip - fenceBuffer,
+      y: buildY,
+      w: treeStrip,
+      h: buildH,
+      color: COLORS.garden,
+      furniture: [],
+      doors: [],
+      windows: [],
+    });
+    // Bottom garden strip
+    rooms.push({
+      id: 'addon-yard-bottom',
+      type: 'garden',
+      label: 'GARDEN',
+      x: fenceBuffer,
+      y: H - treeStrip - fenceBuffer,
+      w: W - fenceBuffer * 2,
+      h: treeStrip,
+      color: COLORS.garden,
+      furniture: [],
+      doors: [],
+      windows: [],
+    });
+    // Tree markers
+    const treeSpots = [
+      { id: 'addon-tree-1', x: W - treeStrip + 0.5, y: buildY + 1 },
+      { id: 'addon-tree-2', x: W - treeStrip + 0.5, y: buildY + buildH - 4 },
+      { id: 'addon-tree-3', x: fenceBuffer + 1, y: H - treeStrip + 0.5 },
+      { id: 'addon-tree-4', x: W - treeStrip - 4, y: H - treeStrip + 0.5 },
+    ];
+    treeSpots.forEach((t) => {
+      rooms.push({
+        ...t,
+        type: 'garden',
+        label: 'TREE',
+        w: 3,
+        h: 3,
+        color: 'rgba(34, 197, 94, 0.4)',
+        furniture: [],
+        doors: [],
+        windows: [],
+      });
+    });
+  }
+
+  // ── 4. Roof-only markers ─────────────────────────────────────────────
+  if (wantSolar) {
+    const solarW = Math.min(10, Math.max(6, buildW - 4));
+    const solarH = Math.min(4, Math.max(3, buildH - 4));
+    rooms.push({
+      id: 'addon-solar',
+      type: 'garden',
+      label: 'SOLAR PANELS (ROOF)',
+      x: buildX + 2,
+      y: buildY + 2,
+      w: solarW,
+      h: solarH,
+      color: 'rgba(26, 42, 74, 0.4)',
+      furniture: [],
+      doors: [],
+      windows: [],
+    });
+  }
+
+  if (wantTank) {
+    const tankSize = Math.min(4, Math.max(3, Math.min(buildW, buildH) - 2));
+    rooms.push({
+      id: 'addon-tank',
+      type: 'garden',
+      label: 'WATER TANK (ROOF)',
+      x: buildX + buildW - tankSize - 2,
+      y: buildY + 2,
+      w: tankSize,
+      h: tankSize,
+      color: 'rgba(0, 0, 255, 0.2)',
+      furniture: [],
+      doors: [],
+      windows: [],
+    });
+  }
+
+  // ── 5. Perimeter fence wrapping the entire plan ──────────────────────
+  if (wantFence) {
+    rooms.push({
+      id: 'addon-fence',
+      type: 'garden',
+      label: 'PERIMETER FENCE',
+      x: 0,
+      y: 0,
+      w: W,
+      h: H,
+      color: 'transparent',
+      furniture: [],
+      doors: [],
+      windows: [],
+      openWalls: ['top', 'bottom', 'left', 'right'],
+    });
+  }
+
+  return { ...plan, rooms, width: W, height: H };
+}
+
 function applyDynamicChanges(plan: Plan, c: ConfigState): Plan {
   let rooms = [...plan.rooms];
   let currentWidth = plan.width;
   let currentHeight = plan.height;
+  const removedRooms: Room[] = [];
   
   // 1. Handle Bedrooms
   const beds = rooms.filter(r => r.type === 'bedroom');
@@ -1365,6 +1639,7 @@ function applyDynamicChanges(plan: Plan, c: ConfigState): Plan {
     let toRemove = beds.length - c.bedrooms;
     for (let i = rooms.length - 1; i >= 0 && toRemove > 0; i--) {
       if (rooms[i].type === 'bedroom' && !rooms[i].label.toLowerCase().includes('master')) {
+        removedRooms.push(rooms[i]);
         rooms.splice(i, 1);
         toRemove--;
       }
@@ -1394,10 +1669,17 @@ function applyDynamicChanges(plan: Plan, c: ConfigState): Plan {
     let toRemove = baths.length - c.bathrooms;
     for (let i = rooms.length - 1; i >= 0 && toRemove > 0; i--) {
       if (rooms[i].type === 'bathroom' && !rooms[i].label.toLowerCase().includes('master')) {
+        removedRooms.push(rooms[i]);
         rooms.splice(i, 1);
         toRemove--;
       }
     }
+  }
+
+  // Reclaim the empty footprint left behind by removed bedrooms/bathrooms so the
+  // plan stays visually compact instead of showing dead space.
+  for (const removedRoom of removedRooms) {
+    absorbRemovedRoomSpace(rooms, removedRoom, c);
   }
 
   // 3. Handle Kitchen Layout
@@ -1462,134 +1744,6 @@ function applyDynamicChanges(plan: Plan, c: ConfigState): Plan {
     }
   }
 
-  // 4. Handle Carport
-  const livingRooms = rooms.filter(r => r.type !== 'carport' && r.type !== 'garden' && r.id !== 'addon-carport');
-  const buildingHeight = Math.max(plan.height, ...livingRooms.map(r => r.y + r.h));
-  
-  const hasCarport = rooms.some(r => r.type === 'carport' || r.id === 'addon-carport');
-  const wantCarport = c.addons.includes('carport');
-  if (wantCarport && !hasCarport) {
-    const carportW = 12;
-    rooms.push({
-      id: 'addon-carport',
-      type: 'carport',
-      label: 'CARPORT',
-      x: -carportW - 2, // Place on the left
-      y: 0,
-      w: carportW,
-      h: buildingHeight, // Match full height
-      color: COLORS.carport,
-      furniture: [],
-      doors: [],
-      windows: [],
-    });
-  } else if (!wantCarport && hasCarport) {
-    const idx = rooms.findIndex(r => r.type === 'carport' || r.id === 'addon-carport');
-    if (idx !== -1) rooms.splice(idx, 1);
-  } else if (wantCarport && hasCarport) {
-    // Update existing carport height if it changed
-    const cp = rooms.find(r => r.type === 'carport' || r.id === 'addon-carport');
-    if (cp) cp.h = buildingHeight;
-  }
-
-  // 4. Solar Panels & Water Tank (Visual markers in 2D)
-  // We place them INSIDE the house bounds in 2D so they don't take extra land space
-  const mainHouseRooms = rooms.filter(r => r.type !== 'carport' && r.type !== 'garden' && !r.id.startsWith('addon-'));
-  const houseX = Math.min(...mainHouseRooms.map(r => r.x));
-  const houseY = Math.min(...mainHouseRooms.map(r => r.y));
-
-  const hasSolar = rooms.some(r => r.id === 'addon-solar');
-  const wantSolar = c.addons.includes('solar');
-  if (wantSolar && !hasSolar) {
-    rooms.push({
-      id: 'addon-solar',
-      type: 'garden',
-      label: 'SOLAR PANELS (ROOF)',
-      x: houseX + 2,
-      y: houseY + 2,
-      w: 10,
-      h: 4,
-      color: 'rgba(26, 42, 74, 0.4)',
-      furniture: [],
-      doors: [],
-      windows: [],
-    });
-  } else if (!wantSolar && hasSolar) {
-    const idx = rooms.findIndex(r => r.id === 'addon-solar');
-    if (idx !== -1) rooms.splice(idx, 1);
-  }
-
-  const hasTank = rooms.some(r => r.id === 'addon-tank');
-  const wantTank = c.addons.includes('water_tank');
-  if (wantTank && !hasTank) {
-    rooms.push({
-      id: 'addon-tank',
-      type: 'garden',
-      label: 'WATER TANK (ROOF)',
-      x: houseX + 14,
-      y: houseY + 2,
-      w: 4,
-      h: 4,
-      color: 'rgba(0, 0, 255, 0.2)',
-      furniture: [],
-      doors: [],
-      windows: [],
-    });
-  } else if (!wantTank && hasTank) {
-    const idx = rooms.findIndex(r => r.id === 'addon-tank');
-    if (idx !== -1) rooms.splice(idx, 1);
-  }
-
-  // 5. Fence & Landscaping
-  const wantFence = c.addons.includes('fence');
-  const hasFenceMarker = rooms.some(r => r.id === 'addon-fence');
-  if (wantFence && !hasFenceMarker) {
-    rooms.push({
-      id: 'addon-fence',
-      type: 'garden',
-      label: 'PERIMETER FENCE',
-      x: -4,
-      y: -4,
-      w: currentWidth + 8,
-      h: buildingHeight + 8,
-      color: 'transparent',
-      furniture: [],
-      doors: [],
-      windows: [],
-      openWalls: ['top', 'bottom', 'left', 'right'], // Custom styling in canvas
-    });
-  } else if (!wantFence && hasFenceMarker) {
-    const idx = rooms.findIndex(r => r.id === 'addon-fence');
-    if (idx !== -1) rooms.splice(idx, 1);
-  }
-
-  const wantLandscaping = c.addons.includes('landscaping');
-  const hasLandscaping = rooms.some(r => r.id.startsWith('addon-tree'));
-  if (wantLandscaping && !hasLandscaping) {
-    // Add some tree markers in the garden areas
-    [
-      { id: 'addon-tree-1', x: currentWidth + 2, y: 2 },
-      { id: 'addon-tree-2', x: currentWidth + 4, y: 15 },
-      { id: 'addon-tree-3', x: -6, y: 10 },
-    ].forEach(t => {
-      rooms.push({
-        ...t,
-        type: 'garden',
-        label: 'TREE',
-        w: 3,
-        h: 3,
-        color: 'rgba(34, 197, 94, 0.2)',
-        furniture: [],
-        doors: [],
-        windows: [],
-      });
-    });
-  } else if (!wantLandscaping && hasLandscaping) {
-    for (let i = rooms.length - 1; i >= 0; i--) {
-      if (rooms[i].id.startsWith('addon-tree')) rooms.splice(i, 1);
-    }
-  }
-
   // Final Bounds Calculation & Normalization
   const minX = Math.min(0, ...rooms.map(r => r.x));
   const minY = Math.min(0, ...rooms.map(r => r.y));
@@ -1601,7 +1755,7 @@ function applyDynamicChanges(plan: Plan, c: ConfigState): Plan {
   const maxX = Math.max(1, ...rooms.map(r => r.x + r.w));
   const maxY = Math.max(1, ...rooms.map(r => r.y + r.h));
 
-  return { ...plan, width: maxX, height: maxY, rooms };
+  return applyAddOnsToPlan({ ...plan, width: maxX, height: maxY, rooms }, c);
 }
 
 // ── Generate empty plan for custom editor ─────────────────────────

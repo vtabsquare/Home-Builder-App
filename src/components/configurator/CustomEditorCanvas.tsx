@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Stage, Layer, Rect, Text, Line, Group, Transformer } from 'react-konva';
 import { Plan, Room, FurnitureItem, generateEmptyPlan, regenerateFurniture } from '@/lib/floorplan';
-import { intelligentlyPlaceDoors } from '@/lib/doorPlacer';
 import { useConfig, HomeType } from '@/store/configurator';
 import Konva from 'konva';
 import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed } from 'lucide-react';
@@ -255,10 +254,8 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
   };
 
   const savePlan = () => {
-    // Intelligently place doors before saving
-    let finalPlan = intelligentlyPlaceDoors(plan);
-    // Add windows on exterior walls
-    finalPlan = addWindowsToRooms(finalPlan);
+    // Preserve the user's exact door placement; only auto-fill exterior windows.
+    const finalPlan = addWindowsToRooms(plan);
     setPlan(finalPlan);
     onChange?.(finalPlan);
     onSave?.(finalPlan);

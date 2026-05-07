@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, useConfig, RoofType, Material } from '@/store/configurator';
+import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getFamilyDoubleStoreyPackageKey, useConfig, RoofType, Material } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { FloorPlanCanvas } from '../FloorPlanCanvas';
 import { ElevationCanvas } from '../ElevationCanvas';
 import { CustomEditorCanvas, ROOM_BLOCKS } from '../CustomEditorCanvas';
 import { Plan, splitPlanToFloors, Room, generateEmptyPlan, regenerateFurniture } from '@/lib/floorplan';
+import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash } from 'lucide-react';
 
@@ -46,7 +47,8 @@ function getRoomTabs(plan: Plan): RoomTab[] {
 }
 
 export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
-  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout } = useConfig();
+  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset } = useConfig();
+  const isCustomPreset = presetId === -1;
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [advanced, setAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -56,17 +58,23 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
   // Double storey floor splitting
   const canDoubleStorey = homeType === 'family' || homeType === 'premium';
+  const familyPackageKey = useMemo(() => getFamilyDoubleStoreyPackageKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey }), [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey]);
+  const familyPackageLayout = useMemo(() => {
+    if (!(homeType === 'family' && isDoubleStorey && presetId !== -1)) return null;
+    return packageLayouts[familyPackageKey] || packageLayouts[FAMILY_DOUBLE_STOREY_PACKAGE_KEY] || null;
+  }, [homeType, isDoubleStorey, presetId, packageLayouts, familyPackageKey]);
   const floors = useMemo(() => {
     if (!isDoubleStorey) return null;
+    if (familyPackageLayout) return familyPackageLayout;
     return splitPlanToFloors(plan, homeType);
-  }, [isDoubleStorey, plan, homeType]);
+  }, [isDoubleStorey, plan, homeType, familyPackageLayout]);
 
   // Determine which plan to show based on floor selection
   const displayPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return plan;
-    if (activeFloor === 0) return customPlan || floors.ground;
-    return customFirstFloorPlan || floors.first;
-  }, [isDoubleStorey, floors, activeFloor, plan, customFirstFloorPlan, customPlan]);
+    if (activeFloor === 0) return (isCustomPreset ? customPlan : null) || floors.ground;
+    return (isCustomPreset ? customFirstFloorPlan : null) || floors.first;
+  }, [isDoubleStorey, floors, activeFloor, plan, customFirstFloorPlan, customPlan, isCustomPreset]);
 
   const currentPlan = useMemo(() => {
     const p = stagedPlan || displayPlan;
@@ -158,6 +166,27 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   }, [activeTab, displayPlan]);
 
   const currentTabLabel = roomTabs.find((t) => t.id === activeTab)?.label || 'OVERVIEW';
+
+  const commitStagedPlan = () => {
+    if (!stagedPlan) return null;
+
+    const newGround = (isDoubleStorey && activeFloor === 1)
+      ? ((isCustomPreset ? customPlan : null) || familyPackageLayout?.ground || floors?.ground || plan)
+      : stagedPlan;
+    const newFirst = (isDoubleStorey && activeFloor === 1)
+      ? stagedPlan
+      : ((isCustomPreset ? customFirstFloorPlan : null) || familyPackageLayout?.first || floors?.first || null);
+
+    if (!isCustomPreset) {
+      setPresetOverride(presetId, newGround, newFirst);
+    } else if (isDoubleStorey && activeFloor === 1) {
+      setCustomFirstFloorPlan(newFirst);
+    } else {
+      setCustomPlan(newGround);
+    }
+
+    return { newGround, newFirst };
+  };
 
   return (
     <StepShell
@@ -262,44 +291,56 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                     <>
                       <button
                         onClick={async () => {
-                          const newGround = (isDoubleStorey && activeFloor === 1) ? (customPlan || floors?.ground || plan) : stagedPlan;
-                          const newFirst = (isDoubleStorey && activeFloor === 1) ? stagedPlan : (customFirstFloorPlan || floors?.first || null);
+                          const committed = commitStagedPlan();
+                          if (!committed) return;
 
-                          if (isDoubleStorey && activeFloor === 1) {
-                            setCustomFirstFloorPlan(newFirst);
-                          } else {
-                            onChange?.(newGround);
-                          }
+                          try {
+                            if (isFamilyDoubleStoreyPackage) {
+                              await savePackageLayout(getFamilyDoubleStoreyPackageKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey }), committed.newGround, committed.newFirst);
+                              toast({ title: 'Plan updated', description: 'Family double-storey package saved successfully.' });
+                            } else if (presetId === -1 && loadedPresetId) {
+                              await updateSavedPreset(committed.newGround, committed.newFirst);
+                              toast({ title: 'Preset updated', description: 'Your saved preset has been updated.' });
+                            } else if (presetId === 0 || presetId === 1) {
+                              await saveBuiltInPreset(presetId, committed.newGround, committed.newFirst);
+                              toast({ title: 'Preset updated', description: `${presetId === 0 ? 'Preset A' : 'Preset B'} has been updated.` });
+                            } else {
+                              toast({ title: 'Preset updated', description: 'Changes have been applied locally.' });
+                            }
 
-                          if (isFamilyDoubleStoreyPackage) {
-                            await savePackageLayout(FAMILY_DOUBLE_STOREY_PACKAGE_KEY, newGround, newFirst);
-                          } else {
-                            await updateSavedPreset(newGround, newFirst);
+                            setStagedPlan(null);
+                            planHistory.forEach(h => removeHistoryRecord(h.id));
+                          } catch (error) {
+                            console.error('Failed to update plan', error);
+                            toast({ title: 'Update failed', description: 'Could not update the plan. Please try again.' });
                           }
-                          
-                          setStagedPlan(null);
-                          planHistory.forEach(h => removeHistoryRecord(h.id));
                         }}
                         className="flex items-center gap-1.5 rounded-full bg-clay px-4 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-clay/90 transition-all active:scale-95"
                       >
                         <Save size={14} /> Update Plan
                       </button>
                       <button
-                        onClick={() => {
-                          const newGround = (isDoubleStorey && activeFloor === 1) ? customPlan : stagedPlan;
-                          const newFirst = (isDoubleStorey && activeFloor === 1) ? stagedPlan : customFirstFloorPlan;
+                        onClick={async () => {
+                          const committed = commitStagedPlan();
+                          if (!committed) return;
 
-                          saveAsPreset(newGround, newFirst);
-                          
-                          if (isDoubleStorey && activeFloor === 1) {
-                            setCustomFirstFloorPlan(newFirst);
-                          } else {
-                            onChange?.(newGround); // Set it as active
+                          const fallbackName = presetId === 0 ? 'Preset A Copy' : presetId === 1 ? 'Preset B Copy' : 'Custom Preset';
+                          const name = window.prompt('Enter a name for this preset', fallbackName);
+                          if (!name || !name.trim()) {
+                            toast({ title: 'Save cancelled', description: 'Preset name is required to save a new preset.' });
+                            return;
                           }
-                          loadSavedPreset(savedPresets.length); // Load the one we just saved
-                          setStagedPlan(null);
-                          planHistory.forEach(h => removeHistoryRecord(h.id));
-                          setAdvanced(false); // Can exit advanced mode to see new preset
+
+                          try {
+                            await saveAsPreset(name.trim(), committed.newGround, committed.newFirst);
+                            toast({ title: 'Preset saved', description: `Saved as ${name.trim()}.` });
+                            setStagedPlan(null);
+                            planHistory.forEach(h => removeHistoryRecord(h.id));
+                            setAdvanced(false);
+                          } catch (error) {
+                            console.error('Failed to save preset', error);
+                            toast({ title: 'Save failed', description: 'Could not save the preset. Please try again.' });
+                          }
                         }}
                         className="flex items-center gap-1.5 rounded-full bg-blue-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-blue-600 transition-all active:scale-95"
                       >
@@ -415,27 +456,44 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                     onChange={(editorPlan) => {
                       if (isDoubleStorey && activeFloor === 1) {
                         setCustomFirstFloorPlan(editorPlan);
-                      } else {
+                      } else if (isCustomPreset) {
                         setCustomPlan(editorPlan);
                       }
                     }}
                     onSave={async (editorPlan) => {
-                      const newGround = (isDoubleStorey && activeFloor === 1) ? (customPlan || floors?.ground || plan) : editorPlan;
-                      const newFirst = (isDoubleStorey && activeFloor === 1) ? editorPlan : (customFirstFloorPlan || floors?.first || null);
+                      const newGround = (isDoubleStorey && activeFloor === 1)
+                        ? ((isCustomPreset ? customPlan : null) || familyPackageLayout?.ground || floors?.ground || plan)
+                        : editorPlan;
+                      const newFirst = (isDoubleStorey && activeFloor === 1)
+                        ? editorPlan
+                        : ((isCustomPreset ? customFirstFloorPlan : null) || familyPackageLayout?.first || floors?.first || null);
 
-                      if (isDoubleStorey && activeFloor === 1) {
-                        setCustomFirstFloorPlan(newFirst);
-                      } else {
-                        setCustomPlan(newGround);
+                      try {
+                        if (isFamilyDoubleStoreyPackage) {
+                          await savePackageLayout(familyPackageKey, newGround, newFirst);
+                        } else if (!isCustomPreset && (presetId === 0 || presetId === 1)) {
+                          await saveBuiltInPreset(presetId, newGround, newFirst);
+                        } else if (isCustomPreset && loadedPresetId) {
+                          await updateSavedPreset(newGround, newFirst);
+                        } else if (!isCustomPreset) {
+                          setPresetOverride(presetId, newGround, newFirst);
+                        }
+                        toast({ title: 'Layout saved', description: 'Your floor plan layout has been saved.' });
+                      } catch (error) {
+                        console.error('Failed to save custom editor layout', error);
+                        toast({ title: 'Save failed', description: 'Could not save the floor plan layout. Please try again.' });
+                        return;
                       }
 
-                      if (isFamilyDoubleStoreyPackage) {
-                        await savePackageLayout(FAMILY_DOUBLE_STOREY_PACKAGE_KEY, newGround, newFirst);
+                      if (isCustomPreset && isDoubleStorey && activeFloor === 1) {
+                        setCustomFirstFloorPlan(newFirst);
+                      } else if (isCustomPreset) {
+                        setCustomPlan(newGround);
                       }
 
                       setAdvancedEditorMode(false);
                     }}
-                    initialPlan={isDoubleStorey && activeFloor === 1 ? (customFirstFloorPlan || floors?.first || null) : null}
+                    initialPlan={isDoubleStorey && activeFloor === 1 ? ((isCustomPreset ? customFirstFloorPlan : null) || floors?.first || null) : null}
                   />
                 </motion.div>
               ) : view === '2d' ? (
@@ -495,7 +553,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 <motion.div key="3d" className="h-full w-full"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   transition={{ duration: 0.3 }}>
-                  <ElevationCanvas plan={currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={isDoubleStorey && floors ? (customFirstFloorPlan || floors.first) : undefined} />
+                  <ElevationCanvas plan={currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={isDoubleStorey && floors ? ((isCustomPreset ? customFirstFloorPlan : null) || floors.first) : undefined} />
                 </motion.div>
               )}
             </AnimatePresence>

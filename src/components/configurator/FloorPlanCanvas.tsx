@@ -25,8 +25,18 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
   const [isAddingDoor, setIsAddingDoor] = useState(false);
   const transformerRef = useRef<Konva.Transformer>(null);
   const roomRefs = useRef<{ [key: string]: Konva.Group }>({});
+  const localPlanRef = useRef(localPlan);
 
-  useEffect(() => setLocalPlan(plan), [plan]);
+  useEffect(() => {
+    setLocalPlan(plan);
+    localPlanRef.current = plan;
+  }, [plan]);
+
+  const commitLocalPlan = (updated: Plan, notify = true) => {
+    localPlanRef.current = updated;
+    setLocalPlan(updated);
+    if (notify) onChange?.(updated);
+  };
 
   useEffect(() => {
     if (advanced && selectedRoomId && transformerRef.current && roomRefs.current[selectedRoomId]) {
@@ -84,12 +94,15 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
   const handleDragEnd = (id: string, e: Konva.KonvaEventObject<DragEvent>) => {
     const newX = Math.round((e.target.x() - buildingOffsetX) / scale);
     const newY = Math.round((e.target.y() - buildingOffsetY) / scale);
+    const room = localPlan.rooms?.find((r) => r.id === id);
+    if (!room) return;
+    const clampedX = Math.max(0, Math.min(localPlan.width - room.w, newX));
+    const clampedY = Math.max(0, Math.min(localPlan.height - room.h, newY));
     const updated: Plan = {
       ...localPlan,
-      rooms: (localPlan.rooms || []).map((r) => (r.id === id ? { ...r, x: Math.max(0, newX), y: Math.max(0, newY) } : r)),
+      rooms: (localPlan.rooms || []).map((r) => (r.id === id ? { ...r, x: clampedX, y: clampedY } : r)),
     };
-    setLocalPlan(updated);
-    onChange?.(updated);
+    commitLocalPlan(updated);
   };
 
   const handleRotateRoom = (id: string) => {
@@ -103,8 +116,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
         return newRoom;
       }),
     };
-    setLocalPlan(updated);
-    onChange?.(updated);
+    commitLocalPlan(updated);
   };
 
   const handleAddDoor = (roomId: string) => {
@@ -116,8 +128,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
         return { ...r, doors: [...r.doors, newDoor] };
       }),
     };
-    setLocalPlan(updated);
-    onChange?.(updated);
+    commitLocalPlan(updated);
   };
 
   const handleDeleteRoom = (roomId: string) => {
@@ -125,15 +136,15 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
       ...localPlan,
       rooms: (localPlan.rooms || []).filter((r) => r.id !== roomId),
     };
-    setLocalPlan(updated);
+    commitLocalPlan(updated);
     setSelectedRoomId(null);
-    onChange?.(updated);
   };
 
   const setPlotEntrance = (pos: number, commit: boolean) => {
     const clamped = Math.max(0.1, Math.min(0.9, pos));
     setLocalPlan((prev) => {
       const updated = { ...prev, plotEntranceX: clamped };
+      localPlanRef.current = updated;
       if (commit) onChange?.(updated);
       return updated;
     });
@@ -248,8 +259,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                   ...localPlan,
                   rooms: (localPlan.rooms || []).map(r => r.id === room.id ? newRoom : r)
                 };
-                setLocalPlan(updatedPlan);
-                onChange?.(updatedPlan);
+                commitLocalPlan(updatedPlan);
               }}
             />
           ))}
@@ -314,10 +324,10 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                         return r;
                       });
                       const updatedPlan = { ...localPlan, rooms: updatedRooms };
-                      setLocalPlan(updatedPlan);
+                      commitLocalPlan(updatedPlan, false);
                     }}
                     onDragEnd={() => {
-                      onChange?.(localPlan);
+                      onChange?.(localPlanRef.current);
                     }}
                     onDelete={() => {
                       if (advanced) {
@@ -332,8 +342,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
                           return r;
                         });
                         const updatedPlan = { ...localPlan, rooms: updatedRooms };
-                        setLocalPlan(updatedPlan);
-                        onChange?.(updatedPlan);
+                        commitLocalPlan(updatedPlan);
                         setSelectedDoor(null);
                       }
                     }}
@@ -849,3 +858,4 @@ const WindowShape = ({ window: win, room, scale, offsetX, offsetY }: any) => {
     </Group>
   );
 };
+

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, useConfig } from '@/store/configurator';
+import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getFamilyDoubleStoreyPackageKey, useConfig } from '@/store/configurator';
 import { computeCost } from '@/lib/cost';
-import { generatePlan, Plan } from '@/lib/floorplan';
+import { applyAddOnsToPlan, generatePlan, Plan } from '@/lib/floorplan';
 import { ProgressHeader } from '@/components/configurator/ProgressHeader';
 import { CostPanel } from '@/components/configurator/CostPanel';
 import { FloorPlanCanvas } from '@/components/configurator/FloorPlanCanvas';
@@ -16,13 +16,22 @@ import { Maximize2, Minimize2, Sparkles } from 'lucide-react';
 
 const Index = () => {
   const config = useConfig();
-  const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts } = config;
+  const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts, presetOverrides } = config;
 
   const cost = useMemo(() => computeCost(config), [config]);
-  const basePlan = useMemo(() => generatePlan(config), [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.addons, config.presetId]);
+  const basePlan = useMemo(() => {
+    if (config.presetId !== -1) {
+      const override = presetOverrides[getBuiltInPresetKey(config, config.presetId)];
+      if (override?.ground?.rooms) return override.ground;
+    }
+    return generatePlan(config);
+  }, [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.addons, config.presetId, config.land, config.landSize, config.customLandArea, config.roof, config.material, config.isDoubleStorey, config.activeFloor, presetOverrides]);
 
-  const packageLayout = homeType === 'family' && isDoubleStorey ? packageLayouts[FAMILY_DOUBLE_STOREY_PACKAGE_KEY] : null;
-  const plan = customPlan || packageLayout?.ground || basePlan || { width: 0, height: 0, rooms: [] };
+  const packageLayout = homeType === 'family' && isDoubleStorey
+    ? packageLayouts[getFamilyDoubleStoreyPackageKey(config)] || packageLayouts[FAMILY_DOUBLE_STOREY_PACKAGE_KEY]
+    : null;
+  const selectedPlan = (config.presetId === -1 ? customPlan : null) || packageLayout?.ground || basePlan || { width: 0, height: 0, rooms: [] };
+  const plan = useMemo(() => applyAddOnsToPlan(selectedPlan, config), [selectedPlan, config.addons]);
 
   useEffect(() => {
     config.fetchSavedPresets();
