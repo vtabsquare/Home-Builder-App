@@ -442,17 +442,17 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
           />
           <Rect
             x={plotOffsetX}
-            y={plotOffsetY + PLOT_PADDING_FT * scale}
+            y={plotOffsetY}
             width={PLOT_PADDING_FT * scale}
-            height={localH * scale}
+            height={plotH * scale}
             fill="#98c58b"
             opacity={0.4}
           />
           <Rect
             x={plotOffsetX + (PLOT_PADDING_FT + localW) * scale}
-            y={plotOffsetY + PLOT_PADDING_FT * scale}
+            y={plotOffsetY}
             width={PLOT_PADDING_FT * scale}
-            height={localH * scale}
+            height={plotH * scale}
             fill="#98c58b"
             opacity={0.4}
           />

@@ -12,8 +12,12 @@ export type Material = 'budget' | 'modern' | 'luxury';
 export const FAMILY_DOUBLE_STOREY_PACKAGE_KEY = 'family-double-storey';
 const BUILT_IN_PRESET_PREFIX = '__builtin_floor_plan__';
 
-export const getBuiltInPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>, presetId: number) =>
-  `${BUILT_IN_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_addons_${[...(state.addons || [])].sort().join('-') || 'none'}_${presetId}`;
+export const getBuiltInPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>, presetId: number) => {
+  // Exclude visual-only addons from the key (smart_home, solar, water_tank, fence)
+  // Only layout-affecting addons (carport, landscaping) should trigger different preset overrides
+  const layoutAffectingAddons = (state.addons || []).filter(a => a === 'carport' || a === 'landscaping');
+  return `${BUILT_IN_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_addons_${layoutAffectingAddons.sort().join('-') || 'none'}_${presetId}`;
+};
 
 export const getFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>) =>
   `${FAMILY_DOUBLE_STOREY_PACKAGE_KEY}_${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}`;

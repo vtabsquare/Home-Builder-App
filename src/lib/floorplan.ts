@@ -1430,16 +1430,15 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
   const wantTank = c.addons.includes('water_tank');
 
   // ── 1. Reserve perimeter space for ground-level add-ons ──────────────
-  // Carport gets a strip on the LEFT, trees get a strip on the RIGHT + BOTTOM,
-  // fence adds a thin buffer on every side. Solar/tank are roof-only, no strip.
+  // Carport gets a strip on the LEFT, trees get a strip on the RIGHT + BOTTOM.
+  // Fence, solar, and water tank are visual-only and do not reshape the building.
   const carportStrip = wantCarport ? Math.min(13, Math.max(9, Math.round(W * 0.25))) : 0;
   const treeStrip = wantTrees ? 4 : 0;
-  const fenceBuffer = wantFence ? 1 : 0;
 
-  const reserveLeft = carportStrip + fenceBuffer;
-  const reserveRight = treeStrip + fenceBuffer;
-  const reserveTop = fenceBuffer;
-  const reserveBottom = treeStrip + fenceBuffer;
+  const reserveLeft = carportStrip;
+  const reserveRight = treeStrip;
+  const reserveTop = 0;
+  const reserveBottom = treeStrip;
 
   const buildX = reserveLeft;
   const buildY = reserveTop;
@@ -1491,7 +1490,7 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
       id: 'addon-carport',
       type: 'carport',
       label: 'CARPORT',
-      x: fenceBuffer,
+      x: reserveLeft,
       y: buildY,
       w: Math.max(6, carportStrip - 1),
       h: buildH,
@@ -1508,7 +1507,7 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
       id: 'addon-yard-right',
       type: 'garden',
       label: 'GARDEN',
-      x: W - treeStrip - fenceBuffer,
+      x: W - treeStrip,
       y: buildY,
       w: treeStrip,
       h: buildH,
@@ -1522,9 +1521,9 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
       id: 'addon-yard-bottom',
       type: 'garden',
       label: 'GARDEN',
-      x: fenceBuffer,
-      y: H - treeStrip - fenceBuffer,
-      w: W - fenceBuffer * 2,
+      x: reserveLeft,
+      y: H - treeStrip,
+      w: W - reserveLeft - reserveRight,
       h: treeStrip,
       color: COLORS.garden,
       furniture: [],
@@ -1535,7 +1534,7 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
     const treeSpots = [
       { id: 'addon-tree-1', x: W - treeStrip + 0.5, y: buildY + 1 },
       { id: 'addon-tree-2', x: W - treeStrip + 0.5, y: buildY + buildH - 4 },
-      { id: 'addon-tree-3', x: fenceBuffer + 1, y: H - treeStrip + 0.5 },
+      { id: 'addon-tree-3', x: reserveLeft + 1, y: H - treeStrip + 0.5 },
       { id: 'addon-tree-4', x: W - treeStrip - 4, y: H - treeStrip + 0.5 },
     ];
     treeSpots.forEach((t) => {
