@@ -1,0 +1,1184 @@
+===============================================================================
+GBTI HOME BUILDER APP - COMPREHENSIVE FUNCTIONALITY DOCUMENTATION
+===============================================================================
+
+Generated on: May 6, 2026
+Application: Smart Home Builder Configurator
+Technology Stack: React, TypeScript, Zustand, Three.js, Konva, Supabase, Framer Motion
+
+===============================================================================
+TABLE OF CONTENTS
+===============================================================================
+
+1. APPLICATION OVERVIEW
+2. CORE ARCHITECTURE
+3. MODULE 1: LAND SELECTION (StepLand)
+4. MODULE 2: HOME TYPE SELECTION (StepHomeType)
+5. MODULE 3: FEATURES CUSTOMIZATION (StepFeatures)
+6. MODULE 4: PREVIEW & EDITING (StepPreview)
+   - 4.1: 2D Floor Plan Canvas
+   - 4.2: 3D Elevation Canvas
+   - 4.3: Custom Editor Canvas
+7. MODULE 5: LEAD CAPTURE (StepLeadCapture)
+8. SUPPORTING MODULES
+   - 8.1: Configurator Store (State Management)
+   - 8.2: Cost Calculation System
+   - 8.3: Floor Plan Generation Engine
+   - 8.4: Door Placement Logic
+9. UI COMPONENTS
+10. DATA FLOW DIAGRAM
+11. INTEGRATIONS
+12. KIOSK MODE
+
+===============================================================================
+1. APPLICATION OVERVIEW
+===============================================================================
+
+The GBTI Smart Home Builder is an interactive web application that allows users
+to design custom homes through a step-by-step configurator. Users can select
+land options, home types, customize features, view 2D/3D previews, and receive
+real-time cost estimates.
+
+Key Features:
+- Step-by-step home configuration wizard (5 steps)
+- Real-time 2D floor plan visualization
+- Interactive 3D elevation rendering
+- Dynamic cost calculation
+- Custom floor plan editor
+- Preset-based layouts
+- Double storey support
+- Lead capture and proposal generation
+- Kiosk mode for in-person demonstrations
+
+===============================================================================
+2. CORE ARCHITECTURE
+===============================================================================
+
+Technology Stack:
+- Frontend: React 18 with TypeScript
+- State Management: Zustand with persistence middleware
+- 2D Graphics: Konva (Canvas-based)
+- 3D Graphics: Three.js with React Three Fiber
+- Animations: Framer Motion
+- Backend: Supabase (PostgreSQL database)
+- Build Tool: Vite
+- Styling: Tailwind CSS
+
+Application Structure:
+- src/pages/Index.tsx - Main application container
+- src/store/configurator.ts - Global state management
+- src/components/configurator/ - Step components
+- src/lib/ - Business logic utilities
+- src/integrations/supabase/ - Database client
+
+State Management (Zustand):
+The application uses a centralized Zustand store with the following key state:
+- Step navigation (0-4)
+- Land selection (own/need, size, custom area)
+- Home type (starter/family/premium)
+- Room configuration (bedrooms, bathrooms, kitchen)
+- Add-ons (solar, carport, water tank, smart home)
+- Roof and material preferences
+- Custom floor plans
+- Preset management
+- Double storey configuration
+- Lead information
+
+===============================================================================
+3. MODULE 1: LAND SELECTION (StepLand)
+===============================================================================
+
+File: src/components/configurator/steps/StepLand.tsx
+
+Purpose:
+Allows users to select whether they own land or need to purchase land, and
+select appropriate land packages.
+
+Functionality Flow:
+1. Initial State Display
+   - Two main choice cards: "I own land" and "I need land"
+   - Selection triggers state update via setLand()
+
+2. "I Own Land" Flow
+   - User selects "own" option
+   - Land size selection is hidden (not applicable)
+   - User can proceed to next step
+   - State: land = 'own', landSize = null, customLandArea = 0
+
+3. "I Need Land" Flow
+   - User selects "need" option
+   - Land package options are revealed with animation (Framer Motion)
+   - Three preset packages displayed:
+     a) Small: 800-1000 sqft ($67,500)
+     b) Medium: 1200-1600 sqft ($105,000)
+     c) Large: 1800-2400 sqft ($157,500)
+   - Custom option for areas above 2400 sqft
+   - User selects package via setLandSize()
+   - For custom option, user enters area via setCustomLandArea()
+   - Real-time price calculation displayed
+
+4. Validation
+   - Can proceed if: land === 'own' OR (land === 'need' AND landSize selected)
+   - For custom: requires customLandArea > 0
+
+5. Navigation
+   - Next button enabled when valid
+   - No previous button (first step)
+
+Key Functions:
+- handleLandChoice(choice): Sets land ownership status
+- setLandSize(size): Selects preset package size
+- setCustomLandArea(area): Sets custom land area
+
+Data Flow:
+User Selection → Zustand Store → Cost Calculation → UI Update
+
+Dependencies:
+- Zustand store (useConfig)
+- Cost utilities (LAND_PACKAGES, LAND_SQFT_RATE, formatMoney)
+- Framer Motion (animations)
+
+===============================================================================
+4. MODULE 2: HOME TYPE SELECTION (StepHomeType)
+===============================================================================
+
+File: src/components/configurator/steps/StepHomeType.tsx
+
+Purpose:
+Allows users to select the base home footprint/size, which determines default
+room configurations and base pricing.
+
+Functionality Flow:
+1. Initial State Display
+   - Three home type cards displayed in grid
+   - Each card shows: label, area range, bedroom count, base cost
+
+2. Home Type Options:
+   a) Starter
+      - 800-1000 sqft
+      - 2 bedrooms, 1 bathroom
+      - Base cost: $135,000
+      - Tag: "Compact + efficient"
+   
+   b) Family
+      - 1200-1600 sqft
+      - 3 bedrooms, 2 bathrooms
+      - Base cost: $245,000
+      - Tag: "Most popular"
+   
+   c) Premium
+      - 1800-2400 sqft
+      - 4 bedrooms, 3 bathrooms
+      - Base cost: $410,000
+      - Tag: "Spacious + airy"
+
+3. Selection Flow
+   - User clicks on home type card
+   - setHomeType() updates state
+   - Triggers automatic updates:
+     - Resets bedroom/bathroom counts to defaults
+     - Clears custom plans
+     - Resets double storey mode
+     - Resets preset selection
+     - Resets active floor
+
+4. Visual Feedback
+   - Selected card highlighted with border
+   - Mini silhouette SVG shows relative size
+   - Real-time cost update in sidebar
+
+5. Navigation
+   - Next button always enabled
+   - Previous button returns to land step
+
+Key Functions:
+- setHomeType(type): Updates home type and resets dependent state
+
+Data Flow:
+Home Type Selection → Zustand Store → Default Config Update → Floor Plan Regeneration
+
+Dependencies:
+- Zustand store (useConfig)
+- HOME_TYPE_DEFAULTS constant
+- Cost utilities (formatMoney)
+
+===============================================================================
+5. MODULE 3: FEATURES CUSTOMIZATION (StepFeatures)
+===============================================================================
+
+File: src/components/configurator/steps/StepFeatures.tsx
+
+Purpose:
+Allows users to customize room counts, kitchen layout, and add optional features.
+
+Functionality Flow:
+1. Bedroom/Bathroom Selection
+   - Stepper controls for each
+   - Bedroom range: 1-6
+   - Bathroom range: 1-5
+   - Each increment/decrement triggers setBedrooms()/setBathrooms()
+   - Real-time floor plan update based on new counts
+   - Constraints: Min 10×10 ft per bedroom, Min 5×7 ft per bathroom
+
+2. Kitchen Layout Selection
+   - Three options displayed:
+     a) Standard: Closed kitchen with separate dining
+     b) Open Plan: Merged kitchen + living + dining
+     c) Galley: Compact two-wall kitchen
+   - Selection via setKitchen()
+   - Affects furniture placement in floor plan
+
+3. Add-ons Selection
+   - Four optional add-ons with toggle buttons:
+     a) Solar Panels: $12,500
+     b) Carport: $8,500
+     c) Water Tank: $4,200
+     d) Smart Home Package: $15,800
+   - toggleAddon() manages array state
+   - Visual feedback: Active state with checkmark and color change
+   - Real-time cost update
+
+4. Validation
+   - No validation required (all options have valid defaults)
+
+5. Navigation
+   - Next button always enabled
+   - Previous button returns to home type step
+
+Key Functions:
+- setBedrooms(count): Updates bedroom count (1-6)
+- setBathrooms(count): Updates bathroom count (1-5)
+- setKitchen(type): Sets kitchen layout type
+- toggleAddon(addon): Adds/removes add-on from selection
+
+Data Flow:
+Feature Selection → Zustand Store → Cost Recalculation → Floor Plan Update
+
+Dependencies:
+- Zustand store (useConfig)
+- Cost utilities (ADDON_META, formatMoney)
+- Framer Motion (animations)
+
+===============================================================================
+6. MODULE 4: PREVIEW & EDITING (StepPreview)
+===============================================================================
+
+File: src/components/configurator/steps/StepPreview.tsx
+
+Purpose:
+Comprehensive preview and editing module with 2D/3D views, preset management,
+and advanced customization options.
+
+Functionality Flow:
+
+6.1 VIEW MODES
+   - 2D Floor Plan View: Shows top-down floor plan with rooms, furniture, doors, windows
+   - 3D Elevation View: Shows photorealistic 3D front elevation with materials, roof, landscaping
+   - Custom Editor: Advanced room-by-room editing with drag, resize, rotate
+
+6.2 PRESET MANAGEMENT
+   - Preset A & Preset B: Built-in layout variations
+   - Saved Presets: User-created custom layouts stored in Supabase
+   - Load Preset: Loads saved layout into current configuration
+   - Save as Preset: Saves current layout to database
+   - Update Plan: Updates existing preset
+   - Delete Preset: Removes saved layout
+
+6.3 ADVANCED EDITING MODE
+   - Enable via "Advanced mode" toggle
+   - Room addition buttons (Bedroom, Hall/Living, Bathroom, Kitchen, Dining, Garden)
+   - Room manipulation: Drag to move, transform to resize
+   - Room rotation: 90-degree increments
+   - Door addition: Add doors to selected rooms
+   - Room deletion: Remove rooms from plan
+   - Change log sidebar: Track and revert changes
+   - Update Plan button: Commit staged changes
+   - Save as Preset button: Save as new preset
+
+6.4 CUSTOM EDITOR MODE
+   - Separate canvas-based editor
+   - Room block palette: Click to add rooms
+   - Boundary rectangle: Shows total plot dimensions
+   - Drag rooms to position
+   - Transform to resize
+   - Rotate rooms
+   - Delete rooms
+   - Intelligent door placement on save
+   - Automatic window placement on exterior walls
+   - Usage statistics: Room count, area used, percentage
+
+6.5 DOUBLE STOREY SUPPORT
+   - Toggle for Family and Premium home types
+   - Floor selector: Ground Floor / First Floor
+   - Separate floor plans for each level
+   - Staircase visualization in 3D
+   - Roof extends over both floors
+   - Package layouts for double storey configurations
+
+6.6 ROOM NAVIGATION TABS
+   - Overview: Show all rooms
+   - Hall: Highlight living areas
+   - Bedrooms: Highlight bedroom rooms
+   - Kitchen: Highlight kitchen
+   - Bathroom: Highlight bathrooms
+   - Balcony: Highlight balcony
+   - Garden: Highlight garden/carport
+   - Touch swipe support for mobile
+   - Camera animation to focus on selected room type
+
+6.7 3D CUSTOMIZATION
+   - Roof type: Gable or Flat
+   - Material: Budget, Modern, Luxury
+   - Each material has color palette for walls, trim, roof, windows, doors
+   - Real-time material update in 3D view
+
+6.8 FLOOR PLAN CANVAS INTERACTIONS
+   - Zoom: Mouse wheel or buttons
+   - Pan: Drag canvas
+   - Fit to view: Reset zoom and position
+   - Room selection: Click to select
+   - Room drag: Move selected room (advanced mode)
+   - Room resize: Transform handles (advanced mode)
+   - Door drag: Reposition doors along walls
+   - Entrance gate: Draggable along front wall
+
+Key Functions:
+- setView(mode): Switch between 2D/3D/custom editor
+- setPresetId(id): Select preset layout
+- setAdvancedEditorMode(enabled): Toggle custom editor
+- setDoubleStorey(enabled): Toggle double storey mode
+- setActiveFloor(floor): Switch between ground/first floor
+- handleAddRoom(type): Add room to plan
+- saveAsPreset(): Save current plan to database
+- loadSavedPreset(index): Load saved preset
+- updateSavedPreset(): Update existing preset
+- deleteSavedPreset(index): Delete saved preset
+
+Data Flow:
+User Interaction → Canvas Component → Plan Update → Zustand Store → Database Sync
+
+Dependencies:
+- Zustand store (useConfig)
+- FloorPlanCanvas (2D rendering)
+- ElevationCanvas (3D rendering)
+- CustomEditorCanvas (Advanced editing)
+- Floor plan utilities (splitPlanToFloors, regenerateFurniture)
+- Supabase (preset storage)
+
+===============================================================================
+6.1: 2D FLOOR PLAN CANVAS (FloorPlanCanvas)
+===============================================================================
+
+File: src/components/configurator/FloorPlanCanvas.tsx
+
+Purpose:
+Renders 2D floor plan using Konva canvas library with interactive room
+manipulation, furniture rendering, and architectural details.
+
+Functionality Flow:
+
+1. INITIALIZATION
+   - Canvas setup with Konva Stage and Layer
+   - Responsive sizing with ResizeObserver
+   - Scale calculation based on plan dimensions
+   - Grid rendering for reference
+
+2. ROOM RENDERING
+   - Each room rendered as colored rectangle
+   - Room type determines color scheme
+   - Floor textures:
+     - Bathroom: Tile pattern
+     - Bedroom/Living: Wood grain pattern
+     - Balcony/Carport: Hatch pattern
+     - Garden: Green hatch pattern
+   - Room labels with dimensions
+   - Open walls support (for open floor plans)
+
+3. FURNITURE RENDERING
+   - Furniture items rendered as 2D shapes
+   - Types: bed, wardrobe, desk, nightstand, toilet, sink, shower, bathtub,
+     stove, fridge, counter, island, dining table, sofa, TV, coffee table,
+     plant, rug, bookshelf, washing machine
+   - Each furniture type has specific rendering logic
+   - Colors and styling based on furniture type
+   - Rotation support
+   - Shadow effects for depth
+
+4. DOOR RENDERING
+   - Door rendering with swing direction
+   - Connection lines between rooms
+   - Door types: standard (swinging), open (archway)
+   - Drag to reposition along wall
+   - Delete functionality (advanced mode)
+
+5. WINDOW RENDERING
+   - Window rectangles on walls
+   - Positioned based on relative wall position
+   - Width varies by room type
+
+6. PLOT RENDERING
+   - Boundary rectangle with dimensions
+   - Front gate with entrance position
+   - Gate draggable along front wall
+   - Garden beds with green color
+   - Trees at front corners
+   - Fence lines
+
+7. INTERACTIONS (Advanced Mode)
+   - Room selection: Click to select
+   - Room drag: Move room within bounds
+   - Room transform: Resize using handles
+   - Room rotation: 90-degree increments
+   - Door addition: Add door to selected room
+   - Room deletion: Remove from plan
+   - Transformer tool for resize/rotate
+
+8. NAVIGATION CONTROLS
+   - Zoom in/out buttons
+   - Fit to view button
+   - Mouse wheel zoom
+   - Drag to pan
+
+9. REAL-TIME UPDATES
+   - onChange callback on every modification
+   - Furniture regeneration on room resize/rotate
+   - Door/window position updates
+
+Key Functions:
+- handleDragEnd: Update room position after drag
+- handleRotateRoom: Rotate room 90 degrees
+- handleAddDoor: Add door to selected room
+- handleDeleteRoom: Remove room from plan
+- setPlotEntrance: Update gate position
+
+Data Flow:
+User Interaction → Konva Event → State Update → onChange Callback → Parent Component
+
+Dependencies:
+- Konva (Canvas library)
+- react-konva (React bindings)
+- Floor plan utilities (regenerateFurniture)
+- Zustand store (kitchen type for furniture)
+
+===============================================================================
+6.2: 3D ELEVATION CANVAS (ElevationCanvas)
+===============================================================================
+
+File: src/components/configurator/ElevationCanvas.tsx
+
+Purpose:
+Renders photorealistic 3D front elevation using Three.js with materials,
+lighting, landscaping, and interactive camera controls.
+
+Functionality Flow:
+
+1. SCENE SETUP
+   - Three.js Canvas with React Three Fiber
+   - Camera positioned at [45, 25, 45]
+   - OrbitControls for user interaction
+   - Environment preset (sunset)
+   - Fog for depth
+
+2. LIGHTING SYSTEM
+   - Ambient light: Soft fill
+   - Directional light (sun): Warm golden, casts shadows
+   - Directional light (fill): Cool blue, opposite side
+   - Directional light (rim): Backlighting for edge definition
+   - Point lights: Interior room lights (when roof hidden)
+   - Wall sconce lights: Near entrance
+
+3. GROUND RENDERING
+   - Base terrain: Dark green
+   - Inner lawn: Lighter green around house
+   - Driveway/courtyard: Gray pad
+   - Grass patches: Varied green circles
+   - Front trees: Cylindrical trunks with spherical foliage
+
+4. HOUSE RENDERING
+   - Foundation: Concrete block
+   - Floor rendering:
+     - Wood texture for bedroom/living/dining
+     - Tile texture for bathroom/kitchen
+   - Wall extraction:
+     - Deduplication of shared walls
+     - Wall segments with holes for doors/windows
+     - Wall thickness: 0.4 ft
+     - Wall height: 13 ft
+   - Door rendering:
+     - Main entrance: Double-panel with glass inserts, decorative frame
+     - Room doors: Single panel with handle
+     - Bathroom doors: Frosted glass upper panel
+     - Open archways: Frame only
+   - Window rendering:
+     - Rectangular windows on walls
+     - Glass material with transparency
+   - Façade accents:
+     - Stepped foundation base
+     - Plinth band (darker base strip)
+     - Mid-wall accent line
+     - Cornice/crown molding
+     - Entrance canopy
+     - Wall sconce lights
+
+5. ROOF RENDERING
+   - Gable roof: Triangular prism with overhang
+   - Flat roof: Flat rectangular surface
+   - Roof transparency toggle (for room focus)
+   - Material colors based on selection
+
+6. MATERIAL SYSTEM
+   - Budget: Light walls, brown trim, brown roof
+   - Modern: Light walls, black trim, black roof
+   - Luxury: Dark walls, gold trim, black roof
+   - Each material has color palette for:
+     - Walls, trim, roof, windows, doors, accent, façade
+
+7. ADD-ON RENDERING
+   - Solar panels: Grid on roof
+   - Water tank: Cylindrical tank on roof
+   - Carport: Separate structure with roof
+   - Smart home: Visual indicator
+
+8. DOUBLE STOREY RENDERING
+   - Second floor walls and floors
+   - Staircase visualization
+   - Extended roof structure
+   - Floor selector UI
+
+9. CAMERA CONTROLS
+   - OrbitControls for rotation, zoom, pan
+   - Auto-rotate when in overview mode
+   - Camera animation on room selection
+   - Focus on specific room types
+   - Free camera when room selected
+
+10. FLOATING LABELS
+    - Room labels above each room
+    - Highlighted when room type selected
+    - Scale and shadow effects
+
+11. INTERACTIVE FEATURES
+    - Room tab selection triggers camera animation
+    - Material selection updates all materials
+    - Roof type toggles between gable/flat
+    - Add-ons toggle visibility
+
+Key Functions:
+- CameraController: Manages camera position and animation
+- WallSegment: Renders individual wall with holes
+- GableRoof: Renders triangular roof
+- FlatRoof: Renders flat roof
+- SolarPanels: Renders solar panel array
+- WaterTank: Renders water tank
+- Carport: Renders carport structure
+
+Data Flow:
+State Update → Material/Config Change → 3D Scene Update → Render
+
+Dependencies:
+- Three.js
+- React Three Fiber
+- @react-three/drei (OrbitControls, Environment, ContactShadows, Html)
+- Floor plan data structure
+- Material color palettes
+
+===============================================================================
+6.3: CUSTOM EDITOR CANVAS (CustomEditorCanvas)
+===============================================================================
+
+File: src/components/configurator/CustomEditorCanvas.tsx
+
+Purpose:
+Advanced floor plan editor allowing users to create custom layouts from
+scratch with room blocks, drag-and-drop, and intelligent door/window placement.
+
+Functionality Flow:
+
+1. INITIALIZATION
+   - Canvas setup with Konva Stage
+   - Initial plan based on home type or custom land area
+   - Grid rendering for reference
+   - Boundary rectangle showing plot dimensions
+
+2. ROOM BLOCK PALETTE
+   - Six room types available:
+     - Bedroom (12×10 ft default)
+     - Hall/Living (16×14 ft default)
+     - Bathroom (7×7 ft default)
+     - Kitchen (12×10 ft default)
+     - Dining (10×10 ft default)
+     - Garden (10×10 ft default)
+   - Click to add room to center of canvas
+   - Color-coded by type
+   - Icon indicators
+
+3. ROOM MANIPULATION
+   - Drag: Move room within boundary
+   - Transform: Resize using corner handles
+   - Selection: Click to select room
+   - Rotate: 90-degree increments via button
+   - Delete: Remove room via button
+   - Boundary clamping: Rooms stay within plot
+
+4. ROOM RENDERING
+   - Colored rectangles with borders
+   - Selected state: Blue border with shadow
+   - Floor textures (same as FloorPlanCanvas)
+   - Room labels with dimensions
+   - Move indicator on selected room
+
+5. TOOLBAR
+   - Add Room buttons for each type
+   - Selected room action bar:
+     - Room name and dimensions
+     - Rotate button
+     - Delete button
+
+6. STATUS BAR
+   - Room count
+   - Total area used
+   - Total plot area
+   - Usage percentage
+
+7. SAVE FUNCTIONALITY
+   - Intelligent door placement (via doorPlacer.ts)
+   - Automatic window placement on exterior walls
+   - Window placement logic:
+     - Detects exterior walls (walls on plot boundary)
+     - Adds windows on exterior-facing walls
+     - Bathroom windows: 2 ft width
+     - Other rooms: 3 ft width
+   - onSave callback with final plan
+
+8. NAVIGATION CONTROLS
+   - Zoom in/out buttons
+   - Fit to view button
+   - Mouse wheel zoom
+   - Drag to pan
+
+9. DIMENSION LABELS
+   - Plot width label
+   - Plot height label
+   - Area display in boundary
+
+Key Functions:
+- addRoom(type): Add new room block to plan
+- deleteRoom(id): Remove room from plan
+- rotateRoom(id): Rotate room 90 degrees
+- handleDragEnd: Update room position after drag
+- handleTransformEnd: Update room size after resize
+- addWindowsToRooms: Add windows to exterior walls
+- savePlan: Apply intelligent door/window placement and save
+
+Data Flow:
+User Action → Plan Update → onChange Callback → Parent Component → onSave → Database
+
+Dependencies:
+- Konva
+- react-konva
+- doorPlacer.ts (intelligent door placement)
+- Floor plan utilities (generateEmptyPlan, regenerateFurniture)
+- Zustand store (kitchen type)
+
+===============================================================================
+7. MODULE 5: LEAD CAPTURE (StepLeadCapture)
+===============================================================================
+
+File: src/components/configurator/steps/StepLeadCapture.tsx
+
+Purpose:
+Collects user contact information and timeline, validates input, and submits
+lead data to Supabase with complete configuration.
+
+Functionality Flow:
+
+1. FORM DISPLAY
+   - Full name input
+   - Phone number input
+   - Email input
+   - Timeline selection (0-3 months, 3-6 months, 6-12 months, 12+ months)
+   - Cost breakdown display
+   - Submit button with total cost
+
+2. VALIDATION
+   - Zod schema validation:
+     - Name: 2-100 characters, required
+     - Phone: 6-30 characters, required
+     - Email: Valid email format, required
+     - Timeline: Required selection
+   - Real-time error display
+   - Form submission blocked until valid
+
+3. SUBMISSION FLOW
+   - Validate all fields
+   - Show loading state
+   - Construct configuration object:
+     - Land choice
+     - Home type
+     - Bedrooms/bathrooms
+     - Kitchen type
+     - Add-ons
+     - Total area
+     - Roof type
+     - Material type
+   - Submit to Supabase 'leads' table:
+     - name, phone, email, timeline
+     - config (JSON object)
+     - total_cost
+   - Handle success/error responses
+   - Show toast notifications
+
+4. SUCCESS STATE
+   - Display confirmation message
+   - Show user's first name
+   - Display total cost and area
+   - "Start a new design" button
+   - Reset configurator on click
+
+5. NAVIGATION
+   - No next button (final step)
+   - Previous button returns to preview step
+
+Key Functions:
+- submit(): Validate and submit lead data
+- setLead(): Update lead information in state
+
+Data Flow:
+Form Input → Validation → Configuration Assembly → Supabase Insert → Success/Error Display
+
+Dependencies:
+- Zustand store (useConfig)
+- Zod (validation)
+- Supabase client
+- Sonner (toast notifications)
+- Framer Motion (animations)
+- Cost utilities (CostBreakdown, formatMoney)
+
+===============================================================================
+8. SUPPORTING MODULES
+===============================================================================
+
+8.1 CONFIGURATOR STORE (State Management)
+File: src/store/configurator.ts
+
+Purpose:
+Centralized state management using Zustand with persistence for the entire
+application configuration.
+
+State Structure:
+- step: Current step number (0-4)
+- land: Land ownership ('own' | 'need' | null)
+- landSize: Land package size ('small' | 'medium' | 'large' | 'custom' | null)
+- customLandArea: Custom land area in sqft
+- homeType: Home type ('starter' | 'family' | 'premium')
+- bedrooms: Number of bedrooms (1-6)
+- bathrooms: Number of bathrooms (1-5)
+- kitchen: Kitchen type ('standard' | 'open' | 'galley')
+- addons: Array of add-ons ('solar' | 'carport' | 'water_tank' | 'smart_home')
+- roof: Roof type ('gable' | 'flat')
+- material: Material type ('budget' | 'modern' | 'luxury')
+- name: User's full name
+- phone: User's phone number
+- email: User's email
+- timeline: Build timeline
+- kioskMode: Kiosk mode flag
+- presetId: Selected preset (0 or 1)
+- advancedEditorMode: Custom editor mode flag
+- loadedPresetId: ID of loaded preset from database
+- customPlan: Custom floor plan object
+- planHistory: Array of change history records
+- isDoubleStorey: Double storey mode flag
+- activeFloor: Current floor (0 or 1)
+- customFirstFloorPlan: First floor custom plan
+- savedPresets: Array of saved presets from database
+- packageLayouts: Package layouts from database
+
+Key Actions:
+- setStep, next, prev: Navigation
+- setLand, setLandSize, setCustomLandArea: Land configuration
+- setHomeType: Home type selection
+- setBedrooms, setBathrooms: Room counts
+- setKitchen: Kitchen layout
+- toggleAddon: Add-on management
+- setRoof, setMaterial: 3D customization
+- setLead: Lead information
+- setKioskMode: Kiosk mode toggle
+- setPresetId: Preset selection
+- setAdvancedEditorMode: Custom editor toggle
+- setCustomPlan, setCustomFirstFloorPlan: Custom plans
+- setDoubleStorey, setActiveFloor: Double storey management
+- addHistoryRecord, removeHistoryRecord: Change tracking
+- fetchSavedPresets: Load presets from database
+- fetchPackageLayouts: Load package layouts from database
+- savePackageLayout: Save package layout to database
+- saveAsPreset: Save new preset to database
+- updateSavedPreset: Update existing preset
+- deleteSavedPreset: Delete preset from database
+- loadSavedPreset: Load preset into state
+- reset: Reset all state to initial
+
+Persistence:
+- Zustand persist middleware
+- Local storage key: 'gbti-configurator'
+- Survives page refreshes
+
+Database Integration:
+- Supabase client for preset/lead operations
+- Tables: presets, package_layouts, leads
+
+===============================================================================
+8.2 COST CALCULATION SYSTEM
+File: src/lib/cost.ts
+
+Purpose:
+Calculates estimated costs for the home configuration including structure,
+rooms, features, land, and financing.
+
+Cost Components:
+- Base Structure: Area × $145/sqft
+- Bedroom Cost: $9,500 × bedroom count
+- Bathroom Cost: $6,800 × bathroom count
+- Kitchen Cost: $8,000 (standard) / $14,000 (open) / $6,500 (galley)
+- Add-ons:
+  - Solar Panels: $12,500
+  - Carport: $8,500
+  - Water Tank: $4,200
+  - Smart Home: $15,800
+- Land Cost: Area × $75/sqft (if land needed)
+
+Area Calculation:
+- Base area from home type defaults
+- Extra bedroom area: +130 sqft per bedroom over default
+- Extra bathroom area: +60 sqft per bathroom over default
+
+Financing:
+- Down payment: 10% of total
+- Loan amount: Total - down payment
+- EMI: Monthly payment calculation
+  - Default interest rate: 6.5%
+  - Default tenure: 25 years
+  - Formula: (Loan × r × (1+r)^n) / ((1+r)^n - 1)
+  - Where r = monthly interest rate, n = months
+
+Key Functions:
+- computeArea(config): Calculate total area based on configuration
+- computeCost(config, options): Calculate complete cost breakdown
+- formatMoney(amount): Format as currency (USD)
+
+Data Flow:
+Configuration → Area Calculation → Component Costs → Total → Financing Calculation
+
+===============================================================================
+8.3 FLOOR PLAN GENERATION ENGINE
+File: src/lib/floorplan.ts
+
+Purpose:
+Generates floor plans based on home type, preset selection, and room
+configuration. Includes furniture placement, door connectivity, and validation.
+
+Data Structures:
+- FurnitureItem: Type, position, dimensions, rotation
+- DoorInfo: Wall, position, width, swing, connection, type
+- WindowInfo: Wall, position, width
+- Room: ID, type, label, position, dimensions, color, furniture, doors, windows, orientation, open walls
+- Plan: Width, height, rooms array, plot entrance position
+
+Furniture Generation:
+- regenerateFurniture(room, kitchenType): Generates furniture based on room type
+  - Bedroom: Bed, wardrobe (orientation-aware)
+  - Bathroom: Sink, toilet, shower/bathtub (master vs common)
+  - Kitchen: Counter, stove, fridge (orientation-aware, kitchen type affects layout)
+  - Living: TV, sofa (orientation-aware)
+  - Dining: Dining table
+  - Balcony: Plants
+  - Garden: Scattered plants
+
+Door Connectivity:
+- roomsAreAdjacent(a, b): Detects shared walls between rooms
+- sharedWallMidpoint(a, wall, b): Calculates door position on shared wall
+- getDoorType(roomTypeA, roomTypeB): Determines door type (standard vs open)
+- injectAdjacencyDoors(rooms): Automatically adds doors between adjacent rooms
+  - Skips certain room type combinations
+  - Respects attached bathrooms
+  - Validates hallway connections
+  - Prevents duplicate doors
+
+Validation:
+- cleanupDoors(rooms): Removes invalid door connections
+- validateAndFixBathrooms(rooms): Ensures bathroom size hierarchy
+
+Preset Generation:
+- starterPresetA(config): 28×40 ft layout with 2 bed, 1 bath, hallway
+- starterPresetB(config): 33×30 ft layout with 2 bed, 1 bath, hallway
+- familyPresetA(config): 40×40 ft layout with 3 bed, 2 bath, garden, patio
+- familyPresetB(config): Alternative family layout
+- premiumPresetA(config): Larger premium layout
+- premiumPresetB(config): Alternative premium layout
+- generatePlan(config): Main function to select appropriate preset
+
+Double Storey:
+- splitPlanToFloors(plan, homeType): Splits single floor plan into ground and first floor
+- Ground floor: Living, kitchen, dining, guest rooms
+- First floor: Bedrooms, bathrooms
+
+Key Functions:
+- generatePlan(config): Main entry point for plan generation
+- generateEmptyPlan(homeType): Creates empty plan for custom editor
+- splitPlanToFloors(plan, homeType): Splits plan for double storey
+
+Data Flow:
+Configuration → Preset Selection → Room Generation → Furniture Placement → Door Injection → Validation → Final Plan
+
+===============================================================================
+8.4 DOOR PLACEMENT LOGIC
+File: src/lib/doorPlacer.ts
+
+Purpose:
+Intelligently places doors in custom floor plans based on room adjacency,
+accessibility requirements, and architectural best practices.
+
+Functionality:
+- intelligentlyPlaceDoors(plan): Analyzes room layout and adds doors
+  - Detects adjacent rooms
+  - Determines optimal door positions
+  - Respects room type constraints
+  - Ensures accessibility
+  - Adds main entrance door
+  - Connects rooms logically
+
+Algorithm:
+1. Identify all room adjacencies
+2. For each adjacency pair:
+   - Check if door should exist based on room types
+   - Calculate optimal position on shared wall
+   - Determine door type (standard vs open)
+   - Add door to both rooms
+3. Add main entrance door to exterior
+4. Validate door placements
+5. Remove redundant doors
+
+Key Functions:
+- intelligentlyPlaceDoors(plan): Main door placement algorithm
+
+Dependencies:
+- Floor plan data structures
+- Room adjacency detection
+
+===============================================================================
+9. UI COMPONENTS
+===============================================================================
+
+9.1 PROGRESS HEADER
+File: src/components/configurator/ProgressHeader.tsx
+
+Purpose:
+Displays step progress indicator and reset button.
+
+Features:
+- Step indicators (1-5) with labels
+- Active step highlighting
+- Click to navigate to previous steps
+- Reset button to clear configuration
+- Responsive design
+
+9.2 COST PANEL
+File: src/components/configurator/CostPanel.tsx
+
+Purpose:
+Displays real-time cost breakdown and financing information.
+
+Features:
+- Total cost display
+- Cost breakdown by component
+- Down payment amount
+- Monthly EMI
+- Compact mode for sidebar
+- Full mode for detailed view
+
+9.3 STEP SHELL
+File: src/components/configurator/StepShell.tsx
+
+Purpose:
+Reusable wrapper for step components with consistent layout.
+
+Features:
+- Eyebrow (step indicator)
+- Title and subtitle
+- Next/Previous navigation buttons
+- Disabled state handling
+- Animation support
+- Consistent spacing and styling
+
+9.4 SELECTABLE CARD
+File: src/components/configurator/StepShell.tsx (exported)
+
+Purpose:
+Reusable card component for selections.
+
+Features:
+- Selected state styling
+- Click handler
+- Hover effects
+- Custom content support
+
+===============================================================================
+10. DATA FLOW DIAGRAM
+===============================================================================
+
+User Input
+    ↓
+Step Component (Land/HomeType/Features/Preview/LeadCapture)
+    ↓
+Zustand Store (configurator.ts)
+    ↓
+├─→ Cost Calculation (cost.ts)
+│   ↓
+│   Cost Panel Update
+│
+├─→ Floor Plan Generation (floorplan.ts)
+│   ↓
+│   └─→ 2D Canvas (FloorPlanCanvas.tsx)
+│   └─→ 3D Canvas (ElevationCanvas.tsx)
+│   └─→ Custom Editor (CustomEditorCanvas.tsx)
+│
+├─→ Database Operations (Supabase)
+│   ↓
+│   Preset Management
+│   Lead Submission
+│
+└─→ Persistence (Local Storage)
+    ↓
+    State Restoration on Refresh
+
+===============================================================================
+11. INTEGRATIONS
+===============================================================================
+
+11.1 SUPABASE
+Tables:
+- presets: User-saved floor plan layouts
+  - id, name, plan_data (JSON), created_at
+- package_layouts: Pre-built package layouts
+  - package_key, plan_data (JSON), updated_at
+- leads: Lead capture data
+  - id, name, phone, email, timeline, config (JSON), total_cost
+
+Operations:
+- fetchSavedPresets(): SELECT * FROM presets ORDER BY created_at
+- fetchPackageLayouts(): SELECT * FROM package_layouts
+- saveAsPreset(): INSERT INTO presets
+- updateSavedPreset(): UPDATE presets
+- deleteSavedPreset(): DELETE FROM presets
+- savePackageLayout(): UPSERT INTO package_layouts
+- submitLead(): INSERT INTO leads
+
+11.2 FRAMER MOTION
+Usage:
+- Step transitions (AnimatePresence)
+- Land package reveal animation
+- Feature toggle animations
+- Success state animations
+- Camera animations in 3D view
+
+11.3 LUCIDE REACT
+Usage:
+- Icons throughout the application
+- Room type icons
+- Action buttons
+- Navigation icons
+
+===============================================================================
+12. KIOSK MODE
+===============================================================================
+
+Purpose:
+Allows the application to run in a kiosk setting for in-person demonstrations.
+
+Features:
+- Fullscreen toggle
+- Inactivity reset (60 seconds)
+- Automatic state reset after inactivity
+- Supabase operations still functional
+- No browser UI (fullscreen)
+
+Implementation:
+- setKioskMode(true/false): Toggle kiosk mode
+- useInactivityReset hook: Monitors user activity
+- Fullscreen API: Enter/exit fullscreen
+- Reset function: Clears all state
+
+Activation:
+- Click "Kiosk mode" button in sidebar
+- Automatically enters fullscreen
+- Monitors for inactivity
+- Resets after 60 seconds of no activity
+
+===============================================================================
+SUMMARY OF TECHNOLOGIES
+===============================================================================
+
+Frontend Framework: React 18 + TypeScript
+State Management: Zustand with persistence
+2D Graphics: Konva (Canvas library)
+3D Graphics: Three.js + React Three Fiber
+Animations: Framer Motion
+Database: Supabase (PostgreSQL)
+Build Tool: Vite
+Styling: Tailwind CSS
+Icons: Lucide React
+Validation: Zod
+Notifications: Sonner
+
+===============================================================================
+KEY FUNCTIONALITY HIGHLIGHTS
+===============================================================================
+
+1. Real-time Cost Calculation
+   - Updates instantly on any configuration change
+   - Detailed breakdown by component
+   - Financing calculations (EMI, down payment)
+
+2. Interactive 2D Floor Plans
+   - Drag, resize, rotate rooms
+   - Furniture auto-placement
+   - Door/window management
+   - Multiple preset layouts
+
+3. Photorealistic 3D Visualization
+   - Material customization
+   - Roof type selection
+   - Landscaping details
+   - Camera controls and animations
+
+4. Custom Floor Plan Editor
+   - Room block palette
+   - Intelligent door placement
+   - Automatic window placement
+   - Usage statistics
+
+5. Preset Management
+   - Built-in presets per home type
+   - User-saved custom presets
+   - Database persistence
+   - Load/update/delete operations
+
+6. Double Storey Support
+   - Floor selector (ground/first)
+   - Separate floor plans
+   - Staircase visualization
+   - Extended roof structure
+
+7. Lead Capture System
+   - Form validation
+   - Configuration bundling
+   - Database submission
+   - Success confirmation
+
+8. Kiosk Mode
+   - Fullscreen operation
+   - Inactivity reset
+   - Demo-friendly interface
+
+===============================================================================
+END OF DOCUMENTATION
+===============================================================================

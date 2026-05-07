@@ -7,7 +7,7 @@ import { CustomEditorCanvas, ROOM_BLOCKS } from '../CustomEditorCanvas';
 import { Plan, splitPlanToFloors, Room, generateEmptyPlan, regenerateFurniture } from '@/lib/floorplan';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash } from 'lucide-react';
+import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash, Copy, ClipboardPaste } from 'lucide-react';
 
 interface Props {
   plan: Plan;
@@ -24,6 +24,9 @@ const MATERIALS: { id: Material; label: string; swatch: string }[] = [
   { id: 'modern', label: 'Modern', swatch: '#1a1a1a' },
   { id: 'luxury', label: 'Luxury', swatch: '#c9a84c' },
 ];
+
+// Floor Plan Clipboard (persists across re-renders within the session)
+let floorPlanClipboard: { plan: Plan; label: string } | null = null;
 
 interface RoomTab {
   id: string;
@@ -54,6 +57,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [stagedPlan, setStagedPlan] = useState<Plan | null>(null);
   const [roomCounter, setRoomCounter] = useState(0);
+  const [hasCopiedPlan, setHasCopiedPlan] = useState(!!floorPlanClipboard);
   const tabScrollRef = useRef<HTMLDivElement>(null);
 
   // Double storey floor splitting
@@ -94,6 +98,38 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   }, [stagedPlan, displayPlan]);
 
   const isFamilyDoubleStoreyPackage = homeType === 'family' && isDoubleStorey && presetId !== -1;
+
+  const handleCopyLayout = () => {
+    const planToCopy: Plan = JSON.parse(JSON.stringify(currentPlan));
+    const label = isDoubleStorey
+      ? (activeFloor === 0 ? 'Ground Floor' : 'First Floor')
+      : (isCustomPreset && loadedPresetId ? 'Custom Preset' : 'Preset A');
+    floorPlanClipboard = { plan: planToCopy, label };
+    setHasCopiedPlan(true);
+    toast({ title: 'Layout Copied', description: `${label} layout copied. Switch to another floor plan and paste.` });
+  };
+
+  const handlePasteLayout = () => {
+    if (!floorPlanClipboard) return;
+    const pastedPlan: Plan = JSON.parse(JSON.stringify(floorPlanClipboard.plan));
+    const targetW = currentPlan.width;
+    const targetH = currentPlan.height;
+    if (pastedPlan.width !== targetW || pastedPlan.height !== targetH) {
+      const sx = targetW / Math.max(1, pastedPlan.width);
+      const sy = targetH / Math.max(1, pastedPlan.height);
+      pastedPlan.rooms = pastedPlan.rooms.map((room) => {
+        const scaled = { ...room, x: Math.round(room.x * sx), y: Math.round(room.y * sy), w: Math.max(2, Math.round(room.w * sx)), h: Math.max(2, Math.round(room.h * sy)) };
+        scaled.furniture = regenerateFurniture(scaled, kitchen);
+        return scaled;
+      });
+      pastedPlan.width = targetW;
+      pastedPlan.height = targetH;
+    }
+    pastedPlan.plotEntranceX = currentPlan.plotEntranceX;
+    setStagedPlan(pastedPlan);
+    setAdvanced(true);
+    toast({ title: 'Layout Pasted', description: `Pasted layout from "${floorPlanClipboard.label}". Click "Update Plan" to save.` });
+  };
 
   const handleAddRoom = (blockType: Room['type']) => {
     const block = ROOM_BLOCKS.find((b) => b.type === blockType);
@@ -398,6 +434,29 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   {isDoubleStorey ? 'Double Storey ✓' : 'Double Storey'}
                 </button>
               )}
+
+              {/* Copy / Paste Layout */}
+              <div className="flex items-center gap-1.5 ml-1 border-l pl-2 border-border">
+                <button
+                  onClick={handleCopyLayout}
+                  className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-1.5 text-xs font-bold hover:bg-emerald-100 transition-all active:scale-95"
+                  title="Copy current floor plan layout to clipboard"
+                >
+                  <Copy size={12} />
+                  Copy Layout
+                </button>
+                {hasCopiedPlan && floorPlanClipboard && (
+                  <button
+                    onClick={handlePasteLayout}
+                    className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 text-violet-700 px-3 py-1.5 text-xs font-bold hover:bg-violet-100 transition-all active:scale-95"
+                    title={`Paste layout from ${floorPlanClipboard.label}`}
+                  >
+                    <ClipboardPaste size={12} />
+                    Paste Layout
+                    <span className="text-[8px] opacity-60 ml-0.5">({floorPlanClipboard.label})</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
