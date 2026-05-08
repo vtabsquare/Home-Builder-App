@@ -1,6 +1,7 @@
 import { useConfig, HOME_TYPE_DEFAULTS, HomeType } from '@/store/configurator';
 import { StepShell, SelectableCard } from '../StepShell';
 import { formatMoney } from '@/lib/cost';
+import { motion } from 'framer-motion';
 
 const TYPES: { id: HomeType; tag: string; desc: string }[] = [
   { id: 'starter', tag: 'Compact + efficient', desc: 'Smart starter footprint with everything essential. Perfect first build.' },
@@ -13,32 +14,44 @@ export const StepHomeType = () => {
 
   return (
     <StepShell
-      eyebrow="Step 02 · Footprint"
-      title="Pick your home type."
-      subtitle="Each footprint comes with a base layout that auto-adapts to your customization."
+      eyebrow="Step 02 · Selection"
+      title="Choose your home type."
+      subtitle="Each blueprint represents a foundational layout optimized for light, flow, and structural efficiency."
       onNext={next}
       onPrev={prev}
     >
-      <div className="grid gap-4 md:grid-cols-3">
-        {TYPES.map(({ id, tag, desc }) => {
+      <div className="grid gap-8 md:grid-cols-3">
+        {TYPES.map(({ id, tag, desc }, i) => {
           const d = HOME_TYPE_DEFAULTS[id];
           const active = homeType === id;
           return (
-            <SelectableCard key={id} selected={active} onClick={() => setHomeType(id)} className="min-h-[220px]">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-clay font-medium">{tag}</div>
-              <h3 className="mt-2 font-display text-3xl font-extrabold">{d.label}</h3>
-              <div className="mt-1 text-xs text-muted-foreground num">
-                {d.areaRange[0]}–{d.areaRange[1]} sqft · {d.bedrooms} bed
-              </div>
-              <p className="mt-4 text-sm text-foreground/75 leading-relaxed">{desc}</p>
-              <div className="mt-6 flex items-end justify-between">
+            <motion.div
+              key={id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              className="h-full"
+            >
+              <SelectableCard selected={active} onClick={() => setHomeType(id)} className="h-full flex flex-col justify-between">
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">From</div>
-                  <div className="font-display text-xl font-bold num">{formatMoney(d.baseCost)}</div>
+                  <div className={`text-[10px] uppercase tracking-[0.3em] font-bold mb-3 ${active ? 'text-clay' : 'text-muted-foreground/40'}`}>{tag}</div>
+                  <h3 className="font-display text-3xl font-normal tracking-tight text-foreground">{d.label}</h3>
+                  <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 num">
+                    {d.areaRange[0]}–{d.areaRange[1]} SQ FT · {d.bedrooms} BED
+                  </div>
+                  <p className="mt-5 text-sm text-muted-foreground leading-relaxed font-light">
+                    {desc}
+                  </p>
                 </div>
-                <MiniSilhouette type={id} />
-              </div>
-            </SelectableCard>
+                <div className="mt-8 pt-6 border-t border-border flex items-end justify-between">
+                  <div>
+                    <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground/40 mb-1 font-bold">Estimated</div>
+                    <div className="font-display text-xl font-normal num tracking-tight text-foreground">{formatMoney(d.baseCost)}</div>
+                  </div>
+                  <MiniSilhouette type={id} active={active} />
+                </div>
+              </SelectableCard>
+            </motion.div>
           );
         })}
       </div>
@@ -46,17 +59,24 @@ export const StepHomeType = () => {
   );
 };
 
-const MiniSilhouette = ({ type }: { type: HomeType }) => {
+const MiniSilhouette = ({ type, active }: { type: HomeType, active: boolean }) => {
   const w = type === 'starter' ? 30 : type === 'family' ? 44 : 60;
   return (
-    <svg width="80" height="40" viewBox="0 0 80 40" fill="none" className="opacity-70">
+    <motion.svg 
+      width="80" 
+      height="40" 
+      viewBox="0 0 80 40" 
+      fill="none" 
+      className={`transition-all duration-500 ${active ? 'opacity-100 scale-105' : 'opacity-20'}`}
+    >
       <path
         d={`M${(80 - w) / 2} 30 L${(80 - w) / 2} 18 L${40} 8 L${(80 + w) / 2} 18 L${(80 + w) / 2} 30 Z`}
-        stroke="hsl(var(--ink))"
+        stroke={active ? "hsl(var(--clay))" : "currentColor"}
         strokeWidth="1.5"
-        fill="hsl(var(--clay) / 0.3)"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-      <line x1="0" y1="30" x2="80" y2="30" stroke="hsl(var(--ink))" strokeWidth="1" />
-    </svg>
+      <line x1="0" y1="30" x2="80" y2="30" stroke={active ? "hsl(var(--clay))" : "currentColor"} strokeWidth="1" />
+    </motion.svg>
   );
 };

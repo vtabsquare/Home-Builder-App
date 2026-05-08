@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getFamilyDoubleStoreyPackageKey, useConfig } from '@/store/configurator';
 import { computeCost } from '@/lib/cost';
 import { applyAddOnsToPlan, generatePlan, Plan } from '@/lib/floorplan';
@@ -11,12 +11,15 @@ import { StepHomeType } from '@/components/configurator/steps/StepHomeType';
 import { StepFeatures } from '@/components/configurator/steps/StepFeatures';
 import { StepPreview } from '@/components/configurator/steps/StepPreview';
 import { StepLeadCapture } from '@/components/configurator/steps/StepLeadCapture';
+import { LandingPage } from '@/components/LandingPage';
 import { useInactivityReset } from '@/hooks/useInactivityReset';
 import { Maximize2, Minimize2, Sparkles } from 'lucide-react';
 
 const Index = () => {
   const config = useConfig();
   const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts, presetOverrides } = config;
+
+  const [showLanding, setShowLanding] = useState(true);
 
   const cost = useMemo(() => computeCost(config), [config]);
   const basePlan = useMemo(() => {
@@ -70,7 +73,10 @@ const Index = () => {
     }
   }, []);
 
-  useInactivityReset(() => reset(), 60000, kioskMode);
+  useInactivityReset(() => {
+    reset();
+    setShowLanding(true);
+  }, 60000, kioskMode);
 
   const toggleFullscreen = async () => {
     if (!document.fullscreenElement) {
@@ -94,55 +100,102 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <ProgressHeader onReset={reset} />
+    <>
+      <AnimatePresence>
+        {showLanding && (
+          <motion.div
+            key="landing"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.02, filter: "blur(10px)" }}
+            transition={{ duration: 0.8, ease: "easeInOut" }}
+            className="fixed inset-0 z-50"
+          >
+            <LandingPage 
+              onStart={() => {
+                setShowLanding(false);
+                config.setStep(0);
+              }}
+              onExplore={() => {
+                setShowLanding(false);
+                config.setStep(3);
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <main className="flex-1">
-        <div className="mx-auto max-w-[1480px] px-4 md:px-8 py-6 md:py-10">
-          <div className="grid gap-6 lg:gap-8 lg:grid-cols-[1fr_400px]">
-            {/* Step content */}
-            <div className="min-h-[60vh]">
-              <AnimatePresence mode="wait">{renderStep()}</AnimatePresence>
-            </div>
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: showLanding ? 0 : 1 }}
+        transition={{ duration: 1, delay: 0.4 }}
+        className="min-h-screen flex flex-col cinematic-bg"
+      >
+        <div className="cinematic-vignette" />
+        
+        <ProgressHeader onReset={() => {
+          reset();
+          setShowLanding(true);
+        }} />
 
-            {/* Sticky live preview */}
-            <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">
-              <div className="relative h-[280px] md:h-[320px] overflow-hidden rounded-3xl border border-border shadow-elev bg-gradient-warm">
-                <FloorPlanCanvas plan={plan} onChange={setCustomPlan} />
-                <div className="pointer-events-none absolute left-3 top-3 rounded-full glass-panel px-3 py-1 text-[10px] font-display font-semibold uppercase tracking-[0.2em]">
-                  Live · {plan?.width || 0}′×{plan?.height || 0}′
-                </div>
-                <div className="pointer-events-none absolute right-3 top-3 flex items-center gap-1 rounded-full bg-ink/85 backdrop-blur px-2.5 py-1 text-[10px] text-ink-foreground font-medium">
-                  <Sparkles size={11} className="text-clay" /> Auto-layout
-                </div>
-                {/* Mini room labels */}
-                <div className="pointer-events-none absolute right-3 bottom-3 flex flex-wrap gap-1 max-w-[180px] justify-end">
-                  {(plan.rooms || []).filter(r => !['carport','garden'].includes(r.type)).slice(0, 6).map((r) => (
-                    <span key={r.id} className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider"
-                      style={{ background: r.color, color: 'hsl(0,0%,15%)' }}>
-                      {r.label.split(' ')[0]}
-                    </span>
-                  ))}
-                </div>
+        <main className="flex-1 relative">
+          <div className="mx-auto max-w-[1440px] px-4 md:px-8 py-4 md:py-6">
+            <div className={`grid gap-6 lg:gap-8 ${[3].includes(step) ? 'max-w-6xl mx-auto w-full' : 'lg:grid-cols-[1fr_400px]'}`}>
+              {/* Step content */}
+              <div className="min-h-[60vh]">
+                <AnimatePresence mode="wait">
+                  {renderStep()}
+                </AnimatePresence>
               </div>
-              <CostPanel cost={cost} compact />
 
-              <button
-                onClick={toggleFullscreen}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl border border-border bg-card/60 backdrop-blur py-2.5 text-xs font-medium text-muted-foreground hover:bg-surface transition-colors"
-              >
-                {kioskMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                {kioskMode ? 'Exit kiosk' : 'Kiosk mode'}
-              </button>
-            </aside>
+              {/* Sticky live preview / Cost Sidebar */}
+              {![3].includes(step) && (
+                <aside className="lg:sticky lg:top-24 lg:self-start space-y-6">
+                  <AnimatePresence>
+                    {(step !== 0) && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                        animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
+                        exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                        className="relative overflow-hidden rounded-2xl border border-border/40 glass-dark-panel shadow-elev"
+                      >
+                        <div className="h-[240px] md:h-[280px]">
+                          <FloorPlanCanvas plan={plan} minimal={true} onChange={setCustomPlan} />
+                        </div>
+                        <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-ink/60 backdrop-blur-md px-2.5 py-1 text-[9px] font-display font-semibold uppercase tracking-[0.15em] text-white/80 border border-white/5">
+                          Live Overview · {plan?.width || 0}′×{plan?.height || 0}′
+                        </div>
+                        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_30px_rgba(0,0,0,0.3)] mix-blend-overlay rounded-2xl" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <CostPanel cost={cost} compact />
+                  </motion.div>
+
+                  <button
+                    onClick={toggleFullscreen}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-border/40 glass-subtle py-3 text-[10px] font-semibold text-muted-foreground/80 hover:bg-surface hover:text-foreground transition-all active:scale-[0.98] shadow-sm uppercase tracking-[0.15em]"
+                  >
+                    {kioskMode ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+                    {kioskMode ? 'Exit kiosk' : 'Kiosk mode'}
+                  </button>
+                </aside>
+              )}
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
 
-      <footer className="border-t border-border py-5 text-center text-[11px] text-muted-foreground">
-        © GBTI · Smart Home Builder · Estimates only — final pricing confirmed by your architect
-      </footer>
-    </div>
+        <footer className="relative z-0 border-t border-border/40 py-6 text-center text-[10px] text-muted-foreground uppercase tracking-widest bg-background/50 backdrop-blur-sm mt-auto">
+          © GBTI · Smart Home Builder · Estimates only — final pricing confirmed by your architect
+        </footer>
+      </motion.div>
+    </>
   );
 };
 

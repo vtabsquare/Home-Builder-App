@@ -345,7 +345,12 @@ export const useConfig = create<ConfigState & ConfigActions>()(
           isDoubleStorey: hasFirstFloor ? true : s.isDoubleStorey
         };
       }),
-      reset: () => set({ ...initial }),
+      reset: () => set((state) => ({
+        ...initial,
+        savedPresets: state.savedPresets,
+        packageLayouts: state.packageLayouts,
+        presetOverrides: state.presetOverrides,
+      })),
     }),
     { name: 'gbti-configurator' }
   )

@@ -8,10 +8,12 @@ import Konva from 'konva';
 interface Props {
   plan: Plan;
   advanced?: boolean;
+  minimal?: boolean;
+  hideZoomHelper?: boolean;
   onChange?: (plan: Plan) => void;
 }
 
-export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => {
+export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZoomHelper = false, onChange }: Props) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const config = useConfig();
@@ -151,7 +153,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
   };
 
   return (
-    <div ref={wrapRef} className="relative h-full w-full overflow-hidden rounded-2xl bg-[#f8f9fa] shadow-inner">
+    <div ref={wrapRef} className="relative h-full w-full overflow-hidden rounded-2xl bg-transparent shadow-inner">
       {advanced && selectedRoomId && (
         <div className="absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
           <button
@@ -396,45 +398,47 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
           </Group>
         </Layer>
 
-        <Layer listening={false}>
-          {(localPlan.rooms || []).map(room => {
-            const isRooftop = room.id.startsWith('addon-solar') || room.id.startsWith('addon-tank');
-            const isFence = room.id === 'addon-fence';
-            
-            const labelY = isFence 
-              ? buildingOffsetY + room.y * scale - 22 
-              : buildingOffsetY + room.y * scale + (room.h * scale)/2 - (isRooftop ? 0 : 10);
+        {!minimal && (
+          <Layer listening={false}>
+            {(localPlan.rooms || []).map(room => {
+              const isRooftop = room.id.startsWith('addon-solar') || room.id.startsWith('addon-tank');
+              const isFence = room.id === 'addon-fence';
+              
+              const labelY = isFence 
+                ? buildingOffsetY + room.y * scale - 22 
+                : buildingOffsetY + room.y * scale + (room.h * scale)/2 - (isRooftop ? 0 : 10);
 
-            return (
-              <Text key={`label-${room.id}`}
-                text={room.label} 
-                fontFamily="Urbanist" fontStyle={(isRooftop || isFence) ? "600 italic" : "800"} 
-                fontSize={(isRooftop || isFence) ? 9 : Math.max(10, Math.min(14, room.w * scale * 0.08))}
-                fill={(isRooftop || isFence) ? "rgba(26, 42, 74, 0.7)" : "rgba(0,0,0,0.75)"} 
-                align="center" verticalAlign="middle"
-                x={buildingOffsetX + room.x * scale} 
-                y={labelY} 
-                width={room.w * scale} 
-                shadowColor="white" shadowBlur={6} shadowOpacity={1} shadowOffset={{x:0, y:0}}
-                letterSpacing={(isRooftop || isFence) ? 0.5 : 1.2} />
-            );
-          })}
-          {(localPlan.rooms || []).map(room => {
-            if (room.id === 'addon-fence') return null; // Don't show dimensions for fence
-            return (
-              <Text key={`dim-${room.id}`}
-                 text={`${Math.round(room.w)}′ × ${Math.round(room.h)}′`} 
-                 fontFamily="Epilogue" fontStyle="600" 
-                 fontSize={9}
-                 fill="rgba(0,0,0,0.55)" 
-                 align="center" verticalAlign="middle"
-                 x={buildingOffsetX + room.x * scale} 
-                 y={buildingOffsetY + room.y * scale + (room.h * scale)/2 + 6} 
-                 width={room.w * scale} 
-                 shadowColor="white" shadowBlur={4} shadowOpacity={1} shadowOffset={{x:0, y:0}} />
-            );
-          })}
-        </Layer>
+              return (
+                <Text key={`label-${room.id}`}
+                  text={room.label} 
+                  fontFamily="Urbanist" fontStyle={(isRooftop || isFence) ? "600 italic" : "800"} 
+                  fontSize={(isRooftop || isFence) ? 9 : Math.max(10, Math.min(14, room.w * scale * 0.08))}
+                  fill={(isRooftop || isFence) ? "rgba(26, 42, 74, 0.7)" : "rgba(0,0,0,0.75)"} 
+                  align="center" verticalAlign="middle"
+                  x={buildingOffsetX + room.x * scale} 
+                  y={labelY} 
+                  width={room.w * scale} 
+                  shadowColor="white" shadowBlur={6} shadowOpacity={1} shadowOffset={{x:0, y:0}}
+                  letterSpacing={(isRooftop || isFence) ? 0.5 : 1.2} />
+              );
+            })}
+            {(localPlan.rooms || []).map(room => {
+              if (room.id === 'addon-fence') return null; // Don't show dimensions for fence
+              return (
+                <Text key={`dim-${room.id}`}
+                   text={`${Math.round(room.w)}′ × ${Math.round(room.h)}′`} 
+                   fontFamily="Epilogue" fontStyle="600" 
+                   fontSize={9}
+                   fill="rgba(0,0,0,0.55)" 
+                   align="center" verticalAlign="middle"
+                   x={buildingOffsetX + room.x * scale} 
+                   y={buildingOffsetY + room.y * scale + (room.h * scale)/2 + 6} 
+                   width={room.w * scale} 
+                   shadowColor="white" shadowBlur={4} shadowOpacity={1} shadowOffset={{x:0, y:0}} />
+              );
+            })}
+          </Layer>
+        )}
 
         <Layer listening={false}>
           <Rect
@@ -521,9 +525,11 @@ export const FloorPlanCanvas = ({ plan, advanced = false, onChange }: Props) => 
           className="flex h-8 w-8 items-center justify-center rounded-lg glass-panel text-[9px] font-bold shadow-sm hover:bg-white/90 transition-colors">FIT</button>
       </div>
 
-      <div className="absolute left-3 bottom-3 glass-panel rounded-lg px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-widest shadow-sm">
-        Scroll to zoom · Drag to pan
-      </div>
+      {!minimal && !hideZoomHelper && (
+        <div className="absolute left-3 bottom-3 glass-panel rounded-lg px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-widest shadow-sm">
+          Scroll to zoom · Drag to pan
+        </div>
+      )}
     </div>
   );
 };

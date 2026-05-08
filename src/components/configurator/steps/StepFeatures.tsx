@@ -2,7 +2,7 @@ import { useConfig, AddOn, KitchenType, HOME_TYPE_LIMITS } from '@/store/configu
 import { StepShell } from '../StepShell';
 import { ADDON_META, formatMoney } from '@/lib/cost';
 import { Minus, Plus, Sun, Car, Droplets, Cpu, Check, Fence, Trees } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const ADDON_ICON: Record<AddOn, any> = {
   solar: Sun,
@@ -26,22 +26,22 @@ export const StepFeatures = () => {
 
   return (
     <StepShell
-      eyebrow="Step 03 · Customize"
-      title="Shape every detail."
-      subtitle="The floor plan and your estimate update in real time on the right."
+      eyebrow="Step 03 · Configuration"
+      title="Define the details."
+      subtitle="Adjust room counts, explore spatial layouts, and select architectural enhancements."
       onNext={next}
       onPrev={prev}
     >
-      <div className="space-y-7">
-        <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-10">
+        <div className="grid gap-8 md:grid-cols-2">
           <Stepper
             label="Bedrooms"
             value={bedrooms}
             onChange={setBedrooms}
             min={bedroomLimits.min}
             max={bedroomLimits.max}
-            hint="Min 10×10 ft each"
-            note={bedroomLimits.min === bedroomLimits.max ? `Fixed at ${bedroomLimits.min}` : `Range: ${bedroomLimits.min}–${bedroomLimits.max}`}
+            hint="Min 10×10 ft"
+            note={bedroomLimits.min === bedroomLimits.max ? `Fixed at ${bedroomLimits.min}` : `${bedroomLimits.min} to ${bedroomLimits.max}`}
           />
           <Stepper
             label="Bathrooms"
@@ -49,44 +49,46 @@ export const StepFeatures = () => {
             onChange={setBathrooms}
             min={bathroomLimits.min}
             max={bathroomLimits.max}
-            hint="Min 5×7 ft each"
-            note={bathroomLimits.min === bathroomLimits.max ? `Fixed at ${bathroomLimits.min}` : `Range: ${bathroomLimits.min}–${bathroomLimits.max}`}
+            hint="Min 5×7 ft"
+            note={bathroomLimits.min === bathroomLimits.max ? `Fixed at ${bathroomLimits.min}` : `${bathroomLimits.min} to ${bathroomLimits.max}`}
           />
         </div>
 
-        <div>
-          <div className="mb-3 flex items-baseline justify-between">
-            <h3 className="font-display text-lg font-bold">Kitchen layout</h3>
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Choose one</span>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
+          <div className="mb-4 flex items-baseline justify-between">
+            <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Spatial Layout</h3>
+            <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Options</span>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-3">
             {KITCHENS.map((k) => {
               const active = kitchen === k.id;
               return (
                 <button
                   key={k.id}
                   onClick={() => setKitchen(k.id)}
-                  className={`relative rounded-2xl border-2 p-4 text-left transition-all ${
-                    active ? 'border-ink bg-card shadow-soft' : 'border-border bg-card/50 hover:border-clay'
+                  className={`group relative overflow-hidden rounded-xl p-6 text-left transition-all duration-500 border ${
+                    active 
+                      ? 'bg-surface shadow-elev border-clay/30 scale-[1.02]' 
+                      : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-display font-bold">{k.label}</span>
-                    {active && <Check size={16} className="text-clay" />}
+                  <div className="relative z-10 flex items-center justify-between mb-2">
+                    <span className={`font-display font-medium tracking-tight text-base ${active ? 'text-foreground' : 'text-foreground/80'}`}>{k.label}</span>
+                    {active && <div className="h-1.5 w-1.5 rounded-full bg-clay" />}
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground leading-snug">{k.desc}</p>
+                  <p className="relative z-10 text-[11px] text-muted-foreground leading-relaxed font-light">{k.desc}</p>
                 </button>
               );
             })}
           </div>
-        </div>
+        </motion.div>
 
-        <div>
-          <div className="mb-3 flex items-baseline justify-between">
-            <h3 className="font-display text-lg font-bold">Add-ons</h3>
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Tap to toggle</span>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
+          <div className="mb-4 flex items-baseline justify-between">
+            <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Enhancements</h3>
+            <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Optional</span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-6 sm:grid-cols-2">
             {(Object.keys(ADDON_META) as AddOn[]).map((id) => {
               const meta = ADDON_META[id];
               const Icon = ADDON_ICON[id];
@@ -96,27 +98,27 @@ export const StepFeatures = () => {
                   key={id}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => toggleAddon(id)}
-                  className={`flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition-all ${
-                    active ? 'border-ink bg-clay/15 shadow-soft' : 'border-border bg-card/50 hover:border-clay'
+                  className={`group relative overflow-hidden flex items-center gap-5 rounded-xl p-5 text-left transition-all duration-500 border ${
+                    active 
+                      ? 'bg-surface shadow-elev border-clay/30' 
+                      : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'
                   }`}
                 >
-                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${active ? 'bg-ink text-ink-foreground' : 'bg-surface'}`}>
-                    <Icon size={20} />
+                  <div className={`relative z-10 flex h-12 w-12 items-center justify-center rounded-lg border transition-colors duration-500 ${active ? 'bg-clay border-clay text-white shadow-sm' : 'bg-soft-section border-border text-muted-foreground'}`}>
+                    <Icon size={20} strokeWidth={1.25} />
                   </div>
-                  <div className="flex-1">
-                    <div className="font-medium">{meta.label}</div>
-                    <div className="text-xs text-muted-foreground num">+{formatMoney(meta.cost)}</div>
+                  <div className="relative z-10 flex-1">
+                    <div className={`font-medium tracking-tight text-sm ${active ? 'text-foreground' : 'text-foreground/80'}`}>{meta.label}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-clay num mt-1">+{formatMoney(meta.cost)}</div>
                   </div>
-                  <div className={`h-5 w-5 rounded-full border-2 transition-all flex items-center justify-center ${
-                    active ? 'border-ink bg-ink' : 'border-border'
-                  }`}>
-                    {active && <Check size={12} className="text-ink-foreground" strokeWidth={3} />}
-                  </div>
+                  {active && (
+                    <div className="relative z-10 h-1.5 w-1.5 rounded-full bg-clay" />
+                  )}
                 </motion.button>
               );
             })}
           </div>
-        </div>
+        </motion.div>
       </div>
     </StepShell>
   );
@@ -125,38 +127,46 @@ export const StepFeatures = () => {
 const Stepper = ({
   label, value, onChange, min, max, hint, note,
 }: { label: string; value: number; onChange: (n: number) => void; min: number; max: number; hint?: string; note?: string }) => (
-  <div className="rounded-2xl border border-border bg-card p-4">
-    <div className="flex items-baseline justify-between">
-      <span className="font-display font-bold">{label}</span>
-      {hint && <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{hint}</span>}
+  <div className="relative rounded-xl bg-surface border border-border p-6 shadow-soft transition-all hover:shadow-soft group">
+    <div className="flex items-baseline justify-between mb-5">
+      <span className="font-display text-lg tracking-tight text-foreground/80 font-normal">{label}</span>
+      {hint && <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">{hint}</span>}
     </div>
-    <div className="mt-3 flex items-center justify-between">
+    <div className="flex items-center justify-between bg-soft-section/50 rounded-xl p-2 border border-border/50">
       <button
         onClick={() => onChange(value - 1)}
         disabled={value <= min}
-        className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface hover:bg-muted disabled:opacity-30 transition-colors"
+        className="flex h-12 w-12 items-center justify-center rounded-lg bg-surface border border-border shadow-sm hover:bg-soft-section disabled:opacity-30 transition-all active:scale-95"
       >
-        <Minus size={18} />
+        <Minus size={18} className="text-foreground" strokeWidth={1.5} />
       </button>
-      <motion.div
-        key={value}
-        initial={{ scale: 0.85, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="font-display text-4xl font-extrabold num tabular-nums"
-      >
-        {value}
-      </motion.div>
+      
+      <div className="relative h-12 flex-1 flex items-center justify-center overflow-hidden">
+        <AnimatePresence mode="popLayout">
+          <motion.div
+            key={value}
+            initial={{ y: -15, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 15, opacity: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="font-display text-3xl font-normal num tracking-tighter"
+          >
+            {value}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
       <button
         onClick={() => onChange(value + 1)}
         disabled={value >= max}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-ink text-ink-foreground hover:scale-105 disabled:opacity-30 transition-transform"
+        className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg hover:brightness-110 disabled:opacity-30 transition-all active:scale-95"
       >
-        <Plus size={18} />
+        <Plus size={18} strokeWidth={1.5} />
       </button>
     </div>
     {note && (
-      <div className="mt-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-        {value <= min ? `Minimum reached · ${note}` : value >= max ? `Maximum reached · ${note}` : note}
+      <div className="mt-4 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground/40 font-bold">
+        {note}
       </div>
     )}
   </div>

@@ -37,13 +37,13 @@ interface RoomTab {
 
 function getRoomTabs(plan: Plan): RoomTab[] {
   const tabs: RoomTab[] = [
-    { id: 'overview', label: 'OVERVIEW', icon: Eye, color: 'hsl(33, 40%, 55%)' },
+    { id: 'overview', label: 'OVERVIEW', icon: Eye, color: 'hsl(var(--accent))' },
   ];
   const hasType = (type: string) => plan.rooms?.some((r) => r.type === type) || false;
-  if (hasType('living')) tabs.push({ id: 'living', label: 'HALL', icon: Sofa, color: 'hsl(215, 35%, 55%)' });
-  if (hasType('bedroom')) tabs.push({ id: 'bedroom', label: 'BEDROOMS', icon: BedDouble, color: 'hsl(33, 35%, 60%)' });
-  if (hasType('kitchen')) tabs.push({ id: 'kitchen', label: 'KITCHEN', icon: CookingPot, color: 'hsl(28, 40%, 55%)' });
-  if (hasType('bathroom')) tabs.push({ id: 'bathroom', label: 'BATHROOM', icon: Bath, color: 'hsl(200, 30%, 55%)' });
+  if (hasType('living')) tabs.push({ id: 'living', label: 'HALL', icon: Sofa, color: 'hsl(var(--primary))' });
+  if (hasType('bedroom')) tabs.push({ id: 'bedroom', label: 'BEDROOMS', icon: BedDouble, color: 'hsl(var(--primary))' });
+  if (hasType('kitchen')) tabs.push({ id: 'kitchen', label: 'KITCHEN', icon: CookingPot, color: 'hsl(var(--accent))' });
+  if (hasType('bathroom')) tabs.push({ id: 'bathroom', label: 'BATHROOM', icon: Bath, color: 'hsl(var(--primary))' });
   if (hasType('balcony')) tabs.push({ id: 'balcony', label: 'BALCONY', icon: Fence, color: 'hsl(120, 25%, 50%)' });
   if (hasType('garden') || hasType('carport')) tabs.push({ id: 'garden', label: 'GARDEN', icon: Trees, color: 'hsl(120, 30%, 45%)' });
   return tabs;
@@ -237,280 +237,311 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
   return (
     <StepShell
-      eyebrow="Step 04 · Preview"
-      title="Your home, in real time."
-      subtitle="Switch between floor plan and 3D elevation. Navigate rooms with the tabs below."
+      eyebrow="Step 04 · Visualization"
+      title="Experience your design."
+      subtitle="Switch between the technical floor plan and immersive 3D elevation. Navigate room by room."
       onNext={next}
       onPrev={prev}
     >
-      <div className="space-y-4">
+      <div className="space-y-8">
         {/* View toggle + controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-full bg-surface p-1">
-            {(['2d', '3d'] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => { setView(v); setAdvancedEditorMode(false); }}
-                className={`relative rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
-                  view === v && !advancedEditorMode ? 'text-ink-foreground' : 'text-muted-foreground'
-                }`}
-              >
-                {view === v && !advancedEditorMode && (
-                  <motion.div layoutId="view-pill" className="absolute inset-0 rounded-full bg-ink"
-                    transition={{ type: 'spring', stiffness: 400, damping: 32 }} />
-                )}
-                <span className="relative">{v === '2d' ? '📐 Floor Plan' : '🏠 3D Tour'}</span>
-              </button>
-            ))}
-          </div>
-
-          {view === '2d' && !advancedEditorMode && (
-            <div className="flex items-center gap-2">
-              {/* Preset selector */}
-              <div className="inline-flex rounded-full bg-surface/80 p-0.5 border border-border">
-                {[0].map((id) => (
+        <div className="flex flex-col gap-6 bg-surface p-6 rounded-3xl border border-border shadow-soft">
+          {/* Main Controls Row */}
+          {!advancedEditorMode ? (
+            <div className="flex flex-wrap items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
+              <div className="inline-flex rounded-xl bg-soft-section p-1 border border-border shadow-inner">
+                {(['2d', '3d'] as const).map((v) => (
                   <button
-                    key={id}
-                    onClick={() => setPresetId(id)}
-                    className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                      presetId === id
-                        ? 'bg-clay text-white shadow-md'
-                        : 'text-muted-foreground hover:text-foreground'
+                    key={v}
+                    onClick={() => { setView(v); setAdvancedEditorMode(false); }}
+                    className={`relative rounded-lg px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
+                      view === v && !advancedEditorMode ? 'text-white' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    <Layers size={10} className="inline mr-1 -mt-0.5" />
-                    Preset A
-                  </button>
-                ))}
-                {savedPresets.map((savedPresetObj, i) => (
-                  <button
-                    key={`saved-${i}`}
-                    onClick={() => loadSavedPreset(i)}
-                    className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                      presetId === -1 && loadedPresetId === savedPresetObj.id
-                        ? 'bg-clay text-white shadow-md'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <Layers size={10} className="inline mr-1 -mt-0.5" />
-                    {savedPresetObj.name || `Custom ${i + 1}`}
+                    {view === v && !advancedEditorMode && (
+                      <motion.div layoutId="view-pill" className="absolute inset-0 rounded-lg bg-primary shadow-lg"
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
+                    )}
+                    <span className="relative z-10">{v === '2d' ? '2D View' : '3D View'}</span>
                   </button>
                 ))}
               </div>
 
-              <button
-                onClick={() => setAdvanced((v) => !v)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  advanced ? 'border-ink bg-ink text-ink-foreground' : 'border-border hover:bg-surface'
-                }`}
-              >
-                {advanced ? 'Advanced · ON' : 'Advanced mode'}
-              </button>
-              {advanced && (
+              {view === '2d' && !advancedEditorMode && (
+                <div className="inline-flex rounded-xl bg-soft-section/50 p-1 border border-border/50">
+                  {[0].map((id) => (
+                    <button
+                      key={id}
+                      onClick={() => setPresetId(id)}
+                      className={`rounded-lg px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-all duration-300 ${
+                        presetId === id
+                          ? 'bg-white text-foreground shadow-sm'
+                          : 'text-muted-foreground/60 hover:text-foreground'
+                      }`}
+                    >
+                      Preset A
+                    </button>
+                  ))}
+                  {savedPresets.map((savedPresetObj, i) => (
+                    <button
+                      key={`saved-${i}`}
+                      onClick={() => loadSavedPreset(i)}
+                      className={`rounded-lg px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-all duration-300 ${
+                        presetId === -1 && loadedPresetId === savedPresetObj.id
+                          ? 'bg-white text-foreground shadow-sm'
+                          : 'text-muted-foreground/60 hover:text-foreground'
+                      }`}
+                    >
+                      {savedPresetObj.name || `Custom ${i + 1}`}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4">
+              {view === '2d' && !advancedEditorMode && (
                 <>
-                  <button
-                    onClick={() => {
-                      setStagedPlan(null);
-                      onResetPlan?.();
-                    }}
-                    className="rounded-full border border-red-200 bg-red-50 text-red-600 px-3 py-1.5 text-xs font-medium hover:bg-red-100 transition-colors"
-                  >
-                    Reset
-                  </button>
-                  <div className="flex flex-wrap items-center gap-1.5 ml-2 border-l pl-2 border-border">
-                    {ROOM_BLOCKS.map((block) => {
-                      const Icon = block.icon;
-                      return (
-                        <button
-                          key={block.type}
-                          onClick={() => handleAddRoom(block.type)}
-                          title={`Add ${block.label}`}
-                          className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-bold uppercase tracking-wider border border-border hover:bg-surface transition-all active:scale-95 shadow-sm"
-                          style={{ borderLeftColor: block.color, borderLeftWidth: 3 }}
-                        >
-                          <Icon size={12} />
-                          {block.label.split(' ')[0]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {stagedPlan && (
-                    <>
-                      <button
-                        onClick={async () => {
-                          const committed = commitStagedPlan();
-                          if (!committed) return;
-
-                          try {
-                            if (isFamilyDoubleStoreyPackage) {
-                              await savePackageLayout(getFamilyDoubleStoreyPackageKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey }), committed.newGround, committed.newFirst);
-                              toast({ title: 'Plan updated', description: 'Family double-storey package saved successfully.' });
-                            } else if (presetId === -1 && loadedPresetId) {
-                              await updateSavedPreset(committed.newGround, committed.newFirst);
-                              toast({ title: 'Preset updated', description: 'Your saved preset has been updated.' });
-                            } else if (presetId === 0) {
-                              await saveBuiltInPreset(presetId, committed.newGround, committed.newFirst);
-                              toast({ title: 'Preset updated', description: 'Preset A has been updated.' });
-                            } else {
-                              toast({ title: 'Preset updated', description: 'Changes have been applied locally.' });
-                            }
-
-                            setStagedPlan(null);
-                            planHistory.forEach(h => removeHistoryRecord(h.id));
-                          } catch (error) {
-                            console.error('Failed to update plan', error);
-                            toast({ title: 'Update failed', description: 'Could not update the plan. Please try again.' });
-                          }
-                        }}
-                        className="flex items-center gap-1.5 rounded-full bg-clay px-4 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-clay/90 transition-all active:scale-95"
-                      >
-                        <Save size={14} /> Update Plan
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const committed = commitStagedPlan();
-                          if (!committed) return;
-
-                          const fallbackName = presetId === 0 ? 'Preset A Copy' : 'Custom Preset';
-                          const name = window.prompt('Enter a name for this preset', fallbackName);
-                          if (!name || !name.trim()) {
-                            toast({ title: 'Save cancelled', description: 'Preset name is required to save a new preset.' });
-                            return;
-                          }
-
-                          try {
-                            await saveAsPreset(name.trim(), committed.newGround, committed.newFirst);
-                            toast({ title: 'Preset saved', description: `Saved as ${name.trim()}.` });
-                            setStagedPlan(null);
-                            planHistory.forEach(h => removeHistoryRecord(h.id));
-                            setAdvanced(false);
-                          } catch (error) {
-                            console.error('Failed to save preset', error);
-                            toast({ title: 'Save failed', description: 'Could not save the preset. Please try again.' });
-                          }
-                        }}
-                        className="flex items-center gap-1.5 rounded-full bg-blue-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-blue-600 transition-all active:scale-95"
-                      >
-                        <Save size={14} /> Save as Preset
-                      </button>
-                    </>
+                  {canDoubleStorey && (
+                    <button
+                      onClick={() => setDoubleStorey(!isDoubleStorey)}
+                      className={`flex items-center gap-2 h-11 rounded-xl border px-5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all active:scale-95 ${
+                        isDoubleStorey
+                          ? 'border-clay/40 bg-soft-section text-clay'
+                          : 'border-border bg-white text-muted-foreground hover:bg-soft-section hover:text-foreground'
+                      }`}
+                    >
+                      <Building2 size={14} strokeWidth={1.5} />
+                      {isDoubleStorey ? '2 Storey ✓' : '2 Storey'}
+                    </button>
                   )}
+                  <button
+                    onClick={() => setAdvancedEditorMode(true)}
+                    className="flex items-center gap-2 h-11 rounded-xl border border-primary/10 bg-primary/5 text-primary px-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary/10 transition-all active:scale-95"
+                  >
+                    <PenTool size={14} strokeWidth={1.5} />
+                    Custom Editor
+                  </button>
+                  <button
+                    onClick={() => setAdvanced((v) => !v)}
+                    className={`h-11 rounded-xl border px-6 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
+                      advanced ? 'border-primary bg-primary text-white shadow-lg' : 'border-border bg-white text-muted-foreground hover:bg-soft-section hover:text-foreground'
+                    }`}
+                  >
+                    {advanced ? 'Advanced' : 'Advanced Mode'}
+                  </button>
                 </>
               )}
-
-              {/* Custom Editor Button */}
-              <button
-                onClick={() => setAdvancedEditorMode(true)}
-                className="flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-600 px-3 py-1.5 text-xs font-bold hover:bg-blue-100 transition-all active:scale-95"
-              >
-                <PenTool size={12} />
-                Custom Editor
-              </button>
-
-              {presetId === -1 && loadedPresetId && (
-                <button
-                  onClick={() => {
-                    const idx = savedPresets.findIndex(p => p.id === loadedPresetId);
-                    if (idx !== -1) deleteSavedPreset(idx);
-                  }}
-                  className="rounded-full border border-red-200 text-red-500 hover:bg-red-50 p-1.5 transition-colors"
-                  title="Delete Layout"
-                >
-                  <Trash size={14} />
-                </button>
+              {view === '3d' && !advancedEditorMode && (
+                <div className="flex items-center gap-6">
+                  <Group label="Roof">
+                    {ROOFS.map((r) => (
+                      <Pill key={r.id} active={roof === r.id} onClick={() => setRoof(r.id)}>{r.label}</Pill>
+                    ))}
+                  </Group>
+                  <Group label="Material">
+                    {MATERIALS.map((m) => (
+                      <Pill key={m.id} active={material === m.id} onClick={() => setMaterial(m.id)}>
+                        <span className="inline-block h-2.5 w-2.5 rounded-full mr-2 align-middle shadow-inner" style={{ background: m.swatch }} />
+                        {m.label}
+                      </Pill>
+                    ))}
+                  </Group>
+                </div>
               )}
-
-              {/* Double Storey Toggle (Family/Premium only) */}
-              {canDoubleStorey && (
-                <button
-                  onClick={() => setDoubleStorey(!isDoubleStorey)}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 ${
-                    isDoubleStorey
-                      ? 'border-amber-400 bg-amber-50 text-amber-700'
-                      : 'border-border bg-surface text-muted-foreground hover:bg-white'
-                  }`}
-                >
-                  <Building2 size={12} />
-                  {isDoubleStorey ? 'Double Storey ✓' : 'Double Storey'}
-                </button>
-              )}
-
-              {/* Copy / Paste Layout */}
-              <div className="flex items-center gap-1.5 ml-1 border-l pl-2 border-border">
-                <button
-                  onClick={handleCopyLayout}
-                  className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-1.5 text-xs font-bold hover:bg-emerald-100 transition-all active:scale-95"
-                  title="Copy current floor plan layout to clipboard"
-                >
-                  <Copy size={12} />
-                  Copy Layout
-                </button>
-                {hasCopiedPlan && floorPlanClipboard && (
-                  <button
-                    onClick={handlePasteLayout}
-                    className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 text-violet-700 px-3 py-1.5 text-xs font-bold hover:bg-violet-100 transition-all active:scale-95"
-                    title={`Paste layout from ${floorPlanClipboard.label}`}
-                  >
-                    <ClipboardPaste size={12} />
-                    Paste Layout
-                    <span className="text-[8px] opacity-60 ml-0.5">({floorPlanClipboard.label})</span>
-                  </button>
-                )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-primary/5 text-primary">
+                <PenTool size={20} strokeWidth={1.5} className="animate-pulse" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-foreground">Custom Editor Mode</span>
+                <span className="text-[9px] text-muted-foreground/60 uppercase tracking-[0.2em] mt-0.5">Architectural Drafting · Level {activeFloor + 1}</span>
               </div>
             </div>
-          )}
-
-          {/* Floor Selector (only when double storey is enabled) */}
-          {isDoubleStorey && !advancedEditorMode && (
-            <div className="inline-flex rounded-full bg-amber-50 border border-amber-200 p-0.5">
-              {([0, 1] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setActiveFloor(f)}
-                  className={`rounded-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                    activeFloor === f
-                      ? 'bg-amber-500 text-white shadow-md'
-                      : 'text-amber-700 hover:bg-amber-100'
-                  }`}
-                >
-                  <ArrowUpDown size={10} className="inline mr-1 -mt-0.5" />
-                  {f === 0 ? 'Ground Floor' : 'First Floor'}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {advancedEditorMode && (
             <button
               onClick={() => setAdvancedEditorMode(false)}
-              className="flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 text-red-600 px-3 py-1.5 text-xs font-bold hover:bg-red-100 transition-all"
+              className="flex items-center gap-2 h-11 rounded-xl bg-white border border-border text-foreground px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section transition-all active:scale-95"
             >
-              <X size={12} />
-              Exit Custom Editor
+              <X size={16} />
+              Exit Editor
             </button>
-          )}
+          </div>
+        )}
 
-          {view === '3d' && !advancedEditorMode && (
-            <>
-              <Group label="Roof">
-                {ROOFS.map((r) => (
-                  <Pill key={r.id} active={roof === r.id} onClick={() => setRoof(r.id)}>{r.label}</Pill>
+          {/* Advanced Controls Row */}
+          <AnimatePresence>
+            {advanced && view === '2d' && !advancedEditorMode && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                animate={{ height: 'auto', opacity: 1, marginTop: 24 }}
+                exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                className="overflow-hidden border-t border-border pt-6"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  {/* Left Column: Room Addition */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">Add Structural Elements</span>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {ROOM_BLOCKS.map((block) => {
+                        const Icon = block.icon;
+                        return (
+                          <button
+                            key={block.type}
+                            onClick={() => handleAddRoom(block.type)}
+                            className="flex h-11 items-center gap-3 rounded-xl px-4 text-[10px] font-bold uppercase tracking-[0.2em] border border-border bg-white hover:bg-soft-section hover:shadow-soft transition-all active:scale-95 group"
+                            style={{ borderLeftColor: block.color, borderLeftWidth: 3 }}
+                          >
+                            <Icon size={16} strokeWidth={1.25} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+                            {block.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Utilities & Actions */}
+                  <div className="space-y-8">
+                    <div className="flex flex-wrap items-start justify-between gap-8">
+                      {/* Clipboard Section */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">Clipboard</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={handleCopyLayout}
+                            className="flex items-center gap-2 h-11 rounded-xl border border-border bg-white text-muted-foreground px-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section hover:text-foreground transition-all active:scale-95"
+                          >
+                            <Copy size={14} />
+                            Copy Layout
+                          </button>
+                          {hasCopiedPlan && (
+                            <button
+                              onClick={handlePasteLayout}
+                              className="flex items-center gap-2 h-11 rounded-xl border border-clay/30 bg-soft-section text-clay px-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:brightness-105 transition-all active:scale-95"
+                            >
+                              <ClipboardPaste size={14} />
+                              Paste <span className="opacity-50 lowercase ml-1">({floorPlanClipboard?.label})</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Management Section */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">Management</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => { setStagedPlan(null); onResetPlan?.(); }}
+                            className="h-11 rounded-xl border border-border bg-white text-muted-foreground px-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all active:scale-95"
+                          >
+                            Reset
+                          </button>
+                          {presetId === -1 && loadedPresetId && (
+                            <button
+                              onClick={() => {
+                                const idx = savedPresets.findIndex(p => p.id === loadedPresetId);
+                                if (idx !== -1) deleteSavedPreset(idx);
+                              }}
+                              className="h-11 w-11 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all"
+                              title="Delete this custom preset"
+                            >
+                              <Trash size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Final Actions Row */}
+                    {stagedPlan && (
+                      <div className="flex items-center gap-4 pt-4 border-t border-border">
+                        <button
+                          onClick={async () => {
+                            const committed = commitStagedPlan();
+                            if (!committed) return;
+                            try {
+                              if (isFamilyDoubleStoreyPackage) {
+                                await savePackageLayout(familyPackageKey, committed.newGround, committed.newFirst);
+                                toast({ title: 'Plan updated' });
+                              } else if (presetId === -1 && loadedPresetId) {
+                                await updateSavedPreset(committed.newGround, committed.newFirst);
+                                toast({ title: 'Preset updated' });
+                              } else if (presetId === 0) {
+                                await saveBuiltInPreset(presetId, committed.newGround, committed.newFirst);
+                                toast({ title: 'Preset A updated' });
+                              }
+                              setStagedPlan(null);
+                              planHistory.forEach(h => removeHistoryRecord(h.id));
+                            } catch (e) {
+                              toast({ title: 'Update failed', variant: 'destructive' });
+                            }
+                          }}
+                          className="flex-1 flex items-center justify-center gap-3 h-12 rounded-xl bg-primary text-white text-[10px] font-bold uppercase tracking-[0.3em] shadow-lg hover:brightness-110 transition-all active:scale-[0.98]"
+                        >
+                          <Check size={18} strokeWidth={2.5} /> Apply Changes
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const committed = commitStagedPlan();
+                            if (!committed) return;
+                            const name = window.prompt('Preset Name:', presetId === 0 ? 'Preset A Copy' : 'Custom Layout');
+                            if (!name) return;
+                            try {
+                              await saveAsPreset(name.trim(), committed.newGround, committed.newFirst);
+                              toast({ title: 'Saved as Preset', description: name });
+                              setStagedPlan(null);
+                              setAdvanced(false);
+                            } catch (e) {
+                              toast({ title: 'Save failed' });
+                            }
+                          }}
+                          className="flex-1 flex items-center justify-center gap-3 h-12 rounded-xl bg-soft-section border border-border text-foreground text-[10px] font-bold uppercase tracking-[0.3em] hover:bg-muted/10 transition-all active:scale-[0.98]"
+                        >
+                          <Save size={18} strokeWidth={1.5} /> Save As New
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Double Storey Floor Selector Overlay */}
+          {isDoubleStorey && !advancedEditorMode && (
+            <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border">
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mr-2">Level Selection:</span>
+              <div className="inline-flex rounded-xl bg-soft-section p-1 border border-border shadow-inner">
+                {([0, 1] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setActiveFloor(f)}
+                    className={`rounded-lg px-8 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
+                      activeFloor === f
+                        ? 'bg-white text-foreground shadow-lg scale-[1.02]'
+                        : 'text-muted-foreground/60 hover:text-foreground'
+                    }`}
+                  >
+                    {f === 0 ? 'Ground Floor' : 'First Floor'}
+                  </button>
                 ))}
-              </Group>
-              <Group label="Material">
-                {MATERIALS.map((m) => (
-                  <Pill key={m.id} active={material === m.id} onClick={() => setMaterial(m.id)}>
-                    <span className="inline-block h-2.5 w-2.5 rounded-full mr-1.5 align-middle" style={{ background: m.swatch }} />
-                    {m.label}
-                  </Pill>
-                ))}
-              </Group>
-            </>
+              </div>
+            </div>
           )}
         </div>
 
         {/* Canvas area */}
-        <div className="flex h-[420px] md:h-[520px] overflow-hidden rounded-3xl border border-border shadow-elev">
+        <div className="flex h-[440px] md:h-[560px] overflow-hidden rounded-3xl border border-border shadow-elev relative bg-white">
           <div
             className="relative flex-1 overflow-hidden"
             onTouchStart={handleTouchStart}
@@ -519,8 +550,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             <AnimatePresence mode="wait">
               {advancedEditorMode ? (
                 <motion.div key="editor" className="h-full w-full"
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}>
+                  initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
                   <CustomEditorCanvas
                     homeType={homeType}
                     onChange={(editorPlan) => {
@@ -568,9 +599,9 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 </motion.div>
               ) : view === '2d' ? (
                 <motion.div key={`2d-${activeFloor}`} className="h-full w-full"
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}>
-                  <FloorPlanCanvas plan={stagedPlan || getHighlightedPlan()} advanced={advanced} onChange={(updatedHighlightedPlan) => {
+                  initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
+                  <FloorPlanCanvas plan={stagedPlan || getHighlightedPlan()} advanced={advanced} hideZoomHelper={true} onChange={(updatedHighlightedPlan) => {
                     const newPlan = {
                       ...(stagedPlan || displayPlan),
                       width: updatedHighlightedPlan.width,
@@ -621,26 +652,19 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 </motion.div>
               ) : (
                 <motion.div key="3d" className="h-full w-full"
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}>
-                  <ElevationCanvas plan={currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={isDoubleStorey && floors ? ((isCustomPreset ? customFirstFloorPlan : null) || floors.first) : undefined} />
+                  initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
+                  <ElevationCanvas plan={currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={isDoubleStorey && floors ? ((isCustomPreset ? customFirstFloorPlan : null) || floors.first) : undefined} hideHelpers={true} />
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Top-left badge (only for non-editor views) */}
-            {!advancedEditorMode && (
-              <div className="pointer-events-none absolute left-4 top-4 rounded-full glass-panel px-3 py-1.5 text-[10px] font-display font-semibold uppercase tracking-[0.2em]">
-                {view === '2d' 
-                  ? `${currentPlan.width}′ × ${currentPlan.height}′${isDoubleStorey ? ` · ${activeFloor === 0 ? 'Ground' : 'First'} Floor` : ''}`
-                  : 'Front elevation'}
-              </div>
-            )}
             
             {/* Staged indicator */}
             {stagedPlan && !advancedEditorMode && (
-              <div className="pointer-events-none absolute left-4 top-14 flex items-center gap-1.5 rounded-full bg-clay/10 border border-clay/30 px-3 py-1 text-[9px] font-bold text-clay uppercase tracking-widest animate-pulse">
-                <Check size={10} /> Unsaved Changes
+              <div className="pointer-events-none absolute left-8 top-8 flex items-center gap-3 rounded-xl bg-clay/5 border border-clay/20 px-4 py-2.5 shadow-lg backdrop-blur-md">
+                <div className="h-1.5 w-1.5 rounded-full bg-clay animate-pulse" /> 
+                <span className="text-[10px] font-bold text-clay uppercase tracking-[0.2em]">Unsaved Drafting Changes</span>
               </div>
             )}
 
@@ -648,12 +672,13 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
           {activeTab !== 'overview' && !advancedEditorMode && (
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="absolute bottom-20 left-1/2 -translate-x-1/2 rounded-2xl bg-white/90 backdrop-blur-md px-6 py-2.5 shadow-elev"
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="absolute bottom-28 left-1/2 -translate-x-1/2 rounded-full border border-border bg-white/90 backdrop-blur-md px-10 py-4 shadow-elev"
             >
-              <span className="font-display text-lg md:text-xl font-extrabold tracking-wider text-foreground">
+              <span className="font-display text-2xl font-normal tracking-tight text-foreground">
                 {currentTabLabel}
               </span>
             </motion.div>
@@ -661,15 +686,15 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
           {/* Room navigation tabs (only for non-editor views) */}
           {!advancedEditorMode && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[90%] max-w-[520px]">
-              <div className="relative flex items-center gap-1">
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-[640px]">
+              <div className="relative flex items-center gap-3">
                 <button onClick={() => scrollTabs('left')}
-                  className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full glass-panel hover:bg-white/80 transition-colors">
-                  <ChevronLeft size={14} />
+                  className="shrink-0 flex h-12 w-12 items-center justify-center rounded-full bg-white/90 backdrop-blur-md border border-border shadow-lg hover:bg-white transition-all hover:scale-105 active:scale-95">
+                  <ChevronLeft size={20} className="text-muted-foreground hover:text-foreground" />
                 </button>
 
                 <div ref={tabScrollRef}
-                  className="flex-1 overflow-x-auto scrollbar-hide flex items-center gap-1.5 rounded-2xl glass-panel px-2 py-1.5">
+                  className="flex-1 overflow-x-auto scrollbar-hide flex items-center gap-2 rounded-[2.5rem] bg-white/90 backdrop-blur-md border border-border shadow-elev px-3 py-2">
                   {roomTabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -677,14 +702,14 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                        className={`shrink-0 flex items-center gap-3 rounded-full px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
                           isActive
-                            ? 'text-white shadow-md'
-                            : 'text-foreground/70 hover:bg-white/50'
+                            ? 'text-white shadow-lg scale-105'
+                            : 'text-muted-foreground/60 hover:text-foreground hover:bg-soft-section'
                         }`}
                         style={isActive ? { background: tab.color } : {}}
                       >
-                        <Icon size={12} />
+                        <Icon size={16} strokeWidth={isActive ? 2 : 1.25} />
                         {tab.label}
                       </button>
                     );
@@ -692,25 +717,24 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 </div>
 
                 <button onClick={() => scrollTabs('right')}
-                  className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full glass-panel hover:bg-white/80 transition-colors">
-                  <ChevronRight size={14} />
+                  className="shrink-0 flex h-12 w-12 items-center justify-center rounded-full bg-white/90 backdrop-blur-md border border-border shadow-lg hover:bg-white transition-all hover:scale-105 active:scale-95">
+                  <ChevronRight size={20} className="text-muted-foreground hover:text-foreground" />
                 </button>
               </div>
             </div>
           )}
         </div>
-
           {/* Change Log Sidebar */}
           {advanced && planHistory.length > 0 && !advancedEditorMode && (
-            <div className="hidden lg:flex flex-col w-[240px] border-l border-border bg-surface/30 backdrop-blur-sm p-4 overflow-y-auto">
-              <div className="flex items-center gap-2 mb-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                <History size={14} /> Change Log
+            <div className="hidden lg:flex flex-col w-[320px] border-l border-border bg-soft-section/20 p-8 overflow-y-auto">
+              <div className="flex items-center gap-3 mb-8 text-[11px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">
+                <History size={18} strokeWidth={1.5} /> Design History
               </div>
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {planHistory.map((record) => (
-                  <div key={record.id} className="group relative rounded-xl bg-white p-3 shadow-sm border border-transparent hover:border-border transition-all">
-                    <div className="text-[11px] font-bold text-ink pr-6">{record.label}</div>
-                    <div className="text-[9px] text-muted-foreground uppercase tracking-tight mt-1">{record.type.replace('-', ' ')}</div>
+                  <div key={record.id} className="group relative rounded-2xl bg-white p-5 shadow-soft border border-border hover:border-clay/20 transition-all duration-500">
+                    <div className="text-[13px] font-medium text-foreground pr-8 leading-tight tracking-tight">{record.label}</div>
+                    <div className="text-[9px] text-muted-foreground/50 uppercase tracking-[0.2em] mt-2 font-bold">{record.type.replace('-', ' ')}</div>
                     <button
                       onClick={() => {
                         // Revert room
@@ -721,23 +745,22 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                         setStagedPlan(revertedPlan);
                         removeHistoryRecord(record.id);
                       }}
-                      className="absolute right-2 top-2 h-5 w-5 flex items-center justify-center rounded-md bg-red-50 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
+                      className="absolute right-4 top-5 h-8 w-8 flex items-center justify-center rounded-full bg-red-50 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all duration-300"
                     >
-                      <X size={12} />
+                      <X size={14} />
                     </button>
                   </div>
                 ))}
               </div>
-              <div className="mt-auto pt-4 text-[9px] text-center text-muted-foreground italic">
-                Changes persist locally after you click Save.
+              <div className="mt-auto pt-8 text-[10px] text-center text-muted-foreground/30 font-bold uppercase tracking-[0.2em]">
+                Drafting State Active
               </div>
             </div>
           )}
         </div>
-
         {/* Swipe hint for mobile */}
         {!advancedEditorMode && (
-          <p className="text-center text-[10px] text-muted-foreground uppercase tracking-widest md:hidden">
+          <p className="text-center text-[10px] font-bold text-muted-foreground/30 uppercase tracking-[0.3em] md:hidden mt-4">
             ← Swipe tabs to navigate rooms →
           </p>
         )}
@@ -747,17 +770,19 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 };
 
 const Group = ({ label, children }: { label: string; children: React.ReactNode }) => (
-  <div className="flex items-center gap-1.5">
-    <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">{label}</span>
-    {children}
+  <div className="flex items-center gap-2">
+    <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground/60 mr-2">{label}</span>
+    <div className="flex items-center gap-1.5">{children}</div>
   </div>
 );
 
 const Pill = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
   <button
     onClick={onClick}
-    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-      active ? 'bg-ink text-ink-foreground' : 'bg-surface hover:bg-muted'
+    className={`rounded-2xl px-5 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all duration-300 ${
+      active 
+        ? 'bg-primary text-primary-foreground shadow-md scale-105' 
+        : 'bg-surface border border-border/50 hover:bg-white hover:shadow-sm'
     }`}
   >
     {children}

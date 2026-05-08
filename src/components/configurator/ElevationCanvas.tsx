@@ -14,6 +14,7 @@ interface Props {
   activeRoom?: string | null;
   isDoubleStorey?: boolean;
   firstFloorPlan?: Plan;
+  hideHelpers?: boolean;
 }
 
 const PLOT_PADDING_FT = 2;
@@ -82,7 +83,7 @@ const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, pl
   return null;
 };
 
-export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom, isDoubleStorey = false, firstFloorPlan }: Props) => {
+export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom, isDoubleStorey = false, firstFloorPlan, hideHelpers = false }: Props) => {
   const hideRoof = activeRoom && activeRoom !== 'overview' && activeRoom !== 'garden';
   const safeW = plan.width || 0;
   const safeD = plan.height || 0;
@@ -151,9 +152,11 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           />
         </Suspense>
       </Canvas>
-      <div className="pointer-events-none absolute left-4 top-4 rounded-xl glass-panel px-3 py-2 text-[9px] font-display font-semibold uppercase tracking-[0.2em]">
-        {activeRoom && activeRoom !== 'overview' ? 'Drag to rotate · Scroll to zoom · Free camera' : 'Drag to rotate · Scroll to zoom'}
-      </div>
+      {!hideHelpers && (
+        <div className="pointer-events-none absolute left-4 top-4 rounded-xl glass-panel px-3 py-2 text-[9px] font-display font-semibold uppercase tracking-[0.2em]">
+          {activeRoom && activeRoom !== 'overview' ? 'Drag to rotate · Scroll to zoom · Free camera' : 'Drag to rotate · Scroll to zoom'}
+        </div>
+      )}
     </div>
   );
 };

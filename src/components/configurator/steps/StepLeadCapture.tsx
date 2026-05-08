@@ -6,7 +6,7 @@ import { CostBreakdown, formatMoney } from '@/lib/cost';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Send, ArrowRight } from 'lucide-react';
 
 const TIMELINES = ['0–3 months', '3–6 months', '6–12 months', '12+ months'];
 
@@ -51,108 +51,144 @@ export const StepLeadCapture = ({ cost }: Props) => {
     });
     setSubmitting(false);
     if (error) {
-      toast.error('Could not submit — please try again');
+      toast.error('Submission failed — please try again');
       return;
     }
     setDone(true);
-    toast.success('Submitted! Our team will be in touch.');
   };
 
   return (
     <StepShell
-      eyebrow="Step 05 · Let's connect"
-      title="Get your full proposal."
-      subtitle="We'll send a detailed PDF to your inbox and an architect will reach out."
+      eyebrow="Step 05 · Finalization"
+      title="Request your proposal."
+      subtitle="Connect with our design team to receive a comprehensive architectural breakdown and structural overview."
       onPrev={() => useConfig.getState().prev()}
     >
-      <AnimatePresence mode="wait">
-        {done ? (
-          <motion.div
-            key="done"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="rounded-3xl bg-gradient-ink text-ink-foreground p-10 text-center"
-          >
-            <CheckCircle2 size={56} className="mx-auto text-clay mb-4" />
-            <h3 className="font-display text-3xl font-extrabold">You're all set, {c.name.split(' ')[0]}.</h3>
-            <p className="mt-2 text-ink-foreground/70 max-w-md mx-auto">
-              Your configuration ({formatMoney(cost.total)} · {cost.area} sqft) was saved. Expect a call within 24 hours.
-            </p>
-            <button
-              onClick={() => useConfig.getState().reset()}
-              className="mt-6 rounded-full bg-clay text-clay-foreground px-6 py-3 text-sm font-semibold hover:scale-105 transition-transform"
+      <div className="max-w-2xl mx-auto">
+        <AnimatePresence mode="wait">
+          {done ? (
+            <motion.div
+              key="done"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="py-12 text-center"
             >
-              Start a new design
-            </button>
-          </motion.div>
-        ) : (
-          <motion.div key="form" className="grid gap-4 md:grid-cols-2">
-            <Field label="Full name" error={errors.name}>
-              <input
-                value={c.name}
-                onChange={(e) => c.setLead({ name: e.target.value })}
-                placeholder="Alex Morgan"
-                className="w-full bg-transparent outline-none font-display text-lg placeholder:text-muted-foreground/50"
-              />
-            </Field>
-            <Field label="Phone" error={errors.phone}>
-              <input
-                value={c.phone}
-                onChange={(e) => c.setLead({ phone: e.target.value })}
-                placeholder="+1 555 0100"
-                className="w-full bg-transparent outline-none font-display text-lg placeholder:text-muted-foreground/50"
-              />
-            </Field>
-            <Field label="Email" error={errors.email} className="md:col-span-2">
-              <input
-                type="email"
-                value={c.email}
-                onChange={(e) => c.setLead({ email: e.target.value })}
-                placeholder="alex@home.com"
-                className="w-full bg-transparent outline-none font-display text-lg placeholder:text-muted-foreground/50"
-              />
-            </Field>
-            <div className="md:col-span-2">
-              <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">Timeline to build</div>
-              <div className="flex flex-wrap gap-2">
-                {TIMELINES.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => c.setLead({ timeline: t })}
-                    className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-                      c.timeline === t ? 'border-ink bg-ink text-ink-foreground' : 'border-border hover:bg-surface'
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-              {errors.timeline && <div className="mt-2 text-xs text-destructive">{errors.timeline}</div>}
-            </div>
-
-            <div className="md:col-span-2 mt-2">
-              <button
-                onClick={submit}
-                disabled={submitting}
-                className="w-full rounded-full bg-ink text-ink-foreground py-4 font-display font-bold text-base shadow-elev hover:scale-[1.01] disabled:opacity-50 transition-transform"
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="inline-flex items-center justify-center h-24 w-24 rounded-full bg-soft-section border border-clay/20 text-clay mb-10"
               >
-                {submitting ? 'Submitting…' : `Send my proposal · ${formatMoney(cost.total)}`}
-              </button>
-              <p className="mt-3 text-center text-xs text-muted-foreground">
-                By submitting you agree to be contacted by GBTI. We never share your data.
+                <CheckCircle2 size={40} strokeWidth={1} />
+              </motion.div>
+
+              <h3 className="font-display text-4xl md:text-5xl font-normal tracking-tight text-foreground mb-6">
+                Proposal secured.
+              </h3>
+
+              <p className="text-muted-foreground max-w-md mx-auto text-lg leading-relaxed font-light">
+                Thank you, <span className="text-foreground font-medium">{c.name.split(' ')[0]}</span>. Your architectural configuration has been received. Our studio will contact you within 24 hours.
               </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+              <button
+                onClick={() => useConfig.getState().reset()}
+                className="mt-12 inline-flex items-center gap-3 rounded-full bg-foreground text-background px-10 py-4 text-[10px] font-bold uppercase tracking-[0.3em] transition-all hover:scale-105 active:scale-95"
+              >
+                New Configuration <ArrowRight size={14} />
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="space-y-10"
+            >
+              <div className="grid gap-6 md:grid-cols-2">
+                <Field label="Full Name" error={errors.name}>
+                  <input
+                    value={c.name}
+                    onChange={(e) => c.setLead({ name: e.target.value })}
+                    placeholder="e.g., Alex Morgan"
+                    className="w-full bg-transparent outline-none font-display text-xl placeholder:text-muted-foreground/30 text-foreground"
+                  />
+                </Field>
+
+                <Field label="Phone Number" error={errors.phone}>
+                  <input
+                    value={c.phone}
+                    onChange={(e) => c.setLead({ phone: e.target.value })}
+                    placeholder="+1 (555) 000-0000"
+                    className="w-full bg-transparent outline-none font-display text-xl placeholder:text-muted-foreground/30 text-foreground"
+                  />
+                </Field>
+
+                <Field label="Email Address" error={errors.email} className="md:col-span-2">
+                  <input
+                    type="email"
+                    value={c.email}
+                    onChange={(e) => c.setLead({ email: e.target.value })}
+                    placeholder="alex@example.com"
+                    className="w-full bg-transparent outline-none font-display text-xl placeholder:text-muted-foreground/30 text-foreground"
+                  />
+                </Field>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.3em] font-bold text-muted-foreground/40 mb-5 text-center">Project Timeline</div>
+                <div className="flex flex-wrap justify-center gap-4">
+                  {TIMELINES.map((t) => {
+                    const isActive = c.timeline === t;
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => c.setLead({ timeline: t })}
+                        className={`rounded-full px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 border ${isActive
+                            ? 'bg-clay border-clay text-white shadow-elev scale-105'
+                            : 'bg-surface border-border text-muted-foreground hover:border-muted-foreground/20 hover:text-foreground'
+                          }`}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+                {errors.timeline && <div className="mt-4 text-center text-[10px] font-bold text-destructive uppercase tracking-[0.1em]">{errors.timeline}</div>}
+              </div>
+
+              <div className="pt-6">
+                <button
+                  onClick={submit}
+                  disabled={submitting}
+                  className="w-full flex items-center justify-center gap-3 rounded-full bg-foreground text-background py-6 font-display font-normal text-xl shadow-elev hover:brightness-110 disabled:opacity-30 transition-all duration-500"
+                >
+                  {submitting ? (
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, ease: "linear", duration: 1 }} className="w-6 h-6 border-2 border-background/20 border-t-background rounded-full" />
+                  ) : (
+                    <>
+                      Request Proposal · {formatMoney(cost.total)}
+                    </>
+                  )}
+                </button>
+                <p className="mt-8 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 max-w-sm mx-auto leading-loose">
+                  Your architectural configuration will be saved to our private design studio.
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </StepShell>
   );
 };
 
 const Field = ({ label, error, className = '', children }: { label: string; error?: string; className?: string; children: React.ReactNode }) => (
-  <div className={`rounded-2xl border-2 px-4 py-3 transition-colors ${error ? 'border-destructive' : 'border-border focus-within:border-ink bg-card'} ${className}`}>
-    <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-1">{label}</div>
+  <div className={`rounded-xl border px-6 py-4 transition-all duration-500 ${error ? 'border-destructive/30 bg-destructive/5' : 'bg-surface border-border focus-within:border-muted-foreground/40 focus-within:shadow-soft'} ${className}`}>
+    <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mb-2">{label}</div>
     {children}
-    {error && <div className="mt-1 text-xs text-destructive">{error}</div>}
+    {error && <div className="mt-2 text-[10px] font-bold text-destructive uppercase tracking-[0.1em]">{error}</div>}
   </div>
 );
+

@@ -3,7 +3,7 @@ GBTI HOME BUILDER APP - COMPREHENSIVE FUNCTIONALITY DOCUMENTATION
 ===============================================================================
 
 Generated on: May 6, 2026
-Application: Smart Home Builder Configurator
+Application: GBTI HOME BUILDER APP
 Technology Stack: React, TypeScript, Zustand, Three.js, Konva, Supabase, Framer Motion
 
 ===============================================================================
