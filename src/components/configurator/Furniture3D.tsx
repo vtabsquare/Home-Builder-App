@@ -4,9 +4,10 @@ import { FurnitureItem } from '@/lib/floorplan';
 
 interface Props {
   item: FurnitureItem;
+  isNight?: boolean;
 }
 
-export const Furniture3D = ({ item }: Props) => {
+export const Furniture3D = ({ item, isNight }: Props) => {
   const { type, w, h } = item;
 
   switch (type) {
