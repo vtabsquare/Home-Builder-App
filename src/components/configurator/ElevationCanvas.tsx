@@ -1561,7 +1561,7 @@ const Carport = ({ plan, plotW, plotD }: { plan: Plan; plotW: number; plotD: num
       )}
 
       {/* ── Parked car ── */}
-      <group position={[carX, 0, carZ]} rotation={[0, carYaw, 0]}>
+      <group position={[carX, 0, carZ]} rotation={[0, carYaw, 0]} scale={[3.5, 3.5, 3.5]}>
         <ParkedCar color="#1f2a44" />
       </group>
     </group>
