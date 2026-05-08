@@ -1,10 +1,13 @@
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows, Html } from '@react-three/drei';
+import { OrbitControls, ContactShadows, Html } from '@react-three/drei';
 import { Suspense, useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { Plan } from '@/lib/floorplan';
 import { Material, RoofType, AddOn } from '@/store/configurator';
 import { Furniture3D } from './Furniture3D';
+import { SceneLighting } from './SceneLighting';
+import { SkyEnvironment, EnhancedGround } from './SkyEnvironment';
+import { createWoodFloorTexture, createWoodFloorNormal, createTileTexture, createTileNormal, createWallTexture, createWallNormal } from './materials';
 
 interface Props {
   plan: Plan;
@@ -15,6 +18,7 @@ interface Props {
   isDoubleStorey?: boolean;
   firstFloorPlan?: Plan;
   hideHelpers?: boolean;
+  isNight?: boolean;
 }
 
 const PLOT_PADDING_FT = 2;
@@ -55,8 +59,9 @@ const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, pl
           const maxY = Math.max(...rs.map(r => r.y + r.h));
           const extent = Math.max(maxX - minX, maxY - minY);
 
-          const height = Math.max(35, extent * 1.8);
-          targetPos.current.set(center.x, height, center.z + 10);
+          // Top-down view: camera directly above the room
+          const height = Math.max(40, extent * 2);
+          targetPos.current.set(center.x, height, center.z);
           targetLookAt.current.copy(center);
         }
       }
@@ -83,7 +88,7 @@ const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, pl
   return null;
 };
 
-export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom, isDoubleStorey = false, firstFloorPlan, hideHelpers = false }: Props) => {
+export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom, isDoubleStorey = false, firstFloorPlan, hideHelpers = false, isNight = false }: Props) => {
   const hideRoof = activeRoom && activeRoom !== 'overview' && activeRoom !== 'garden';
   const safeW = plan.width || 0;
   const safeD = plan.height || 0;
@@ -98,34 +103,26 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
         shadows
         camera={{ position: [45, 25, 45], fov: 36 }}
         dpr={[1, 1.8]}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: isNight ? 0.85 : 1.2 }}
       >
-        <Suspense fallback={null}>
-          <fog attach="fog" args={['#1a2a3a', 90, 220]} />
-          {/* Enhanced Multi-light Setup */}
-          <ambientLight intensity={hideRoof ? 0.85 : 0.35} color="#e8f0f8" />
-          {/* Primary sun — warm golden */}
-          <directionalLight
-            position={[30, 50, 25]} intensity={hideRoof ? 2.5 : 2.0} castShadow color="#fff0d6"
-            shadow-mapSize={[2048, 2048]}
-            shadow-camera-left={-55} shadow-camera-right={55}
-            shadow-camera-top={55} shadow-camera-bottom={-55}
-            shadow-bias={-0.0004}
-          />
-          {/* Cool fill — opposite side for depth */}
-          <directionalLight position={[-25, 18, -15]} intensity={0.5} color="#6088b8" />
-          {/* Subtle rim light — backlighting for edge definition */}
-          <directionalLight position={[-10, 30, -30]} intensity={0.3} color="#c0d0e0" />
+        <Suspense fallback={
+          <Html center>
+            <div style={{ color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.6 }}>Loading 3D…</div>
+          </Html>
+        }>
+          {/* Premium Lighting System */}
+          <SceneLighting isNight={isNight} hideRoof={!!hideRoof} />
           
-          <Environment preset="sunset" />
-          <Ground />
+          {/* Sky & Environment */}
+          <SkyEnvironment isNight={isNight} />
+          <EnhancedGround isNight={isNight} />
           {addons.includes('landscaping') && <GrassField planW={safeW} planD={safeD} />}
           
-          <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} />
+          <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} />
           
           {/* Second Floor (Double Storey) */}
           {isDoubleStorey && firstFloorPlan && (
-            <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} material={material} activeRoom={activeRoom} />
+            <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} material={material} activeRoom={activeRoom} hideRoof={hideRoof} />
           )}
           
           <Pathway planD={plotD} gateX={gateX} />
@@ -140,16 +137,17 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           {addons.includes('fence') && <FenceAround planW={plotW} planD={plotD} gateX={gateX} />}
           
           <CameraController activeRoom={activeRoom} plan={plan} />
-          <ContactShadows position={[0, 0.02, 0]} opacity={0.55} scale={120} blur={2.8} far={30} />
+          <ContactShadows position={[0, 0.02, 0]} opacity={isNight ? 0.3 : 0.55} scale={120} blur={2.8} far={30} />
           <OrbitControls
             makeDefault
             enablePan={true} enableZoom={true} enableRotate={true}
             minDistance={5} maxDistance={100}
             minPolarAngle={0} maxPolarAngle={Math.PI / 2.1}
             autoRotate={!activeRoom || activeRoom === 'overview' || activeRoom === 'garden'} 
-            autoRotateSpeed={0.4}
-            enableDamping dampingFactor={0.05}
+            autoRotateSpeed={0.35}
+            enableDamping dampingFactor={0.03}
           />
+
         </Suspense>
       </Canvas>
       {!hideHelpers && (
@@ -234,49 +232,31 @@ const GrassField = ({ planW, planD }: { planW: number; planD: number }) => {
 };
 
 /* ─── Main House Component ─── */
-const House = ({ plan, roof, material, activeRoom, addons }: {
-  plan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons: AddOn[];
+const House = ({ plan, roof, material, activeRoom, addons, isNight = false }: {
+  plan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons: AddOn[]; isNight?: boolean;
 }) => {
   const colors = MATERIAL_COLORS[material];
   const W = plan.width;
   const D = plan.height;
   const wallH = 13;
   const t = 0.4; // Realistic wall thickness
-  const hideRoof = activeRoom && activeRoom !== 'overview' && activeRoom !== 'garden';
+  const hideRoof = true;
 
   const round2 = (num: number) => Math.round(num * 100) / 100;
 
-  // Procedural Floor Textures
-  const floorTextures = useMemo(() => {
-    // Wood texture
-    const wCanvas = document.createElement('canvas');
-    wCanvas.width = 512; wCanvas.height = 512;
-    const wCtx = wCanvas.getContext('2d')!;
-    wCtx.fillStyle = '#d4c4b4'; wCtx.fillRect(0,0,512,512);
-    wCtx.fillStyle = '#c4b4a4';
-    for(let i=0; i<512; i+=40) {
-      wCtx.fillRect(0, i, 512, 2);
-      for(let j=0; j<512; j+=80) {
-        if (Math.random() > 0.5) wCtx.fillRect(j + (i%80), i-20, 2, 40);
-      }
-    }
-    const woodTex = new THREE.CanvasTexture(wCanvas);
-    woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
-    woodTex.repeat.set(1.5, 1.5);
+  // PBR Floor Textures from materials factory
+  const floorTextures = useMemo(() => ({
+    wood: createWoodFloorTexture(1.5, 1.5),
+    woodNormal: createWoodFloorNormal(1.5, 1.5),
+    tile: createTileTexture(4, 4),
+    tileNormal: createTileNormal(4, 4),
+  }), []);
 
-    // Tile texture
-    const tCanvas = document.createElement('canvas');
-    tCanvas.width = 256; tCanvas.height = 256;
-    const tCtx = tCanvas.getContext('2d')!;
-    tCtx.fillStyle = '#f8fafc'; tCtx.fillRect(0,0,256,256);
-    tCtx.strokeStyle = '#cbd5e1'; tCtx.lineWidth = 4;
-    tCtx.strokeRect(0,0,256,256);
-    const tileTex = new THREE.CanvasTexture(tCanvas);
-    tileTex.wrapS = tileTex.wrapT = THREE.RepeatWrapping;
-    tileTex.repeat.set(4, 4);
-
-    return { wood: woodTex, tile: tileTex };
-  }, []);
+  // Wall textures
+  const wallTextures = useMemo(() => ({
+    map: createWallTexture(3, 2),
+    normal: createWallNormal(3, 2),
+  }), []);
 
   // 1. & 4. Compute exact bounding box for the structure
   const mainRooms = (plan.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony');
@@ -385,15 +365,64 @@ const House = ({ plan, roof, material, activeRoom, addons }: {
               <mesh receiveShadow position={[cx, 0.01, cz]}>
                 <boxGeometry args={[r.w, 0.02, r.h]} />
                 <meshStandardMaterial 
-                  color={['bedroom', 'living', 'dining'].includes(r.type) || ['bathroom', 'kitchen'].includes(r.type) ? '#ffffff' : r.color}
+                  color={['bedroom', 'living', 'dining'].includes(r.type) ? '#d4c4b4' : ['bathroom', 'kitchen'].includes(r.type) ? '#f8fafc' : r.color}
                   map={['bedroom', 'living', 'dining'].includes(r.type) ? floorTextures.wood : ['bathroom', 'kitchen'].includes(r.type) ? floorTextures.tile : undefined}
-                  roughness={['bathroom', 'kitchen'].includes(r.type) ? 0.2 : 0.8}
+                  normalMap={['bedroom', 'living', 'dining'].includes(r.type) ? floorTextures.woodNormal : ['bathroom', 'kitchen'].includes(r.type) ? floorTextures.tileNormal : undefined}
+                  normalScale={new THREE.Vector2(0.3, 0.3)}
+                  roughness={['bathroom', 'kitchen'].includes(r.type) ? 0.15 : 0.75}
+                  metalness={['bathroom', 'kitchen'].includes(r.type) ? 0.05 : 0}
                 />
               </mesh>
               
-              {/* Interior Room Light (visible when roof is off) */}
+              {/* Ceiling (hidden in top-down room view to see interior) */}
+              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
+                <mesh position={[cx, wallH - 0.01, cz]}>
+                  <boxGeometry args={[r.w - 0.1, 0.02, r.h - 0.1]} />
+                  <meshStandardMaterial color="#f8f6f2" roughness={0.95} />
+                </mesh>
+              )}
+              
+              {/* Ceiling light fixture (hidden in top-down view) */}
+              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
+                <group position={[cx, wallH - 0.3, cz]}>
+                  {/* Flush mount base */}
+                  <mesh>
+                    <cylinderGeometry args={[0.6, 0.6, 0.1, 16]} />
+                    <meshStandardMaterial color="#e8e4dc" roughness={0.4} metalness={0.1} />
+                  </mesh>
+                  {/* Light shade */}
+                  <mesh position={[0, -0.3, 0]}>
+                    <cylinderGeometry args={[0.8, 1.0, 0.4, 16]} />
+                    <meshStandardMaterial color="#fff8f0" roughness={0.9} emissive="#fff0d0" emissiveIntensity={isNight ? 0.5 : 0.1} />
+                  </mesh>
+                </group>
+              )}
+              
+              {/* Interior Room Light */}
               {hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
-                <pointLight position={[cx, 11, cz]} intensity={1.2} distance={25} color="#ffedd6" castShadow={false} />
+                <pointLight position={[cx, 11, cz]} intensity={isNight ? 2.5 : 1.2} distance={25} color="#ffedd6" castShadow={false} />
+              )}
+              
+              {/* Skirting boards */}
+              {r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
+                <>
+                  <mesh position={[cx, 0.2, cz - r.h/2 + 0.05]}>
+                    <boxGeometry args={[r.w, 0.4, 0.1]} />
+                    <meshStandardMaterial color="#e8e4dc" roughness={0.6} />
+                  </mesh>
+                  <mesh position={[cx, 0.2, cz + r.h/2 - 0.05]}>
+                    <boxGeometry args={[r.w, 0.4, 0.1]} />
+                    <meshStandardMaterial color="#e8e4dc" roughness={0.6} />
+                  </mesh>
+                  <mesh position={[cx - r.w/2 + 0.05, 0.2, cz]}>
+                    <boxGeometry args={[0.1, 0.4, r.h]} />
+                    <meshStandardMaterial color="#e8e4dc" roughness={0.6} />
+                  </mesh>
+                  <mesh position={[cx + r.w/2 - 0.05, 0.2, cz]}>
+                    <boxGeometry args={[0.1, 0.4, r.h]} />
+                    <meshStandardMaterial color="#e8e4dc" roughness={0.6} />
+                  </mesh>
+                </>
               )}
               
               {/* Furniture */}
@@ -402,7 +431,7 @@ const House = ({ plan, roof, material, activeRoom, addons }: {
                 const fz = round2(r.y + f.y + f.h/2 - D/2);
                 return (
                   <group key={`f-${i}`} position={[fx, 0.02, fz]} rotation={[0, f.rotation ? f.rotation * Math.PI / 180 : 0, 0]}>
-                    <Furniture3D item={f} />
+                    <Furniture3D item={f} isNight={isNight} />
                   </group>
                 );
               })}
@@ -425,14 +454,14 @@ const House = ({ plan, roof, material, activeRoom, addons }: {
             return <WallSegment key={`wall-${i}`} w={w} h={wallH} t={t} color={colors.wall}
               doors={mappedDoors} windows={mappedWindows} materialType={material}
               position={[posX, 0, posZ]} rotation={[0, 0, 0]}
-              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} />;
+              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} hideRoof={hideRoof} />;
           } else {
             const posX = round2(wall.coord - W/2);
             const posZ = round2(wall.start + len/2 - D/2);
             return <WallSegment key={`wall-${i}`} w={w} h={wallH} t={t} color={colors.wall}
               doors={mappedDoors} windows={mappedWindows} materialType={material}
               position={[posX, 0, posZ]} rotation={[0, -Math.PI/2, 0]}
-              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} />;
+              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} hideRoof={hideRoof} />;
           }
         })}
       </group>
@@ -562,7 +591,7 @@ const getDoorHeight = (d: any): number => {
 };
 
 /* ─── Wall Rendering Geometry ─── */
-const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frameColor, glassColor, doorColor, materialType }: any) => {
+const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frameColor, glassColor, doorColor, materialType, hideRoof }: any) => {
   const shape = useMemo(() => {
     const s = new THREE.Shape();
     s.moveTo(-w/2, 0);
@@ -605,7 +634,14 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
     <group position={position} rotation={rotation}>
       <mesh castShadow receiveShadow position={[0, 0, -t/2]}>
         <extrudeGeometry args={[shape, { depth: t, bevelEnabled: false }]} />
-        <meshStandardMaterial color={color} roughness={0.8} />
+        <meshStandardMaterial 
+          color={color} 
+          roughness={0.82} 
+          normalScale={new THREE.Vector2(0.15, 0.15)}
+          transparent={hideRoof}
+          opacity={hideRoof ? 0.08 : 1}
+          depthWrite={!hideRoof}
+        />
       </mesh>
       
       {/* ── Categorized Door Rendering ── */}
@@ -763,7 +799,7 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
             {/* 4. High-transparency Glass - Deeply recessed */}
             <mesh position={[0, 0, -0.15]}>
               <boxGeometry args={[ww, wh, 0.02]} />
-              <meshStandardMaterial color="#ffffff" roughness={0} metalness={1} transparent opacity={0.15} envMapIntensity={2} />
+              <meshPhysicalMaterial color="#e5f0f8" roughness={0.05} metalness={0.1} transparent opacity={0.25} envMapIntensity={1.5} transmission={0.6} ior={1.5} thickness={0.5} />
             </mesh>
             {/* 5. Heavy architectural window sill */}
             <mesh position={[0, -wh/2 - 0.25, 0.2]}>
@@ -1204,8 +1240,8 @@ const FenceAround = ({ planW, planD, gateX }: { planW: number; planD: number; ga
 };
 
 /* ─── Second Floor (Double Storey) ─── */
-const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom }: {
-  plan: Plan; firstFloorPlan: Plan; material: Material; activeRoom?: string | null;
+const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom, hideRoof }: {
+  plan: Plan; firstFloorPlan: Plan; material: Material; activeRoom?: string | null; hideRoof?: boolean;
 }) => {
   const colors = MATERIAL_COLORS[material];
   const W = plan.width;
@@ -1301,12 +1337,12 @@ const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom }: {
             return <WallSegment key={`w2-${i}`} w={w} h={wallH} t={t} color={colors.wall}
               doors={mappedDoors} windows={mappedWindows} materialType={material}
               position={[round2(wall.start + len/2), 0, round2(wall.coord)]} rotation={[0, 0, 0]}
-              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} />;
+              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} hideRoof={hideRoof} />;
           } else {
             return <WallSegment key={`w2-${i}`} w={w} h={wallH} t={t} color={colors.wall}
               doors={mappedDoors} windows={mappedWindows} materialType={material}
               position={[round2(wall.coord), 0, round2(wall.start + len/2)]} rotation={[0, -Math.PI/2, 0]}
-              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} />;
+              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} hideRoof={hideRoof} />;
           }
         })}
 
