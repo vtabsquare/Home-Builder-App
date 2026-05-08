@@ -1,5 +1,7 @@
 import { Sky, Stars, Environment } from '@react-three/drei';
+import { useMemo } from 'react';
 import * as THREE from 'three';
+import { createGrassTexture, createGrassNormal } from './materials';
 
 export const SkyEnvironment = ({ isNight }: { isNight?: boolean }) => {
   return (
@@ -22,7 +24,7 @@ export const SkyEnvironment = ({ isNight }: { isNight?: boolean }) => {
         </>
       ) : (
         <>
-          <color attach="background" args={['#87ceeb']} />
+          <color attach="background" args={['#d9e4ee']} />
           <Sky 
             distance={450000} 
             sunPosition={[10, 20, 10]} 
@@ -33,7 +35,7 @@ export const SkyEnvironment = ({ isNight }: { isNight?: boolean }) => {
             rayleigh={2}
             turbidity={8}
           />
-          <Environment preset="park" />
+          <Environment preset="city" />
         </>
       )}
     </>
@@ -41,28 +43,36 @@ export const SkyEnvironment = ({ isNight }: { isNight?: boolean }) => {
 };
 
 export const EnhancedGround = ({ isNight }: { isNight?: boolean }) => {
+  const grassMap = useMemo(() => createGrassTexture(40, 40), []);
+  const grassNormal = useMemo(() => createGrassNormal(40, 40), []);
+  const distantMap = useMemo(() => createGrassTexture(160, 160), []);
+
   return (
     <group>
-      {/* Primary Lawn */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}>
-        <circleGeometry args={[200, 32]} />
-        <meshStandardMaterial 
-          color={isNight ? '#0a1a0a' : '#2d5a2d'} 
-          roughness={1}
+      {/* Primary Lawn — textured manicured grass with bump */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
+        <circleGeometry args={[180, 64]} />
+        <meshStandardMaterial
+          map={grassMap}
+          normalMap={grassNormal}
+          normalScale={new THREE.Vector2(0.7, 0.7)}
+          color={isNight ? '#1a261a' : '#ffffff'}
+          roughness={0.95}
         />
       </mesh>
-      
-      {/* Outer landscape */}
+
+      {/* Outer meadow / fields — same grass texture, larger tile, slightly cooler */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]}>
-        <circleGeometry args={[500, 32]} />
-        <meshStandardMaterial 
-          color={isNight ? '#050a05' : '#1e3a1e'} 
+        <circleGeometry args={[2400, 96]} />
+        <meshStandardMaterial
+          map={distantMap}
+          color={isNight ? '#0e1810' : '#dee5d6'}
           roughness={1}
         />
       </mesh>
 
-      {/* Subtle fog for depth */}
-      <fog attach="fog" args={[isNight ? '#050505' : '#87ceeb', 50, 250]} />
+      {/* Atmospheric fog — soft warm haze at distance */}
+      <fog attach="fog" args={[isNight ? '#0a1020' : '#e9eed9', 220, 1400]} />
     </group>
   );
 };

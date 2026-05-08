@@ -1,6 +1,5 @@
 import { useRef } from 'react';
 import * as THREE from 'three';
-import { useFrame } from '@react-three/fiber';
 
 export const SceneLighting = ({ isNight, hideRoof }: { isNight?: boolean; hideRoof?: boolean }) => {
   const sunRef = useRef<THREE.DirectionalLight>(null!);
@@ -9,53 +8,67 @@ export const SceneLighting = ({ isNight, hideRoof }: { isNight?: boolean; hideRo
     <>
       {isNight ? (
         <>
-          {/* Night Lighting */}
-          <ambientLight intensity={0.15} color="#1a2a4a" />
+          {/* Night sky ambient */}
+          <ambientLight intensity={0.18} color="#1a2a4a" />
+          {/* Cool moon */}
           <directionalLight
-            position={[5, 10, 5]}
-            intensity={0.2}
-            color="#aabbee"
+            position={[8, 24, 12]}
+            intensity={0.45}
+            color="#bcc8ee"
             castShadow
-            shadow-mapSize={[1024, 1024]}
-          />
-          {/* Moonlight splash */}
-          <pointLight position={[-20, 30, -20]} intensity={0.5} distance={100} color="#6688ff" />
-          
-          {/* Soft fill light */}
-          <hemisphereLight intensity={0.1} color="#112244" groundColor="#000000" />
-        </>
-      ) : (
-        <>
-          {/* Day Lighting */}
-          <ambientLight intensity={0.4} />
-          <directionalLight
-            ref={sunRef}
-            position={[25, 50, 25]}
-            intensity={1.5}
-            castShadow
-            shadow-mapSize={[2048, 2048]}
+            shadow-mapSize-width={2048}
+            shadow-mapSize-height={2048}
             shadow-camera-left={-60}
             shadow-camera-right={60}
             shadow-camera-top={60}
             shadow-camera-bottom={-60}
+            shadow-radius={6}
             shadow-bias={-0.0001}
           />
-          <hemisphereLight intensity={0.3} color="#ffffff" groundColor="#444444" />
+          {/* Sky bounce */}
+          <hemisphereLight intensity={0.12} color="#1a2a4a" groundColor="#0a0a0a" />
+        </>
+      ) : (
+        <>
+          {/* Warm 4500K sun — directional, soft shadows */}
+          <directionalLight
+            ref={sunRef}
+            position={[28, 56, 22]}
+            intensity={2.2}
+            color="#fff1d4"
+            castShadow
+            shadow-mapSize-width={4096}
+            shadow-mapSize-height={4096}
+            shadow-camera-left={-70}
+            shadow-camera-right={70}
+            shadow-camera-top={70}
+            shadow-camera-bottom={-70}
+            shadow-radius={8}
+            shadow-bias={-0.0001}
+            shadow-normalBias={0.04}
+          />
+          {/* Warm sky bounce */}
+          <hemisphereLight intensity={0.42} color="#fff5e6" groundColor="#a3b89a" />
+          {/* Cool fill from opposite side for shape definition */}
+          <directionalLight position={[-30, 30, -20]} intensity={0.35} color="#bdd6e8" />
+          {/* Subtle warm bounce ambient */}
+          <ambientLight intensity={0.18} color="#fff3e0" />
         </>
       )}
 
-      {/* Interior visibility lighting (Global) */}
+      {/* Interior visibility lighting (when room is selected) */}
       {hideRoof && (
         <group>
+          {/* Soft top “skylight” so interiors aren’t flat */}
           <rectAreaLight
-            position={[0, 30, 0]}
+            position={[0, 26, 0]}
             rotation={[-Math.PI / 2, 0, 0]}
-            width={60}
-            height={60}
-            intensity={0.8}
-            color="#ffffff"
+            width={70}
+            height={70}
+            intensity={isNight ? 0.6 : 1.6}
+            color={isNight ? '#aac0ff' : '#fff2dc'}
           />
-          <ambientLight intensity={0.3} />
+          <ambientLight intensity={isNight ? 0.25 : 0.35} color={isNight ? '#3a4870' : '#fff4e2'} />
         </group>
       )}
     </>

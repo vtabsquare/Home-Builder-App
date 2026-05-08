@@ -146,8 +146,8 @@ export const StepLeadCapture = ({ cost }: Props) => {
                         key={t}
                         onClick={() => c.setLead({ timeline: t })}
                         className={`rounded-full px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 border ${isActive
-                            ? 'bg-clay border-clay text-white shadow-elev scale-105'
-                            : 'bg-surface border-border text-muted-foreground hover:border-muted-foreground/20 hover:text-foreground'
+                          ? 'bg-clay border-clay text-white shadow-elev scale-105'
+                          : 'bg-surface border-border text-muted-foreground hover:border-muted-foreground/20 hover:text-foreground'
                           }`}
                       >
                         {t}

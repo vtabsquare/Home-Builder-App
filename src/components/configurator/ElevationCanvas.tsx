@@ -7,7 +7,14 @@ import { Material, RoofType, AddOn } from '@/store/configurator';
 import { Furniture3D } from './Furniture3D';
 import { SceneLighting } from './SceneLighting';
 import { SkyEnvironment, EnhancedGround } from './SkyEnvironment';
-import { createWoodFloorTexture, createWoodFloorNormal, createTileTexture, createTileNormal, createWallTexture, createWallNormal } from './materials';
+import {
+  createWoodFloorTexture, createWoodFloorNormal, createWoodFloorRoughness,
+  createOakFloorTexture, createOakFloorNormal, createOakFloorRoughness,
+  createTileTexture, createTileNormal, createTileRoughness,
+  createMarbleTexture, createMarbleRoughness,
+  createWallTexture, createWallNormal,
+  createDoorWoodTexture, createDoorWoodNormal,
+} from './materials';
 
 interface Props {
   plan: Plan;
@@ -23,10 +30,63 @@ interface Props {
 
 const PLOT_PADDING_FT = 2;
 
+/* Locate the main entrance door in world coords (centered on plan).
+   Returns { x, z, nx, nz } where (nx, nz) is the outward normal. */
+const findMainDoorWorld = (plan: Plan): { x: number; z: number; nx: number; nz: number } | null => {
+  const W = plan.width || 0;
+  const D = plan.height || 0;
+  for (const room of plan.rooms || []) {
+    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony' || room.type === 'hallway') continue;
+    for (const door of room.doors || []) {
+      const isMain = (door as any).label === 'MAIN DOOR' || (!(door as any).connectsTo && (door as any).doorType !== 'open');
+      if (!isMain) continue;
+      const rel = (door as any).position ?? 0.5;
+      let x = 0, z = 0, nx = 0, nz = 0;
+      if (door.wall === 'top') { x = room.x + room.w * rel; z = room.y; nz = -1; }
+      else if (door.wall === 'bottom') { x = room.x + room.w * rel; z = room.y + room.h; nz = 1; }
+      else if (door.wall === 'left') { x = room.x; z = room.y + room.h * rel; nx = -1; }
+      else { x = room.x + room.w; z = room.y + room.h * rel; nx = 1; }
+      return { x: x - W / 2, z: z - D / 2, nx, nz };
+    }
+  }
+  return null;
+};
+
+/* Determine which side of the carport opens outward (away from the rest of the house). */
+type Side = 'top' | 'bottom' | 'left' | 'right';
+const getCarportInfo = (plan: Plan): { cx: number; cz: number; w: number; h: number; side: Side } | null => {
+  const c = (plan.rooms || []).find((r: any) => r.type === 'carport');
+  if (!c) return null;
+  const W = plan.width || 0;
+  const D = plan.height || 0;
+  const main = (plan.rooms || []).filter((r: any) => r.type !== 'carport' && r.type !== 'garden' && r.type !== 'balcony');
+  if (main.length === 0) return null;
+  const mMinX = Math.min(...main.map((r: any) => r.x));
+  const mMaxX = Math.max(...main.map((r: any) => r.x + r.w));
+  const mMinZ = Math.min(...main.map((r: any) => r.y));
+  const mMaxZ = Math.max(...main.map((r: any) => r.y + r.h));
+  const mcx = (mMinX + mMaxX) / 2;
+  const mcz = (mMinZ + mMaxZ) / 2;
+  const ccx = c.x + c.w / 2;
+  const ccz = c.y + c.h / 2;
+  const dx = ccx - mcx;
+  const dz = ccz - mcz;
+  let side: Side;
+  if (Math.abs(dx) > Math.abs(dz)) side = dx > 0 ? 'right' : 'left';
+  else side = dz > 0 ? 'bottom' : 'top';
+  return { cx: ccx - W / 2, cz: ccz - D / 2, w: c.w, h: c.h, side };
+};
+
+/* Rectangle on the ground (XZ plane). */
+type Rect = { minX: number; maxX: number; minZ: number; maxZ: number };
+const pointInRect = (x: number, z: number, r: Rect, pad = 0) =>
+  x >= r.minX - pad && x <= r.maxX + pad && z >= r.minZ - pad && z <= r.maxZ + pad;
+const pointInAnyRect = (x: number, z: number, rects: Rect[], pad = 0) => rects.some(r => pointInRect(x, z, r, pad));
+
 const MATERIAL_COLORS: Record<Material, { wall: string; trim: string; roof: string; window: string; door: string; accent: string; facade: string; rod: string }> = {
-  budget: { wall: '#ffffff', trim: '#8a8478', roof: '#2e4a62', window: '#b8ddec', door: '#b5835a', accent: '#9a8a78', facade: '#d4cbb8', rod: '#4682B4' },
-  modern: { wall: '#f0ebe3', trim: '#1a1a1a', roof: '#2c2c2c', window: '#a8d4e6', door: '#2a2a2a', accent: '#3a3a3a', facade: '#e2dbd0', rod: '#1a1a1a' },
-  luxury: { wall: '#1f1d1a', trim: '#c9a84c', roof: '#0d0d0d', window: '#7ab0c8', door: '#8b6914', accent: '#6a4a1a', facade: '#2a2520', rod: '#c9a84c' },
+  budget: { wall: '#f7f7f5', trim: '#8a8478', roof: '#2e4a62', window: '#b8ddec', door: '#b5835a', accent: '#9a8a78', facade: '#d4cbb8', rod: '#4682B4' },
+  modern: { wall: '#f7f7f5', trim: '#1a1a1a', roof: '#2c2c2c', window: '#a8d4e6', door: '#2a2a2a', accent: '#3a3a3a', facade: '#e2dbd0', rod: '#1a1a1a' },
+  luxury: { wall: '#f7f7f5', trim: '#c9a84c', roof: '#0d0d0d', window: '#7ab0c8', door: '#8b6914', accent: '#6a4a1a', facade: '#2a2520', rod: '#c9a84c' },
 };
 
 const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, plan: Plan }) => {
@@ -100,10 +160,21 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
   return (
     <div className="relative h-full w-full overflow-hidden rounded-2xl bg-gradient-to-b from-[hsl(210,35%,22%)] to-[hsl(210,30%,12%)]">
       <Canvas
-        shadows
-        camera={{ position: [45, 25, 45], fov: 36 }}
-        dpr={[1, 1.8]}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: isNight ? 0.85 : 1.2 }}
+        shadows="soft"
+        camera={{
+          position: [22, 24, 22],
+          fov: 38,
+          near: 0.1,
+          far: 1000
+        }}
+        dpr={[1, 2]}
+        gl={{
+          antialias: true,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: isNight ? 0.9 : 1.15,
+          outputColorSpace: THREE.SRGBColorSpace,
+          powerPreference: 'high-performance',
+        }}
       >
         <Suspense fallback={
           <Html center>
@@ -126,18 +197,23 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           )}
           
           
-          {addons.includes('carport') && <Carport plan={plan} />}
-          
-          {addons.includes('landscaping') && (
-            <>
-              <Trees planW={plotW} planD={plotD} />
-              <Bushes planW={plotW} planD={plotD} />
-            </>
-          )}
+          {addons.includes('carport') && <Carport plan={plan} plotW={plotW} plotD={plotD} />}
+
+          {addons.includes('landscaping') && (() => {
+            const corridors = computeCorridors(plan, plotW, plotD, gateX);
+            return (
+              <>
+                <LandscapeBeds plan={plan} gateX={gateX} corridors={corridors} />
+                <FrontWalkway plan={plan} gateX={gateX} plotD={plotD} />
+                <Trees planW={plotW} planD={plotD} />
+                <Bushes planW={plotW} planD={plotD} corridors={corridors} />
+              </>
+            );
+          })()}
           {addons.includes('fence') && <FenceAround planW={plotW} planD={plotD} gateX={gateX} />}
           
           <CameraController activeRoom={activeRoom} plan={plan} />
-          <ContactShadows position={[0, 0.02, 0]} opacity={isNight ? 0.3 : 0.55} scale={120} blur={2.8} far={30} />
+          <ContactShadows position={[0, 0.02, 0]} opacity={isNight ? 0.28 : 0.32} scale={80} blur={2} far={40} />
           <OrbitControls
             makeDefault
             enablePan={true} enableZoom={true} enableRotate={true}
@@ -245,16 +321,29 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
 
   // PBR Floor Textures from materials factory
   const floorTextures = useMemo(() => ({
-    wood: createWoodFloorTexture(1.5, 1.5),
-    woodNormal: createWoodFloorNormal(1.5, 1.5),
+    walnut: createWoodFloorTexture(2, 2),
+    walnutNormal: createWoodFloorNormal(2, 2),
+    walnutRough: createWoodFloorRoughness(2, 2),
+    oak: createOakFloorTexture(2, 2),
+    oakNormal: createOakFloorNormal(2, 2),
+    oakRough: createOakFloorRoughness(2, 2),
     tile: createTileTexture(4, 4),
     tileNormal: createTileNormal(4, 4),
+    tileRough: createTileRoughness(4, 4),
+    marble: createMarbleTexture(1.5, 1.5),
+    marbleRough: createMarbleRoughness(1.5, 1.5),
   }), []);
 
   // Wall textures
   const wallTextures = useMemo(() => ({
     map: createWallTexture(3, 2),
     normal: createWallNormal(3, 2),
+  }), []);
+
+  // Door / panel wood textures
+  const doorTextures = useMemo(() => ({
+    map: createDoorWoodTexture(1, 2),
+    normal: createDoorWoodNormal(1, 2),
   }), []);
 
   // 1. & 4. Compute exact bounding box for the structure
@@ -299,8 +388,10 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
   };
 
   (plan.rooms || []).forEach(room => {
-    // Only extract solid walls for enclosed rooms
-    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony') return;
+    // Only extract solid walls for enclosed rooms.
+    // Hallways are floor-only corridors — their perimeter walls (if any)
+    // come from adjacent rooms (bedrooms, bathrooms, kitchen) via dedup.
+    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony' || room.type === 'hallway') return;
 
     const rX = room.x;
     const rY = room.y;
@@ -368,68 +459,209 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
           
           return (
             <group key={r.id} position={[0, 0, 0]}>
-              {/* Floor */}
-              <mesh receiveShadow position={[cx, 0.01, cz]}>
-                <boxGeometry args={[r.w, 0.02, r.h]} />
-                <meshStandardMaterial 
-                  color={['bedroom', 'living', 'dining'].includes(r.type) ? '#d4c4b4' : ['bathroom', 'kitchen'].includes(r.type) ? '#f8fafc' : r.color}
-                  map={['bedroom', 'living', 'dining'].includes(r.type) ? floorTextures.wood : ['bathroom', 'kitchen'].includes(r.type) ? floorTextures.tile : undefined}
-                  normalMap={['bedroom', 'living', 'dining'].includes(r.type) ? floorTextures.woodNormal : ['bathroom', 'kitchen'].includes(r.type) ? floorTextures.tileNormal : undefined}
-                  normalScale={new THREE.Vector2(0.3, 0.3)}
-                  roughness={['bathroom', 'kitchen'].includes(r.type) ? 0.15 : 0.75}
-                  metalness={['bathroom', 'kitchen'].includes(r.type) ? 0.05 : 0}
-                />
-              </mesh>
-              
-              {/* Ceiling (hidden in top-down room view to see interior) */}
-              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
-                <mesh position={[cx, wallH - 0.01, cz]}>
-                  <boxGeometry args={[r.w - 0.1, 0.02, r.h - 0.1]} />
-                  <meshStandardMaterial color="#f8f6f2" roughness={0.95} />
-                </mesh>
-              )}
-              
-              {/* Ceiling light fixture (hidden in top-down view) */}
-              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
-                <group position={[cx, wallH - 0.3, cz]}>
-                  {/* Flush mount base */}
-                  <mesh>
-                    <cylinderGeometry args={[0.6, 0.6, 0.1, 16]} />
-                    <meshStandardMaterial color="#e8e4dc" roughness={0.4} metalness={0.1} />
+              {/* Floor — per-room realistic PBR materials */}
+              {(() => {
+                const isLivingDining = ['living', 'dining', 'hall', 'lobby', 'foyer', 'entry'].includes(r.type);
+                const isBedroom = ['bedroom', 'master', 'guest'].includes(r.type);
+                const isKitchen = r.type === 'kitchen';
+                const isBath = r.type === 'bathroom';
+                const isCorridor = ['corridor', 'hallway', 'passage'].includes(r.type);
+
+                let map = floorTextures.oak;
+                let normalMap: any = floorTextures.oakNormal;
+                let roughnessMap: any = floorTextures.oakRough;
+                let baseColor = '#caa775';
+                let roughness = 0.55;
+                let metalness = 0;
+                let envMapIntensity = 0.6;
+
+                if (isLivingDining) {
+                  map = floorTextures.walnut; normalMap = floorTextures.walnutNormal; roughnessMap = floorTextures.walnutRough;
+                  baseColor = '#8a5d36'; roughness = 0.5; envMapIntensity = 0.8;
+                } else if (isBedroom) {
+                  map = floorTextures.oak; normalMap = floorTextures.oakNormal; roughnessMap = floorTextures.oakRough;
+                  baseColor = '#caa775'; roughness = 0.6; envMapIntensity = 0.6;
+                } else if (isKitchen) {
+                  map = floorTextures.marble; normalMap = undefined; roughnessMap = floorTextures.marbleRough;
+                  baseColor = '#f1ede5'; roughness = 0.18; metalness = 0.05; envMapIntensity = 1.4;
+                } else if (isBath) {
+                  map = floorTextures.tile; normalMap = floorTextures.tileNormal; roughnessMap = floorTextures.tileRough;
+                  baseColor = '#e6e8e7'; roughness = 0.22; metalness = 0.04; envMapIntensity = 1.2;
+                } else if (isCorridor) {
+                  map = floorTextures.walnut; normalMap = floorTextures.walnutNormal; roughnessMap = floorTextures.walnutRough;
+                  baseColor = '#8a5d36'; roughness = 0.55; envMapIntensity = 0.7;
+                }
+
+                return (
+                  <mesh receiveShadow position={[cx, 0.01, cz]}>
+                    <boxGeometry args={[r.w, 0.02, r.h]} />
+                    <meshStandardMaterial
+                      color={baseColor}
+                      map={map}
+                      normalMap={normalMap}
+                      normalScale={new THREE.Vector2(0.45, 0.45)}
+                      roughnessMap={roughnessMap}
+                      roughness={roughness}
+                      metalness={metalness}
+                      envMapIntensity={envMapIntensity}
+                    />
                   </mesh>
-                  {/* Light shade */}
-                  <mesh position={[0, -0.3, 0]}>
-                    <cylinderGeometry args={[0.8, 1.0, 0.4, 16]} />
-                    <meshStandardMaterial color="#fff8f0" roughness={0.9} emissive="#fff0d0" emissiveIntensity={isNight ? 0.5 : 0.1} />
+                );
+              })()}
+              
+              {/* Ceiling — false ceiling with recessed depth */}
+              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
+                <>
+                  {/* Main ceiling slab */}
+                  <mesh position={[cx, wallH - 0.01, cz]}>
+                    <boxGeometry args={[r.w - 0.1, 0.02, r.h - 0.1]} />
+                    <meshStandardMaterial color="#fafaf6" roughness={0.95} />
                   </mesh>
-                </group>
+                  {/* Cove drop band — perimeter false-ceiling */}
+                  <mesh position={[cx, wallH - 0.18, cz]}>
+                    <boxGeometry args={[r.w - 1.2, 0.08, r.h - 1.2]} />
+                    <meshStandardMaterial color="#f4f1eb" roughness={0.9} />
+                  </mesh>
+                  {/* Cove warm LED strip emissive border (subtle) */}
+                  {[
+                    { p: [cx, wallH - 0.18, cz - r.h / 2 + 0.65], a: [r.w - 1.2, 0.04, 0.04] },
+                    { p: [cx, wallH - 0.18, cz + r.h / 2 - 0.65], a: [r.w - 1.2, 0.04, 0.04] },
+                    { p: [cx - r.w / 2 + 0.65, wallH - 0.18, cz], a: [0.04, 0.04, r.h - 1.2] },
+                    { p: [cx + r.w / 2 - 0.65, wallH - 0.18, cz], a: [0.04, 0.04, r.h - 1.2] },
+                  ].map((s, si) => (
+                    <mesh key={`cove-${si}`} position={s.p as any}>
+                      <boxGeometry args={s.a as any} />
+                      <meshStandardMaterial color="#fff5dc" emissive="#ffd9a0" emissiveIntensity={isNight ? 1.2 : 0.5} roughness={0.4} />
+                    </mesh>
+                  ))}
+                </>
               )}
+
+              {/* Recessed ceiling downlights — array based on room size */}
+              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (() => {
+                const cols = Math.max(1, Math.min(3, Math.floor(r.w / 4)));
+                const rows = Math.max(1, Math.min(3, Math.floor(r.h / 4)));
+                const lights: any[] = [];
+                for (let ri = 0; ri < rows; ri++) {
+                  for (let ci = 0; ci < cols; ci++) {
+                    const lx = cx - r.w / 2 + (r.w / (cols + 1)) * (ci + 1);
+                    const lz = cz - r.h / 2 + (r.h / (rows + 1)) * (ri + 1);
+                    lights.push(
+                      <group key={`dl-${ri}-${ci}`} position={[lx, wallH - 0.05, lz]}>
+                        {/* Recessed housing */}
+                        <mesh>
+                          <cylinderGeometry args={[0.18, 0.18, 0.06, 18]} />
+                          <meshStandardMaterial color="#e8e4dc" roughness={0.5} metalness={0.2} />
+                        </mesh>
+                        {/* Warm emissive LED face */}
+                        <mesh position={[0, -0.04, 0]}>
+                          <cylinderGeometry args={[0.13, 0.13, 0.02, 18]} />
+                          <meshStandardMaterial color="#fff5dc" emissive="#ffd9a0" emissiveIntensity={isNight ? 2.2 : 0.7} />
+                        </mesh>
+                      </group>
+                    );
+                  }
+                }
+                return <>{lights}</>;
+              })()}
+
+              {/* Interior view: warm fill + recessed downlight array */}
+              {hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (() => {
+                const cols = Math.max(1, Math.min(3, Math.floor(r.w / 4)));
+                const rows = Math.max(1, Math.min(3, Math.floor(r.h / 4)));
+                const items: any[] = [];
+                for (let ri = 0; ri < rows; ri++) {
+                  for (let ci = 0; ci < cols; ci++) {
+                    const lx = cx - r.w / 2 + (r.w / (cols + 1)) * (ci + 1);
+                    const lz = cz - r.h / 2 + (r.h / (rows + 1)) * (ri + 1);
+                    items.push(
+                      <pointLight key={`il-${ri}-${ci}`} position={[lx, wallH - 0.5, lz]} intensity={isNight ? 1.8 : 0.9} distance={14} color="#ffe0b8" castShadow={false} />
+                    );
+                  }
+                }
+                items.push(
+                  <pointLight key="fill" position={[cx, wallH - 1, cz]} intensity={isNight ? 0.6 : 0.5} distance={Math.max(r.w, r.h) * 1.2} color="#fff2dc" castShadow={false} />
+                );
+                return <>{items}</>;
+              })()}
               
-              {/* Interior Room Light */}
-              {hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
-                <pointLight position={[cx, 11, cz]} intensity={isNight ? 2.5 : 1.2} distance={25} color="#ffedd6" castShadow={false} />
-              )}
-              
-              {/* Skirting boards */}
+              {/* Skirting boards — slim modern profile */}
               {r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
                 <>
-                  <mesh position={[cx, 0.2, cz - r.h/2 + 0.05]}>
-                    <boxGeometry args={[r.w, 0.4, 0.1]} />
-                    <meshStandardMaterial color="#e8e4dc" roughness={0.6} />
+                  <mesh position={[cx, 0.18, cz - r.h / 2 + 0.04]}>
+                    <boxGeometry args={[r.w, 0.36, 0.06]} />
+                    <meshStandardMaterial color="#f0ece2" roughness={0.55} />
                   </mesh>
-                  <mesh position={[cx, 0.2, cz + r.h/2 - 0.05]}>
-                    <boxGeometry args={[r.w, 0.4, 0.1]} />
-                    <meshStandardMaterial color="#e8e4dc" roughness={0.6} />
+                  <mesh position={[cx, 0.18, cz + r.h / 2 - 0.04]}>
+                    <boxGeometry args={[r.w, 0.36, 0.06]} />
+                    <meshStandardMaterial color="#f0ece2" roughness={0.55} />
                   </mesh>
-                  <mesh position={[cx - r.w/2 + 0.05, 0.2, cz]}>
-                    <boxGeometry args={[0.1, 0.4, r.h]} />
-                    <meshStandardMaterial color="#e8e4dc" roughness={0.6} />
+                  <mesh position={[cx - r.w / 2 + 0.04, 0.18, cz]}>
+                    <boxGeometry args={[0.06, 0.36, r.h]} />
+                    <meshStandardMaterial color="#f0ece2" roughness={0.55} />
                   </mesh>
-                  <mesh position={[cx + r.w/2 - 0.05, 0.2, cz]}>
-                    <boxGeometry args={[0.1, 0.4, r.h]} />
-                    <meshStandardMaterial color="#e8e4dc" roughness={0.6} />
+                  <mesh position={[cx + r.w / 2 - 0.04, 0.18, cz]}>
+                    <boxGeometry args={[0.06, 0.36, r.h]} />
+                    <meshStandardMaterial color="#f0ece2" roughness={0.55} />
                   </mesh>
                 </>
+              )}
+
+              {/* ── Living room accent wall ── (wood vertical slats on the longest interior wall) */}
+              {hideRoof && ['living', 'hall', 'lobby'].includes(r.type) && (() => {
+                // Pick one short edge of the room (whichever has more depth potential)
+                const onLongSide = r.w >= r.h;
+                const accentWidth = onLongSide ? r.w * 0.85 : 0.18;
+                const accentDepth = onLongSide ? 0.18 : r.h * 0.85;
+                const accentY = wallH * 0.5;
+                const accentH = wallH * 0.92;
+                const px = cx;
+                const pz = onLongSide ? cz - r.h / 2 + 0.12 : cz;
+                const pxAlt = onLongSide ? cx : cx - r.w / 2 + 0.12;
+                return (
+                  <group position={[onLongSide ? px : pxAlt, accentY, onLongSide ? pz : cz]}>
+                    {/* Backing panel */}
+                    <mesh receiveShadow>
+                      <boxGeometry args={[accentWidth, accentH, accentDepth]} />
+                      <meshStandardMaterial color="#5a3d24" map={doorTextures?.map} normalMap={doorTextures?.normal} normalScale={new THREE.Vector2(0.4, 0.4)} roughness={0.5} envMapIntensity={0.6} />
+                    </mesh>
+                    {/* Vertical slat reveals */}
+                    {Array.from({ length: 9 }).map((_, si) => {
+                      const off = (si - 4) * (onLongSide ? accentWidth / 9 : 0);
+                      const offZ = (si - 4) * (onLongSide ? 0 : accentDepth / 9);
+                      return (
+                        <mesh key={`slat-${si}`} position={[onLongSide ? off : 0, 0, onLongSide ? accentDepth / 2 + 0.005 : offZ]}>
+                          <boxGeometry args={[onLongSide ? 0.05 : 0.02, accentH, onLongSide ? 0.02 : 0.05]} />
+                          <meshStandardMaterial color="#1a1208" roughness={0.7} />
+                        </mesh>
+                      );
+                    })}
+                  </group>
+                );
+              })()}
+
+              {/* ── Bathroom: interior wall tile cladding (only in interior view) ── */}
+              {hideRoof && r.type === 'bathroom' && (
+                <>
+                  {/* Back wall tile up to ~6ft */}
+                  <mesh position={[cx, 3.0, cz - r.h / 2 + 0.06]} receiveShadow>
+                    <boxGeometry args={[r.w - 0.05, 6.0, 0.04]} />
+                    <meshStandardMaterial color="#e6e8e7" roughness={0.22} metalness={0.04} envMapIntensity={1.2} />
+                  </mesh>
+                  {/* Side wall tile */}
+                  <mesh position={[cx - r.w / 2 + 0.06, 3.0, cz]} receiveShadow>
+                    <boxGeometry args={[0.04, 6.0, r.h - 0.05]} />
+                    <meshStandardMaterial color="#e6e8e7" roughness={0.22} metalness={0.04} envMapIntensity={1.2} />
+                  </mesh>
+                </>
+              )}
+
+              {/* ── Kitchen backsplash inside (when interior) ── */}
+              {hideRoof && r.type === 'kitchen' && (
+                <mesh position={[cx, 4.5, cz - r.h / 2 + 0.06]} receiveShadow>
+                  <boxGeometry args={[r.w - 0.5, 2.8, 0.04]} />
+                  <meshStandardMaterial color="#eef0ef" roughness={0.18} metalness={0.06} envMapIntensity={1.4} />
+                </mesh>
               )}
               
               {/* Furniture */}
@@ -461,14 +693,16 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
             return <WallSegment key={`wall-${i}`} w={w} h={wallH} t={t} color={colors.wall}
               doors={mappedDoors} windows={mappedWindows} materialType={material}
               position={[posX, 0, posZ]} rotation={[0, 0, 0]}
-              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} hideRoof={hideRoof} />;
+              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door}
+              hideRoof={hideRoof} wallTextures={wallTextures} doorTextures={doorTextures} />;
           } else {
             const posX = round2(wall.coord - W/2);
             const posZ = round2(wall.start + len/2 - D/2);
             return <WallSegment key={`wall-${i}`} w={w} h={wallH} t={t} color={colors.wall}
               doors={mappedDoors} windows={mappedWindows} materialType={material}
               position={[posX, 0, posZ]} rotation={[0, -Math.PI/2, 0]}
-              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} hideRoof={hideRoof} />;
+              frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door}
+              hideRoof={hideRoof} wallTextures={wallTextures} doorTextures={doorTextures} />;
           }
         })}
       </group>
@@ -601,7 +835,7 @@ const getDoorHeight = (d: any): number => {
 };
 
 /* ─── Wall Rendering Geometry ─── */
-const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frameColor, glassColor, doorColor, materialType, hideRoof }: any) => {
+const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frameColor, glassColor, doorColor, materialType, hideRoof, wallTextures, doorTextures }: any) => {
   const shape = useMemo(() => {
     const s = new THREE.Shape();
     s.moveTo(-w/2, 0);
@@ -644,10 +878,14 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
     <group position={position} rotation={rotation}>
       <mesh castShadow receiveShadow position={[0, 0, -t/2]}>
         <extrudeGeometry args={[shape, { depth: t, bevelEnabled: false }]} />
-        <meshStandardMaterial 
-          color={color} 
-          roughness={0.82} 
-          normalScale={new THREE.Vector2(0.15, 0.15)}
+        <meshStandardMaterial
+          color={color}
+          map={wallTextures?.map}
+          normalMap={wallTextures?.normal}
+          normalScale={new THREE.Vector2(0.45, 0.45)}
+          roughness={0.94}
+          metalness={0}
+          envMapIntensity={0.4}
         />
       </mesh>
       
@@ -671,7 +909,7 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
 
         if (cat === 'main') {
           // ── MAIN ENTRANCE DOOR — Premium double-panel with glass inserts ──
-          const mainWood = materialType === 'luxury' ? '#4a2810' : materialType === 'modern' ? '#3a3a3a' : '#6b4020';
+          const mainWood = '#6a4528';
           const accentMetal = materialType === 'luxury' ? '#c9a84c' : materialType === 'modern' ? '#888' : '#8b6530';
           return (
             <group key={`d-${i}`} position={[dx, dh/2, 0]}>
@@ -682,18 +920,18 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
               <mesh position={[0, -0.1, 0.02]}>
                 <boxGeometry args={[dw + 0.3, dh + 0.2, t + 0.08]} />
                 <meshStandardMaterial color={frameColor} roughness={0.55} /></mesh>
-              {/* Door panel — rich wood */}
+              {/* Door panel — rich wood with grain */}
               <mesh position={[0, -0.15, 0.06]}>
                 <boxGeometry args={[dw - 0.15, dh - 0.15, 0.18]} />
-                <meshStandardMaterial color={mainWood} roughness={0.35} /></mesh>
+                <meshStandardMaterial color={mainWood} map={doorTextures?.map} normalMap={doorTextures?.normal} normalScale={new THREE.Vector2(0.5, 0.5)} roughness={0.42} metalness={0.05} envMapIntensity={0.7} /></mesh>
               {/* Vertical center divider */}
               <mesh position={[0, 0, 0.16]}>
                 <boxGeometry args={[0.12, dh - 0.5, 0.06]} />
-                <meshStandardMaterial color={mainWood} roughness={0.3} /></mesh>
+                <meshStandardMaterial color={mainWood} map={doorTextures?.map} roughness={0.4} /></mesh>
               {/* Horizontal divider */}
               <mesh position={[0, dh * 0.08, 0.16]}>
                 <boxGeometry args={[dw - 0.4, 0.12, 0.06]} />
-                <meshStandardMaterial color={mainWood} roughness={0.3} /></mesh>
+                <meshStandardMaterial color={mainWood} map={doorTextures?.map} roughness={0.4} /></mesh>
               {/* Glass panel inserts (upper half) */}
               <mesh position={[-dw/4, dh/4 - 0.1, 0.17]}>
                 <boxGeometry args={[dw/2.8, dh/3.2, 0.04]} />
@@ -725,10 +963,10 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
               {/* Slim frame */}
               <mesh><boxGeometry args={[dw + 0.3, dh + 0.3, t + 0.08]} />
                 <meshStandardMaterial color={frameColor} roughness={0.6} /></mesh>
-              {/* Lower panel — solid light color */}
+              {/* Lower panel — painted wood */}
               <mesh position={[0, -dh/6, 0.03]}>
                 <boxGeometry args={[dw - 0.1, dh * 0.55, 0.1]} />
-                <meshStandardMaterial color={bathDoorColor} roughness={0.5} /></mesh>
+                <meshStandardMaterial color={bathDoorColor} normalMap={doorTextures?.normal} normalScale={new THREE.Vector2(0.2, 0.2)} roughness={0.55} /></mesh>
               {/* Upper frosted glass panel */}
               <mesh position={[0, dh/4 - 0.1, 0.03]}>
                 <boxGeometry args={[dw - 0.2, dh * 0.32, 0.06]} />
@@ -749,24 +987,24 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
         }
 
         // ── ROOM DOOR — Clean panel design, matte wood finish ──
-        const roomDoorColor = materialType === 'luxury' ? '#5a3a1a' : materialType === 'modern' ? '#555' : doorColor;
+        const roomDoorColor = '#6a4528';
         return (
           <group key={`d-${i}`} position={[dx, dh/2, 0]}>
             {/* Standard frame */}
             <mesh><boxGeometry args={[dw + 0.35, dh + 0.35, t + 0.1]} />
               <meshStandardMaterial color={frameColor} roughness={0.6} /></mesh>
-            {/* Door panel */}
+            {/* Door panel — wood grain */}
             <mesh position={[0, -0.15, 0.03]}>
               <boxGeometry args={[dw - 0.05, dh - 0.1, 0.12]} />
-              <meshStandardMaterial color={roomDoorColor} roughness={0.5} /></mesh>
+              <meshStandardMaterial color={roomDoorColor} map={doorTextures?.map} normalMap={doorTextures?.normal} normalScale={new THREE.Vector2(0.4, 0.4)} roughness={0.5} metalness={0.04} envMapIntensity={0.6} /></mesh>
             {/* Upper panel recess */}
             <mesh position={[0, dh/5, 0.1]}>
               <boxGeometry args={[dw - 0.6, dh * 0.35, 0.03]} />
-              <meshStandardMaterial color={roomDoorColor} roughness={0.6} metalness={0.02} /></mesh>
+              <meshStandardMaterial color={roomDoorColor} map={doorTextures?.map} roughness={0.55} metalness={0.02} /></mesh>
             {/* Lower panel recess */}
             <mesh position={[0, -dh/5, 0.1]}>
               <boxGeometry args={[dw - 0.6, dh * 0.3, 0.03]} />
-              <meshStandardMaterial color={roomDoorColor} roughness={0.6} metalness={0.02} /></mesh>
+              <meshStandardMaterial color={roomDoorColor} map={doorTextures?.map} roughness={0.55} metalness={0.02} /></mesh>
             {/* Round door knob */}
             <mesh position={[dw/2 - 0.35, -0.1, 0.14]}>
               <sphereGeometry args={[0.1, 12, 12]} />
@@ -784,47 +1022,90 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
         // Wall thickness is t. Center the window group at z=0.
         return (
           <group key={`w-${i}`} position={[wx, wy, 0]}>
-            {/* 1. Main Glass (Centered in wall) */}
-            <mesh>
-              <boxGeometry args={[ww, wh, 0.05]} />
-              <meshPhysicalMaterial 
-                color="#88ccee" 
-                roughness={0.01} 
-                metalness={0.8} 
-                transparent 
-                opacity={0.5} 
-                transmission={0.8} 
-                ior={1.5} 
-                thickness={0.2}
+            {/* 1. Main glass pane — bright sky-tinted reflective glass, reads as glass from both sides */}
+            <mesh castShadow={false} receiveShadow={false}>
+              <boxGeometry args={[ww, wh, 0.04]} />
+              <meshPhysicalMaterial
+                color="#cfe1ec"
+                roughness={0.03}
+                metalness={0.6}
+                transparent
+                opacity={0.65}
+                ior={1.52}
                 reflectivity={1.0}
-                envMapIntensity={3}
+                envMapIntensity={4}
+                clearcoat={1.0}
+                clearcoatRoughness={0.02}
+                emissive="#9ec1d4"
+                emissiveIntensity={0.35}
+                side={THREE.DoubleSide}
+                depthWrite={false}
               />
             </mesh>
-
-            {/* 2. Window Sash/Frame (Passing through the wall) */}
-            <mesh>
-              <boxGeometry args={[ww + 0.1, wh + 0.1, t + 0.02]} />
-              <meshStandardMaterial color="#2a2a2a" roughness={0.3} metalness={0.6} />
+            {/* Subtle inner highlight strip — adds gloss read */}
+            <mesh position={[0, wh * 0.18, 0.025]} rotation={[0, 0, 0.18]}>
+              <planeGeometry args={[ww * 0.95, 0.35]} />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.18} depthWrite={false} />
             </mesh>
 
-            {/* 3. Symmetrical details on Front and Back */}
+            {/* 2. Wooden frame — perimeter only (4 thin strips through wall thickness) */}
+            {/* Top rail */}
+            <mesh position={[0, wh / 2 + 0.06, 0]}>
+              <boxGeometry args={[ww + 0.18, 0.12, t + 0.04]} />
+              <meshStandardMaterial color="#4a3425" roughness={0.6} metalness={0.05} />
+            </mesh>
+            {/* Bottom rail */}
+            <mesh position={[0, -wh / 2 - 0.06, 0]}>
+              <boxGeometry args={[ww + 0.18, 0.12, t + 0.04]} />
+              <meshStandardMaterial color="#4a3425" roughness={0.6} metalness={0.05} />
+            </mesh>
+            {/* Left stile */}
+            <mesh position={[-ww / 2 - 0.06, 0, 0]}>
+              <boxGeometry args={[0.12, wh, t + 0.04]} />
+              <meshStandardMaterial color="#4a3425" roughness={0.6} metalness={0.05} />
+            </mesh>
+            {/* Right stile */}
+            <mesh position={[ww / 2 + 0.06, 0, 0]}>
+              <boxGeometry args={[0.12, wh, t + 0.04]} />
+              <meshStandardMaterial color="#4a3425" roughness={0.6} metalness={0.05} />
+            </mesh>
+
+            {/* 3. Slim glazing bars — cross dividers (thin so glass dominates) */}
+            <mesh>
+              <boxGeometry args={[ww, 0.05, 0.06]} />
+              <meshStandardMaterial color="#4a3425" roughness={0.6} metalness={0.05} />
+            </mesh>
+            <mesh>
+              <boxGeometry args={[0.05, wh, 0.06]} />
+              <meshStandardMaterial color="#4a3425" roughness={0.6} metalness={0.05} />
+            </mesh>
+
+            {/* 3. Symmetrical casing on Front and Back — PERIMETER ONLY (was solid box, now 4 strips) */}
             {[-1, 1].map((side) => (
-              <group key={side} position={[0, 0, (t/2 + 0.05) * side]}>
-                {/* Casing / Molding */}
-                <mesh>
-                  <boxGeometry args={[ww + 0.4, wh + 0.4, 0.1]} />
+              <group key={side} position={[0, 0, (t / 2 + 0.05) * side]}>
+                {/* Top casing */}
+                <mesh position={[0, wh / 2 + 0.18, 0]}>
+                  <boxGeometry args={[ww + 0.5, 0.22, 0.06]} />
                   <meshStandardMaterial color={frameColor} roughness={0.5} />
                 </mesh>
-                {/* Reflection highlight (Exterior only) */}
-                {side === 1 && (
-                  <mesh position={[0, 0, 0.03]} rotation={[0, 0, 0.5]}>
-                    <planeGeometry args={[ww * 1.5, 0.5]} />
-                    <meshBasicMaterial color="#ffffff" transparent opacity={0.15} />
-                  </mesh>
-                )}
-                {/* Window sill */}
-                <mesh position={[0, -wh/2 - 0.2, 0.05]}>
-                  <boxGeometry args={[ww + 0.8, 0.2, 0.3]} />
+                {/* Bottom casing */}
+                <mesh position={[0, -wh / 2 - 0.18, 0]}>
+                  <boxGeometry args={[ww + 0.5, 0.22, 0.06]} />
+                  <meshStandardMaterial color={frameColor} roughness={0.5} />
+                </mesh>
+                {/* Left casing */}
+                <mesh position={[-ww / 2 - 0.18, 0, 0]}>
+                  <boxGeometry args={[0.22, wh + 0.5, 0.06]} />
+                  <meshStandardMaterial color={frameColor} roughness={0.5} />
+                </mesh>
+                {/* Right casing */}
+                <mesh position={[ww / 2 + 0.18, 0, 0]}>
+                  <boxGeometry args={[0.22, wh + 0.5, 0.06]} />
+                  <meshStandardMaterial color={frameColor} roughness={0.5} />
+                </mesh>
+                {/* Window sill — only on bottom edge */}
+                <mesh position={[0, -wh / 2 - 0.4, 0.05]}>
+                  <boxGeometry args={[ww + 0.8, 0.2, 0.28]} />
                   <meshStandardMaterial color={frameColor} roughness={0.4} />
                 </mesh>
               </group>
@@ -1047,72 +1328,505 @@ const WaterTank = ({ maxX, maxZ, wallH, roofType }: any) => {
   );
 };
 
-const Carport = ({ plan }: any) => {
-  const c = (plan.rooms || []).find((r:any) => r.type === 'carport');
-  if (!c) return null;
-  const rx = c.x - plan.width/2 + c.w/2;
-  const rz = c.y - plan.height/2 + c.h/2;
+/* Low-poly parked car. Car length runs along +/- Z (rotate the parent group to orient). */
+const ParkedCar = ({ color = '#1f2937', accent = '#0a0a0a' }: { color?: string; accent?: string }) => {
   return (
-    <group position={[rx, 0, rz]}>
-      {/* Concrete base slab for the car */}
-      <mesh receiveShadow position={[0, 0.2, 0]}>
-        <boxGeometry args={[c.w, 0.4, c.h]} />
-        <meshStandardMaterial color="#666" roughness={0.9} />
+    <group>
+      {/* Lower body (chassis) */}
+      <mesh position={[0, 0.55, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.85, 0.55, 4.3]} />
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0.55} />
       </mesh>
-      
-      {/* Driveway ramp / approach */}
-      <mesh receiveShadow position={[0, 0.1, c.h/2 + 1.5]} rotation={[-0.05, 0, 0]}>
-        <boxGeometry args={[c.w - 1, 0.2, 3]} />
-        <meshStandardMaterial color="#555" roughness={1} />
+      {/* Hood ridge — slightly raised at front */}
+      <mesh position={[0, 0.95, 1.45]} castShadow>
+        <boxGeometry args={[1.78, 0.18, 1.4]} />
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0.55} />
       </mesh>
-
-      {[[-c.w/2 + 0.5, -c.h/2 + 0.5], [-c.w/2 + 0.5, c.h/2 - 0.5], [c.w/2 - 0.5, -c.h/2 + 0.5], [c.w/2 - 0.5, c.h/2 - 0.5]].map(([x, z], i) => (
-        <mesh key={i} castShadow position={[x, 5.5, z]}>
-          <cylinderGeometry args={[0.2, 0.2, 11, 8]} />
-          <meshStandardMaterial color="#555" roughness={0.6} />
+      {/* Trunk lid — slightly raised at rear */}
+      <mesh position={[0, 0.95, -1.55]} castShadow>
+        <boxGeometry args={[1.78, 0.18, 1.2]} />
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0.55} />
+      </mesh>
+      {/* Cabin (greenhouse) — narrower than body */}
+      <mesh position={[0, 1.32, -0.1]} castShadow>
+        <boxGeometry args={[1.65, 0.7, 2.4]} />
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0.55} />
+      </mesh>
+      {/* Side windows (tinted glass) */}
+      <mesh position={[0.83, 1.32, -0.1]}>
+        <boxGeometry args={[0.02, 0.55, 2.25]} />
+        <meshPhysicalMaterial color="#1a2540" roughness={0.05} metalness={0.4} transparent opacity={0.55} clearcoat={1} />
+      </mesh>
+      <mesh position={[-0.83, 1.32, -0.1]}>
+        <boxGeometry args={[0.02, 0.55, 2.25]} />
+        <meshPhysicalMaterial color="#1a2540" roughness={0.05} metalness={0.4} transparent opacity={0.55} clearcoat={1} />
+      </mesh>
+      {/* Windscreen + rear glass */}
+      <mesh position={[0, 1.32, 1.12]} rotation={[Math.PI * 0.06, 0, 0]}>
+        <boxGeometry args={[1.55, 0.55, 0.04]} />
+        <meshPhysicalMaterial color="#1a2540" roughness={0.05} metalness={0.4} transparent opacity={0.55} clearcoat={1} />
+      </mesh>
+      <mesh position={[0, 1.32, -1.32]} rotation={[-Math.PI * 0.06, 0, 0]}>
+        <boxGeometry args={[1.55, 0.55, 0.04]} />
+        <meshPhysicalMaterial color="#1a2540" roughness={0.05} metalness={0.4} transparent opacity={0.55} clearcoat={1} />
+      </mesh>
+      {/* Wheels (4) */}
+      {[
+        [-0.85, 0.4, 1.5], [0.85, 0.4, 1.5],
+        [-0.85, 0.4, -1.5], [0.85, 0.4, -1.5],
+      ].map(([x, y, z], i) => (
+        <group key={i} position={[x, y, z]}>
+          <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
+            <cylinderGeometry args={[0.4, 0.4, 0.28, 18]} />
+            <meshStandardMaterial color={accent} roughness={0.95} />
+          </mesh>
+          {/* Hubcap */}
+          <mesh rotation={[0, 0, Math.PI / 2]} position={[x > 0 ? 0.145 : -0.145, 0, 0]}>
+            <cylinderGeometry args={[0.2, 0.2, 0.02, 12]} />
+            <meshStandardMaterial color="#bdbdbd" roughness={0.4} metalness={0.7} />
+          </mesh>
+        </group>
+      ))}
+      {/* Headlights */}
+      {[-0.55, 0.55].map((x, i) => (
+        <mesh key={`hl-${i}`} position={[x, 0.7, 2.16]}>
+          <boxGeometry args={[0.42, 0.2, 0.06]} />
+          <meshStandardMaterial color="#fff8d4" emissive="#fff8d4" emissiveIntensity={0.6} roughness={0.3} />
         </mesh>
       ))}
-      <mesh castShadow position={[0, 11.3, 0]}>
-        <boxGeometry args={[c.w + 1, 0.4, c.h + 1]} />
-        <meshStandardMaterial color="#333" roughness={0.8} />
+      {/* Tail lights */}
+      {[-0.55, 0.55].map((x, i) => (
+        <mesh key={`tl-${i}`} position={[x, 0.7, -2.16]}>
+          <boxGeometry args={[0.42, 0.2, 0.06]} />
+          <meshStandardMaterial color="#a91212" emissive="#a91212" emissiveIntensity={0.35} roughness={0.4} />
+        </mesh>
+      ))}
+      {/* Grille */}
+      <mesh position={[0, 0.55, 2.16]}>
+        <boxGeometry args={[1.0, 0.25, 0.04]} />
+        <meshStandardMaterial color="#0d0d0d" roughness={0.5} metalness={0.6} />
       </mesh>
+      {/* Side mirrors */}
+      {[-0.95, 0.95].map((x, i) => (
+        <mesh key={`mir-${i}`} position={[x, 1.2, 0.7]} castShadow>
+          <boxGeometry args={[0.18, 0.12, 0.18]} />
+          <meshStandardMaterial color={color} roughness={0.35} metalness={0.55} />
+        </mesh>
+      ))}
     </group>
   );
+};
+
+const Carport = ({ plan, plotW, plotD }: { plan: Plan; plotW: number; plotD: number }) => {
+  const info = useMemo(() => getCarportInfo(plan), [plan]);
+  if (!info) return null;
+  const { cx, cz, w: cw, h: ch, side } = info;
+
+  const halfPlotW = plotW / 2;
+  const halfPlotD = plotD / 2;
+
+  // Driveway rectangle: from carport's open edge out to plot edge.
+  let dwMinX: number, dwMaxX: number, dwMinZ: number, dwMaxZ: number;
+  let carYaw = 0; // car orientation
+  if (side === 'bottom') {
+    dwMinX = cx - cw / 2 + 0.6;
+    dwMaxX = cx + cw / 2 - 0.6;
+    dwMinZ = cz + ch / 2;
+    dwMaxZ = halfPlotD;
+    carYaw = 0;
+  } else if (side === 'top') {
+    dwMinX = cx - cw / 2 + 0.6;
+    dwMaxX = cx + cw / 2 - 0.6;
+    dwMinZ = -halfPlotD;
+    dwMaxZ = cz - ch / 2;
+    carYaw = Math.PI;
+  } else if (side === 'right') {
+    dwMinX = cx + cw / 2;
+    dwMaxX = halfPlotW;
+    dwMinZ = cz - ch / 2 + 0.6;
+    dwMaxZ = cz + ch / 2 - 0.6;
+    carYaw = -Math.PI / 2;
+  } else {
+    dwMinX = -halfPlotW;
+    dwMaxX = cx - cw / 2;
+    dwMinZ = cz - ch / 2 + 0.6;
+    dwMaxZ = cz + ch / 2 - 0.6;
+    carYaw = Math.PI / 2;
+  }
+  const dwW = Math.max(0.1, dwMaxX - dwMinX);
+  const dwD = Math.max(0.1, dwMaxZ - dwMinZ);
+  const dwCX = (dwMinX + dwMaxX) / 2;
+  const dwCZ = (dwMinZ + dwMaxZ) / 2;
+
+  // Parked car position: centered in carport, oriented along driving axis
+  const carX = cx;
+  const carZ = cz;
+
+  return (
+    <group>
+      {/* ── Carport pad + structure (pad sits flush with ground) ── */}
+      <group position={[cx, 0, cz]}>
+        {/* Concrete pad — slightly recessed for clean edge */}
+        <mesh receiveShadow position={[0, 0.04, 0]}>
+          <boxGeometry args={[cw, 0.08, ch]} />
+          <meshStandardMaterial color="#9a9a96" roughness={0.95} />
+        </mesh>
+        {/* Painted parking bay outline */}
+        <mesh position={[0, 0.082, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[Math.min(cw, ch) * 0.32, Math.min(cw, ch) * 0.34, 32]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.45} />
+        </mesh>
+
+        {/* Four steel posts */}
+        {[
+          [-cw / 2 + 0.4, -ch / 2 + 0.4],
+          [-cw / 2 + 0.4, ch / 2 - 0.4],
+          [cw / 2 - 0.4, -ch / 2 + 0.4],
+          [cw / 2 - 0.4, ch / 2 - 0.4],
+        ].map(([x, z], i) => (
+          <group key={i} position={[x, 0, z]}>
+            <mesh castShadow position={[0, 5.5, 0]}>
+              <cylinderGeometry args={[0.16, 0.18, 11, 12]} />
+              <meshStandardMaterial color="#2a2a2a" roughness={0.55} metalness={0.45} />
+            </mesh>
+            {/* Base plate */}
+            <mesh position={[0, 0.06, 0]}>
+              <boxGeometry args={[0.42, 0.12, 0.42]} />
+              <meshStandardMaterial color="#1a1a1a" roughness={0.6} metalness={0.4} />
+            </mesh>
+          </group>
+        ))}
+
+        {/* Roof slab — flat with subtle overhang */}
+        <mesh castShadow position={[0, 11.18, 0]}>
+          <boxGeometry args={[cw + 1.2, 0.36, ch + 1.2]} />
+          <meshStandardMaterial color="#2a2a2a" roughness={0.7} metalness={0.1} />
+        </mesh>
+        {/* Roof underside trim */}
+        <mesh position={[0, 10.96, 0]}>
+          <boxGeometry args={[cw + 1.0, 0.06, ch + 1.0]} />
+          <meshStandardMaterial color="#3a3a3a" roughness={0.6} />
+        </mesh>
+
+        {/* Wheel-stop curbs at the back of the bay (opposite the open side) */}
+        {(() => {
+          const stopGeom = (side === 'top' || side === 'bottom') ? [cw * 0.7, 0.18, 0.22] : [0.22, 0.18, ch * 0.7];
+          let sp: [number, number, number] = [0, 0.13, 0];
+          if (side === 'bottom') sp = [0, 0.13, -ch / 2 + 0.7];
+          else if (side === 'top') sp = [0, 0.13, ch / 2 - 0.7];
+          else if (side === 'right') sp = [-cw / 2 + 0.7, 0.13, 0];
+          else sp = [cw / 2 - 0.7, 0.13, 0];
+          return (
+            <mesh position={sp} castShadow>
+              <boxGeometry args={stopGeom as any} />
+              <meshStandardMaterial color="#cfcfcf" roughness={0.85} />
+            </mesh>
+          );
+        })()}
+      </group>
+
+      {/* ── Driveway: tarmac/asphalt slab from carport opening to plot edge ── */}
+      {dwW > 0.5 && dwD > 0.5 && (
+        <group>
+          {/* Asphalt base */}
+          <mesh receiveShadow position={[dwCX, 0.012, dwCZ]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[dwW, dwD]} />
+            <meshStandardMaterial color="#3c3c40" roughness={1} />
+          </mesh>
+          {/* Light trim edge stripes */}
+          {(side === 'top' || side === 'bottom') ? (
+            <>
+              <mesh position={[dwMinX + 0.12, 0.018, dwCZ]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[0.08, dwD]} />
+                <meshBasicMaterial color="#e8e2c8" />
+              </mesh>
+              <mesh position={[dwMaxX - 0.12, 0.018, dwCZ]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[0.08, dwD]} />
+                <meshBasicMaterial color="#e8e2c8" />
+              </mesh>
+            </>
+          ) : (
+            <>
+              <mesh position={[dwCX, 0.018, dwMinZ + 0.12]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[dwW, 0.08]} />
+                <meshBasicMaterial color="#e8e2c8" />
+              </mesh>
+              <mesh position={[dwCX, 0.018, dwMaxZ - 0.12]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[dwW, 0.08]} />
+                <meshBasicMaterial color="#e8e2c8" />
+              </mesh>
+            </>
+          )}
+        </group>
+      )}
+
+      {/* ── Parked car ── */}
+      <group position={[carX, 0, carZ]} rotation={[0, carYaw, 0]}>
+        <ParkedCar color="#1f2a44" />
+      </group>
+    </group>
+  );
+};
+
+/* Compute the corridor rectangles to keep clear of greenery (driveway + walkway). */
+const computeCorridors = (
+  plan: Plan,
+  plotW: number,
+  plotD: number,
+  gateX: number,
+): Rect[] => {
+  const rects: Rect[] = [];
+  const halfPlotW = plotW / 2;
+  const halfPlotD = plotD / 2;
+
+  // Driveway corridor
+  const ci = getCarportInfo(plan);
+  if (ci) {
+    const { cx, cz, w: cw, h: ch, side } = ci;
+    if (side === 'bottom') rects.push({ minX: cx - cw / 2 - 0.4, maxX: cx + cw / 2 + 0.4, minZ: cz + ch / 2 - 0.5, maxZ: halfPlotD + 0.5 });
+    else if (side === 'top') rects.push({ minX: cx - cw / 2 - 0.4, maxX: cx + cw / 2 + 0.4, minZ: -halfPlotD - 0.5, maxZ: cz - ch / 2 + 0.5 });
+    else if (side === 'right') rects.push({ minX: cx + cw / 2 - 0.5, maxX: halfPlotW + 0.5, minZ: cz - ch / 2 - 0.4, maxZ: cz + ch / 2 + 0.4 });
+    else rects.push({ minX: -halfPlotW - 0.5, maxX: cx - cw / 2 + 0.5, minZ: cz - ch / 2 - 0.4, maxZ: cz + ch / 2 + 0.4 });
+  }
+
+  // Walkway corridor (gate to main door)
+  const door = findMainDoorWorld(plan);
+  if (door) {
+    const wkW = 1.6; // walkway half-width
+    // Vertical leg from gate down toward door's z
+    const aX = gateX;
+    const aZ1 = halfPlotD;
+    const aZ2 = door.z + door.nz * 1.0;
+    rects.push({
+      minX: Math.min(aX, door.x) - wkW,
+      maxX: Math.max(aX, door.x) + wkW,
+      minZ: Math.min(aZ1, aZ2),
+      maxZ: Math.max(aZ1, aZ2),
+    });
+    // Approach to door
+    rects.push({
+      minX: Math.min(door.x - wkW, door.x + door.nx * 2 - wkW),
+      maxX: Math.max(door.x + wkW, door.x + door.nx * 2 + wkW),
+      minZ: Math.min(door.z - wkW, door.z + door.nz * 2 - wkW),
+      maxZ: Math.max(door.z + wkW, door.z + door.nz * 2 + wkW),
+    });
+  }
+  return rects;
 };
 
 /* ─── Decor ─── */
+const BROADLEAF_GREENS = ['#3d6e3a', '#4a7a44', '#2f5f2f', '#356a36', '#5a8b50'];
+const CYPRESS_GREENS = ['#284e2c', '#1f4524', '#2c5630'];
+
+type TreeKind = 'broadleaf' | 'cypress' | 'small';
+
+const Tree = ({ kind, s, h, palette }: { kind: TreeKind; s: number; h: number; palette: number }) => {
+  if (kind === 'cypress') {
+    // Tall slim Italian cypress
+    return (
+      <group>
+        <mesh castShadow position={[0, h * 0.06, 0]}>
+          <cylinderGeometry args={[0.16 * s, 0.22 * s, h * 0.12, 8]} />
+          <meshStandardMaterial color="#2a1c10" roughness={0.95} />
+        </mesh>
+        <mesh castShadow position={[0, h * 0.55, 0]}>
+          <coneGeometry args={[0.85 * s, h * 0.96, 12]} />
+          <meshStandardMaterial color={CYPRESS_GREENS[palette % CYPRESS_GREENS.length]} roughness={0.9} />
+        </mesh>
+      </group>
+    );
+  }
+  if (kind === 'small') {
+    return (
+      <group>
+        <mesh castShadow position={[0, h * 0.18, 0]}>
+          <cylinderGeometry args={[0.12 * s, 0.18 * s, h * 0.36, 6]} />
+          <meshStandardMaterial color="#3a2818" roughness={0.92} />
+        </mesh>
+        <mesh castShadow position={[0, h * 0.55, 0]}>
+          <sphereGeometry args={[1.4 * s, 10, 8]} />
+          <meshStandardMaterial color={BROADLEAF_GREENS[palette % BROADLEAF_GREENS.length]} roughness={0.9} />
+        </mesh>
+        <mesh castShadow position={[0.4 * s, 0.7 * h, 0.2 * s]}>
+          <sphereGeometry args={[1.0 * s, 8, 7]} />
+          <meshStandardMaterial color={BROADLEAF_GREENS[(palette + 2) % BROADLEAF_GREENS.length]} roughness={0.9} />
+        </mesh>
+      </group>
+    );
+  }
+  // broadleaf — lush full canopy
+  const trunkH = h * 0.55;
+  return (
+    <group>
+      <mesh castShadow position={[0, trunkH * 0.5, 0]}>
+        <cylinderGeometry args={[0.22 * s, 0.42 * s, trunkH, 8]} />
+        <meshStandardMaterial color="#3a2818" roughness={0.95} />
+      </mesh>
+      {/* Layered canopy clusters for organic feel */}
+      <mesh castShadow position={[0, trunkH + 1.2 * s, 0]}>
+        <sphereGeometry args={[2.6 * s, 12, 10]} />
+        <meshStandardMaterial color={BROADLEAF_GREENS[palette % BROADLEAF_GREENS.length]} roughness={0.9} />
+      </mesh>
+      <mesh castShadow position={[1.5 * s, trunkH + 0.8 * s, 0.7 * s]}>
+        <sphereGeometry args={[1.9 * s, 10, 9]} />
+        <meshStandardMaterial color={BROADLEAF_GREENS[(palette + 1) % BROADLEAF_GREENS.length]} roughness={0.9} />
+      </mesh>
+      <mesh castShadow position={[-1.3 * s, trunkH + 0.6 * s, -0.6 * s]}>
+        <sphereGeometry args={[1.7 * s, 10, 8]} />
+        <meshStandardMaterial color={BROADLEAF_GREENS[(palette + 2) % BROADLEAF_GREENS.length]} roughness={0.9} />
+      </mesh>
+      <mesh castShadow position={[0.3 * s, trunkH + 2.4 * s, -0.4 * s]}>
+        <sphereGeometry args={[1.4 * s, 10, 8]} />
+        <meshStandardMaterial color={BROADLEAF_GREENS[(palette + 3) % BROADLEAF_GREENS.length]} roughness={0.9} />
+      </mesh>
+      <mesh castShadow position={[-0.8 * s, trunkH + 2.0 * s, 0.5 * s]}>
+        <sphereGeometry args={[1.2 * s, 8, 7]} />
+        <meshStandardMaterial color={BROADLEAF_GREENS[(palette + 4) % BROADLEAF_GREENS.length]} roughness={0.9} />
+      </mesh>
+    </group>
+  );
+};
+
 const Trees = ({ planW, planD }: { planW: number; planD: number }) => {
-  const treeData = useMemo(() => [
-    { x: -planW / 2 - 8, z: -planD / 2 + 5, s: 1.1, h: 8 },
-    { x: planW / 2 + 8, z: planD / 2 - 3, s: 1, h: 7 },
-    { x: -planW / 2 - 5, z: planD / 2 + 8, s: 1.2, h: 9 },
-    { x: planW / 2 + 10, z: -planD / 2 - 5, s: 0.9, h: 7 },
-    { x: -planW / 2 - 12, z: 0, s: 0.8, h: 6 },
-    { x: planW / 2 + 14, z: 5, s: 1.15, h: 8.5 },
-  ], [planW, planD]);
+  const treeData = useMemo(() => {
+    const arr: { x: number; z: number; s: number; h: number; kind: TreeKind; palette: number }[] = [];
+    const hw = planW / 2;
+    const hd = planD / 2;
+    // Big anchor trees at far corners
+    arr.push({ x: -hw - 9, z: -hd - 8, s: 1.25, h: 11, kind: 'broadleaf', palette: 0 });
+    arr.push({ x: hw + 12, z: hd + 10, s: 1.15, h: 10.5, kind: 'broadleaf', palette: 2 });
+    arr.push({ x: hw + 13, z: -hd - 9, s: 1.05, h: 9, kind: 'broadleaf', palette: 1 });
+    arr.push({ x: -hw - 11, z: hd + 9, s: 1.1, h: 9.5, kind: 'broadleaf', palette: 3 });
+
+    // Cypress columns flanking the gate (front)
+    arr.push({ x: -2.5, z: hd + 1.4, s: 0.9, h: 9, kind: 'cypress', palette: 0 });
+    arr.push({ x: 2.5, z: hd + 1.4, s: 0.9, h: 9, kind: 'cypress', palette: 1 });
+
+    // Side cypresses for accent
+    arr.push({ x: -hw - 1.6, z: 0, s: 0.8, h: 8, kind: 'cypress', palette: 2 });
+    arr.push({ x: hw + 1.6, z: -0.5, s: 0.8, h: 8, kind: 'cypress', palette: 0 });
+
+    // Small ornamentals near front corners of plot
+    arr.push({ x: -hw + 2, z: hd - 2.2, s: 0.7, h: 4.5, kind: 'small', palette: 1 });
+    arr.push({ x: hw - 2, z: hd - 2.2, s: 0.7, h: 4.5, kind: 'small', palette: 4 });
+
+    // Distant background trees for depth (out beyond the plot)
+    for (let i = 0; i < 18; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.max(hw, hd) + 16 + Math.random() * 36;
+      arr.push({
+        x: Math.cos(angle) * dist,
+        z: Math.sin(angle) * dist,
+        s: 0.85 + Math.random() * 0.5,
+        h: 7 + Math.random() * 5,
+        kind: Math.random() < 0.18 ? 'cypress' : 'broadleaf',
+        palette: i,
+      });
+    }
+    return arr;
+  }, [planW, planD]);
+
   return (
     <group>
       {treeData.map((t, i) => (
-        <group key={i} position={[t.x, 0, t.z]}>
-          {/* Trunk */}
-          <mesh castShadow position={[0, t.h * 0.38, 0]}>
-            <cylinderGeometry args={[0.2 * t.s, 0.4 * t.s, t.h * 0.75, 6]} />
-            <meshStandardMaterial color="#3a2a1a" roughness={0.9} />
+        <group key={i} position={[t.x, 0, t.z]} rotation={[0, (i * 1.7) % (Math.PI * 2), 0]}>
+          <Tree kind={t.kind} s={t.s} h={t.h} palette={t.palette} />
+        </group>
+      ))}
+    </group>
+  );
+};
+
+const BUSH_GREENS = ['#3d6e3a', '#4a7a44', '#2f5f2f', '#356a36', '#5a8b50', '#3a6838', '#4f7d48'];
+const FLOWER_COLORS = ['#e85d75', '#f4a261', '#f7d046', '#9b5de5', '#f15bb5', '#fefae0', '#e76f51'];
+
+const Bushes = ({ planW, planD, corridors = [] }: { planW: number; planD: number; corridors?: Rect[] }) => {
+  const data = useMemo(() => {
+    const hw = planW / 2;
+    const hd = planD / 2;
+    const arr: { x: number; z: number; s: number; c: string; h?: number }[] = [];
+    const blocked = (x: number, z: number) => pointInAnyRect(x, z, corridors, 0.5);
+
+    // Foundation hedge along back wall (continuous)
+    for (let x = -hw + 1; x <= hw - 1; x += 1.4) {
+      if (blocked(x, -hd - 1.5)) continue;
+      const c = BUSH_GREENS[(Math.abs(Math.floor(x * 3)) % BUSH_GREENS.length)];
+      arr.push({ x, z: -hd - 1.5, s: 0.85 + ((Math.abs(x) * 1.3) % 0.45), c });
+    }
+    // Foundation hedge along left + right walls
+    for (let z = -hd + 2; z < hd - 2; z += 1.5) {
+      if (!blocked(-hw - 1.5, z)) arr.push({ x: -hw - 1.5, z, s: 0.8 + ((Math.abs(z) * 0.7) % 0.4), c: BUSH_GREENS[(Math.abs(Math.floor(z * 2)) % BUSH_GREENS.length)] });
+      if (!blocked(hw + 1.5, z)) arr.push({ x: hw + 1.5, z, s: 0.8 + ((Math.abs(z) * 0.6) % 0.4), c: BUSH_GREENS[(Math.abs(Math.floor(z * 2)) + 2) % BUSH_GREENS.length] });
+    }
+    // Front planting band
+    for (let x = -hw + 1.5; x <= hw - 1.5; x += 1.2) {
+      if (blocked(x, hd - 1.4)) continue;
+      arr.push({ x, z: hd - 1.4, s: 0.7 + ((Math.abs(x) * 1.7) % 0.4), c: BUSH_GREENS[(Math.abs(Math.floor(x * 5)) % BUSH_GREENS.length)] });
+    }
+    // Scatter accent ornamentals around the lawn
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2 + 0.3;
+      const dist = Math.max(hw, hd) * 0.7 + (i % 3) * 1.2;
+      const x = Math.cos(angle) * dist, z = Math.sin(angle) * dist;
+      if (blocked(x, z)) continue;
+      arr.push({ x, z, s: 0.6 + (i % 3) * 0.18, c: BUSH_GREENS[i % BUSH_GREENS.length] });
+    }
+    return arr;
+  }, [planW, planD, corridors]);
+
+  // Flower bed positions — colorful pops near front and along walls
+  const flowers = useMemo(() => {
+    const hw = planW / 2;
+    const hd = planD / 2;
+    const arr: { x: number; z: number; s: number; c: string }[] = [];
+    const blocked = (x: number, z: number) => pointInAnyRect(x, z, corridors, 0.5);
+    // Front-edge flowers (alternating colors)
+    for (let x = -hw + 1.2; x <= hw - 1.2; x += 0.7) {
+      if (blocked(x, hd - 0.9)) continue;
+      arr.push({ x, z: hd - 0.9, s: 0.16 + (Math.abs(x) % 0.08), c: FLOWER_COLORS[(Math.abs(Math.floor(x * 7))) % FLOWER_COLORS.length] });
+    }
+    // Side patches
+    for (let z = -hd + 3; z < hd - 3; z += 1.0) {
+      if (Math.random() < 0.55 && !blocked(-hw - 0.9, z)) {
+        arr.push({ x: -hw - 0.9, z, s: 0.14 + Math.random() * 0.06, c: FLOWER_COLORS[(Math.abs(Math.floor(z * 5))) % FLOWER_COLORS.length] });
+      }
+      if (Math.random() < 0.55 && !blocked(hw + 0.9, z)) {
+        arr.push({ x: hw + 0.9, z, s: 0.14 + Math.random() * 0.06, c: FLOWER_COLORS[(Math.abs(Math.floor(z * 7)) + 2) % FLOWER_COLORS.length] });
+      }
+    }
+    return arr;
+  }, [planW, planD, corridors]);
+
+  return (
+    <group>
+      {/* Lush layered bushes */}
+      {data.map((b, i) => (
+        <group key={`bush-${i}`} position={[b.x, 0, b.z]}>
+          <mesh castShadow receiveShadow position={[0, b.s * 0.55, 0]}>
+            <sphereGeometry args={[b.s, 12, 9]} />
+            <meshStandardMaterial color={b.c} roughness={0.92} />
           </mesh>
-          {/* Main canopy */}
-          <mesh castShadow position={[0, t.h * 0.8, 0]}>
-            <sphereGeometry args={[3 * t.s, 10, 8]} />
-            <meshStandardMaterial color="#2d5a2d" roughness={0.85} />
+          <mesh castShadow position={[b.s * 0.35, b.s * 0.85, b.s * 0.2]}>
+            <sphereGeometry args={[b.s * 0.7, 10, 8]} />
+            <meshStandardMaterial color={BUSH_GREENS[(i + 2) % BUSH_GREENS.length]} roughness={0.92} />
           </mesh>
-          {/* Secondary canopy */}
-          <mesh castShadow position={[1.2 * t.s, t.h * 0.7, 0.8 * t.s]}>
-            <sphereGeometry args={[2.2 * t.s, 8, 8]} />
-            <meshStandardMaterial color="#3a6b3a" roughness={0.85} />
+          <mesh castShadow position={[-b.s * 0.4, b.s * 0.5, -b.s * 0.15]}>
+            <sphereGeometry args={[b.s * 0.6, 10, 7]} />
+            <meshStandardMaterial color={BUSH_GREENS[(i + 4) % BUSH_GREENS.length]} roughness={0.92} />
           </mesh>
-          {/* Top tuft */}
-          <mesh castShadow position={[-0.5 * t.s, t.h * 0.95, -0.3 * t.s]}>
-            <sphereGeometry args={[1.5 * t.s, 8, 6]} />
-            <meshStandardMaterial color="#4a7a4a" roughness={0.88} />
+        </group>
+      ))}
+
+      {/* Flowers — small colorful spheres */}
+      {flowers.map((f, i) => (
+        <group key={`fl-${i}`} position={[f.x, 0, f.z]}>
+          <mesh position={[0, f.s * 1.1, 0]} castShadow>
+            <sphereGeometry args={[f.s, 8, 6]} />
+            <meshStandardMaterial color={f.c} roughness={0.7} emissive={f.c} emissiveIntensity={0.05} />
+          </mesh>
+          <mesh position={[0, f.s * 0.55, 0]}>
+            <cylinderGeometry args={[0.018, 0.024, f.s * 1.1, 5]} />
+            <meshStandardMaterial color="#3a6b3a" roughness={0.95} />
           </mesh>
         </group>
       ))}
@@ -1120,37 +1834,88 @@ const Trees = ({ planW, planD }: { planW: number; planD: number }) => {
   );
 };
 
-const Bushes = ({ planW, planD }: { planW: number; planD: number }) => {
-  const bushData = useMemo(() => {
-    const arr: { x: number; z: number; s: number; c: string }[] = [];
-    const colors = ['#3d6b3d', '#4a7a4a', '#2d5a2d', '#45704a', '#3a6838'];
-    // Back side
-    for (let i = -planW / 2 + 2; i < planW / 2; i += 3.5) arr.push({ x: i, z: -planD / 2 - 2.5, s: 1 + (Math.abs(i) % 3) * 0.15, c: colors[Math.abs(Math.floor(i)) % colors.length] });
-    // Left side
-    for (let z = -planD / 2 + 3; z < planD / 2; z += 4) arr.push({ x: -planW / 2 - 2.5, z, s: 0.9 + (Math.abs(z) % 3) * 0.12, c: colors[(Math.abs(Math.floor(z)) + 1) % colors.length] });
-    // Right side
-    for (let z = -planD / 2 + 3; z < planD / 2; z += 4) arr.push({ x: planW / 2 + 2.5, z, s: 0.9 + (Math.abs(z) % 3) * 0.12, c: colors[(Math.abs(Math.floor(z)) + 2) % colors.length] });
-    // Front side landscaping band (skip center gate approach)
-    for (let x = -planW / 2 + 2; x < planW / 2; x += 2.8) {
-      if (Math.abs(x) < 3.2) continue;
-      arr.push({ x, z: planD / 2 - 1.6, s: 0.85 + (Math.abs(x) % 2) * 0.2, c: colors[(Math.abs(Math.floor(x)) + 3) % colors.length] });
-    }
-    return arr;
-  }, [planW, planD]);
+/* ─── Mulch beds + Stepping-Stone path ─── */
+const LandscapeBeds = ({ plan, gateX, corridors }: { plan: Plan; gateX: number; corridors: Rect[] }) => {
+  const halfW = plan.width / 2;
+  const halfD = plan.height / 2;
+  const bedWidth = 1.8;
+  const bedDepth = 1.2;
+  const mulchColor = "#4a3020";
+
+  const inCorridor = (x: number, z: number) => {
+    return corridors.some(c => x >= c.minX && x <= c.maxX && z >= c.minZ && z <= c.maxZ);
+  };
+
   return (
     <group>
-      {bushData.map((b, i) => (
-        <group key={i} position={[b.x, 0, b.z]}>
-          <mesh castShadow position={[0, b.s * 0.6, 0]}>
-            <sphereGeometry args={[b.s, 8, 6]} />
-            <meshStandardMaterial color={b.c} roughness={0.9} />
+      {/* Mulch perimeter strips along walls (slightly wider than bushes) */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, -halfD - 1.5]}>
+        <planeGeometry args={[plan.width + 4, 1.6]} />
+        <meshStandardMaterial color={mulchColor} roughness={1} />
+      </mesh>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[-halfW - 1.5, 0.005, 0]}>
+        <planeGeometry args={[1.6, plan.height + 4]} />
+        <meshStandardMaterial color={mulchColor} roughness={1} />
+      </mesh>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[halfW + 1.5, 0.005, 0]}>
+        <planeGeometry args={[1.6, plan.height + 4]} />
+        <meshStandardMaterial color={mulchColor} roughness={1} />
+      </mesh>
+      {/* Front mulch (split around path) */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[(-halfW + (gateX - 2.5)) / 2, 0.005, halfD - 1.0]}>
+        <planeGeometry args={[Math.max(0.1, (gateX - 2.5) - (-halfW)), 1.4]} />
+        <meshStandardMaterial color={mulchColor} roughness={1} />
+      </mesh>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[((gateX + 2.5) + halfW) / 2, 0.005, halfD - 1.0]}>
+        <planeGeometry args={[Math.max(0.1, halfW - (gateX + 2.5)), 1.4]} />
+        <meshStandardMaterial color={mulchColor} roughness={1} />
+      </mesh>
+    </group>
+  );
+};
+
+const FrontWalkway = ({ plan, gateX, plotD }: { plan: Plan; gateX: number; plotD: number }) => {
+  const door = useMemo(() => findMainDoorWorld(plan), [plan]);
+  if (!door) return null;
+
+  const halfPlotD = plotD / 2;
+  const walkwayWidth = 1.8; // full width
+
+  // Path: gate (at plot front) -> approach -> door
+  const gateZ = halfPlotD + 0.5;
+  const doorApproachZ = door.z + door.nz * 1.8;
+
+  return (
+    <group>
+      {/* Main paved walkway from gate toward door */}
+      <mesh receiveShadow position={[gateX, 0.012, (gateZ + doorApproachZ) / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[walkwayWidth, gateZ - doorApproachZ]} />
+        <meshStandardMaterial color="#cfcfcf" roughness={0.92} />
+      </mesh>
+      {/* Horizontal approach to door */}
+      <mesh receiveShadow position={[(gateX + door.x) / 2, 0.012, doorApproachZ]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[Math.abs(door.x - gateX) + walkwayWidth / 2, walkwayWidth]} />
+        <meshStandardMaterial color="#cfcfcf" roughness={0.92} />
+      </mesh>
+      {/* Steps at the door */}
+      {[1, 2, 3].map((i) => (
+        <group key={`step-${i}`} position={[door.x, 0.05 * i, door.z + door.nz * (0.6 + i * 0.35)]}>
+          <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[walkwayWidth, 0.4]} />
+            <meshStandardMaterial color="#d8d8d8" roughness={0.85} />
           </mesh>
-          <mesh castShadow position={[b.s * 0.4, b.s * 0.4, 0]}>
-            <sphereGeometry args={[b.s * 0.7, 6, 5]} />
-            <meshStandardMaterial color={b.c === '#3d6b3d' ? '#4a7a4a' : '#3d6b3d'} roughness={0.9} />
+          {/* Step riser */}
+          <mesh position={[0, 0.18, -0.2]}>
+            <boxGeometry args={[walkwayWidth, 0.36, 0.12]} />
+            <meshStandardMaterial color="#b8b8b8" roughness={0.85} />
           </mesh>
         </group>
       ))}
+      {/* Door landing pad */}
+      <mesh receiveShadow position={[door.x, 0.015, door.z + door.nz * 0.3]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[walkwayWidth + 0.4, 0.8]} />
+        <meshStandardMaterial color="#d8d8d8" roughness={0.85} />
+      </mesh>
     </group>
   );
 };
@@ -1255,7 +2020,7 @@ const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom, hideRoof }: {
   };
 
   (firstFloorPlan?.rooms || []).forEach(room => {
-    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony') return;
+    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony' || room.type === 'hallway') return;
     const rX = room.x, rY = room.y, rW = room.w, rH = room.h;
     const getAbsDoors = (wall: string) => (room.doors || []).filter((d:any) => d.wall === wall).map((d:any) => {
       let doorCategory: 'main' | 'room' | 'bathroom' = 'room';
