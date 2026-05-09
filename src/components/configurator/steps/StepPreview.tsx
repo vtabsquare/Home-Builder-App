@@ -620,6 +620,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                             doors: updatedR.doors,
                             windows: updatedR.windows,
                             orientation: updatedR.orientation,
+                            openWalls: updatedR.openWalls,
                             furniture: updatedR.furniture.length > 0 ? updatedR.furniture : r.furniture
                           };
                         }

@@ -45,6 +45,8 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [roomCounter, setRoomCounter] = useState(0);
+  const [isWallMode, setIsWallMode] = useState(false);
+  const [wallPopup, setWallPopup] = useState<{ roomId: string, wall: string, x: number, y: number } | null>(null);
 
   // Update plan when homeType changes
   useEffect(() => {
@@ -307,6 +309,17 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
             <RotateCw size={12} /> Rotate
           </button>
           <button
+            onClick={() => {
+              setIsWallMode(!isWallMode);
+              setWallPopup(null);
+            }}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase border transition-all active:scale-95 ${
+              isWallMode ? 'bg-clay text-white border-transparent' : 'bg-white border-border hover:bg-surface'
+            }`}
+          >
+            <Maximize size={12} /> {isWallMode ? 'Exit Wall Mode' : 'Add/Remove Wall'}
+          </button>
+          <button
             onClick={() => deleteRoom(selectedRoomId!)}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition-all active:scale-95"
           >
@@ -329,6 +342,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
           onPointerDown={(e) => {
             if (e.target === e.target.getStage()) {
               setSelectedRoomId(null);
+              setWallPopup(null);
             }
           }}
           draggable
@@ -403,8 +417,6 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                     width={rw}
                     height={rh}
                     fill={room.color}
-                    stroke={isSelected ? '#2563eb' : '#2c2c2c'}
-                    strokeWidth={isSelected ? 4 : 2}
                     cornerRadius={2}
                     shadowColor={isSelected ? '#2563eb' : 'black'}
                     shadowBlur={isSelected ? 12 : 4}
@@ -412,24 +424,30 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                     shadowOffsetY={2}
                   />
 
-                  {/* Individual Walls for Hall/Hallway */}
-                  {(room.type === 'living' || room.type === 'hallway') && (
+                  {/* Individual Walls */}
+                  {(true) && (
                     <>
                       {/* Top Wall */}
                       <Line 
                         points={[0, 0, rw, 0]} 
-                        stroke={room.openWalls?.includes('top') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
-                        strokeWidth={3} 
-                        hitStrokeWidth={10}
+                        stroke={room.openWalls?.includes('top') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
+                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+                        hitStrokeWidth={25}
                         onClick={(e) => {
                           e.cancelBubble = true;
-                          const openWalls = room.openWalls || [];
-                          const newOpenWalls = openWalls.includes('top')
-                            ? openWalls.filter(w => w !== 'top')
-                            : [...openWalls, 'top' as any];
-                          const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
-                          setPlan(updated);
-                          onChange?.(updated);
+                          if (isWallMode) {
+                            const stage = e.target.getStage();
+                            const pos = stage.getPointerPosition();
+                            setWallPopup({ roomId: room.id, wall: 'top', x: pos.x, y: pos.y });
+                          } else {
+                            const openWalls = room.openWalls || [];
+                            const newOpenWalls = openWalls.includes('top')
+                              ? openWalls.filter(w => w !== 'top')
+                              : [...openWalls, 'top' as any];
+                            const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
+                            setPlan(updated);
+                            onChange?.(updated);
+                          }
                         }}
                         onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
                         onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
@@ -437,18 +455,24 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                       {/* Bottom Wall */}
                       <Line 
                         points={[0, rh, rw, rh]} 
-                        stroke={room.openWalls?.includes('bottom') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
-                        strokeWidth={3} 
-                        hitStrokeWidth={10}
+                        stroke={room.openWalls?.includes('bottom') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
+                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+                        hitStrokeWidth={25}
                         onClick={(e) => {
                           e.cancelBubble = true;
-                          const openWalls = room.openWalls || [];
-                          const newOpenWalls = openWalls.includes('bottom')
-                            ? openWalls.filter(w => w !== 'bottom')
-                            : [...openWalls, 'bottom' as any];
-                          const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
-                          setPlan(updated);
-                          onChange?.(updated);
+                          if (isWallMode) {
+                            const stage = e.target.getStage();
+                            const pos = stage.getPointerPosition();
+                            setWallPopup({ roomId: room.id, wall: 'bottom', x: pos.x, y: pos.y });
+                          } else {
+                            const openWalls = room.openWalls || [];
+                            const newOpenWalls = openWalls.includes('bottom')
+                              ? openWalls.filter(w => w !== 'bottom')
+                              : [...openWalls, 'bottom' as any];
+                            const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
+                            setPlan(updated);
+                            onChange?.(updated);
+                          }
                         }}
                         onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
                         onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
@@ -456,18 +480,24 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                       {/* Left Wall */}
                       <Line 
                         points={[0, 0, 0, rh]} 
-                        stroke={room.openWalls?.includes('left') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
-                        strokeWidth={3} 
-                        hitStrokeWidth={10}
+                        stroke={room.openWalls?.includes('left') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
+                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+                        hitStrokeWidth={25}
                         onClick={(e) => {
                           e.cancelBubble = true;
-                          const openWalls = room.openWalls || [];
-                          const newOpenWalls = openWalls.includes('left')
-                            ? openWalls.filter(w => w !== 'left')
-                            : [...openWalls, 'left' as any];
-                          const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
-                          setPlan(updated);
-                          onChange?.(updated);
+                          if (isWallMode) {
+                            const stage = e.target.getStage();
+                            const pos = stage.getPointerPosition();
+                            setWallPopup({ roomId: room.id, wall: 'left', x: pos.x, y: pos.y });
+                          } else {
+                            const openWalls = room.openWalls || [];
+                            const newOpenWalls = openWalls.includes('left')
+                              ? openWalls.filter(w => w !== 'left')
+                              : [...openWalls, 'left' as any];
+                            const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
+                            setPlan(updated);
+                            onChange?.(updated);
+                          }
                         }}
                         onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
                         onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
@@ -475,18 +505,24 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                       {/* Right Wall */}
                       <Line 
                         points={[rw, 0, rw, rh]} 
-                        stroke={room.openWalls?.includes('right') ? 'rgba(0,0,0,0.1)' : "#2c2c2c"} 
-                        strokeWidth={3} 
-                        hitStrokeWidth={10}
+                        stroke={room.openWalls?.includes('right') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
+                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+                        hitStrokeWidth={25}
                         onClick={(e) => {
                           e.cancelBubble = true;
-                          const openWalls = room.openWalls || [];
-                          const newOpenWalls = openWalls.includes('right')
-                            ? openWalls.filter(w => w !== 'right')
-                            : [...openWalls, 'right' as any];
-                          const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
-                          setPlan(updated);
-                          onChange?.(updated);
+                          if (isWallMode) {
+                            const stage = e.target.getStage();
+                            const pos = stage.getPointerPosition();
+                            setWallPopup({ roomId: room.id, wall: 'right', x: pos.x, y: pos.y });
+                          } else {
+                            const openWalls = room.openWalls || [];
+                            const newOpenWalls = openWalls.includes('right')
+                              ? openWalls.filter(w => w !== 'right')
+                              : [...openWalls, 'right' as any];
+                            const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
+                            setPlan(updated);
+                            onChange?.(updated);
+                          }
                         }}
                         onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
                         onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
@@ -630,6 +666,116 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
           Save Layout
         </button>
       </div>
+
+      {wallPopup && (
+        <div 
+          className="absolute z-50 flex flex-col gap-1 rounded-xl bg-white p-1 shadow-2xl border border-border animate-in zoom-in-95 duration-200"
+          style={{ left: wallPopup.x, top: wallPopup.y - 40, transform: 'translateX(-50%)' }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              const sourceRoom = plan.rooms.find(r => r.id === wallPopup.roomId);
+              if (!sourceRoom) return;
+
+              const updated = {
+                ...plan,
+                rooms: plan.rooms.map(r => {
+                  const wall = wallPopup.wall;
+                  let isAdjacent = (r.id === wallPopup.roomId);
+                  let targetWall = wall;
+                  
+                  if (r.id !== wallPopup.roomId) {
+                    if (wall === 'top' && Math.abs((r.y + r.h) - sourceRoom.y) < 0.5) {
+                      if (Math.max(r.x, sourceRoom.x) < Math.min(r.x + r.w, sourceRoom.x + sourceRoom.w) - 0.1) {
+                        isAdjacent = true; targetWall = 'bottom';
+                      }
+                    } else if (wall === 'bottom' && Math.abs(r.y - (sourceRoom.y + sourceRoom.h)) < 0.5) {
+                      if (Math.max(r.x, sourceRoom.x) < Math.min(r.x + r.w, sourceRoom.x + sourceRoom.w) - 0.1) {
+                        isAdjacent = true; targetWall = 'top';
+                      }
+                    } else if (wall === 'left' && Math.abs((r.x + r.w) - sourceRoom.x) < 0.5) {
+                      if (Math.max(r.y, sourceRoom.y) < Math.min(r.y + r.h, sourceRoom.y + sourceRoom.h) - 0.1) {
+                        isAdjacent = true; targetWall = 'right';
+                      }
+                    } else if (wall === 'right' && Math.abs(r.x - (sourceRoom.x + sourceRoom.w)) < 0.5) {
+                      if (Math.max(r.y, sourceRoom.y) < Math.min(r.y + r.h, sourceRoom.y + sourceRoom.h) - 0.1) {
+                        isAdjacent = true; targetWall = 'left';
+                      }
+                    }
+                  }
+
+                  if (isAdjacent) {
+                    return { ...r, openWalls: (r.openWalls || []).filter(w => w !== targetWall) };
+                  }
+                  return r;
+                })
+              };
+              setPlan(updated);
+              onChange?.(updated);
+              setWallPopup(null);
+            }}
+            className="flex h-8 items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase text-emerald-700 hover:bg-emerald-50 transition-colors"
+          >
+            <Plus size={12} /> Add Wall
+          </button>
+          <div className="h-px w-full bg-border" />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              const sourceRoom = plan.rooms.find(r => r.id === wallPopup.roomId);
+              if (!sourceRoom) return;
+
+              const updated = {
+                ...plan,
+                rooms: plan.rooms.map(r => {
+                  const wall = wallPopup.wall;
+                  let isAdjacent = (r.id === wallPopup.roomId);
+                  let targetWall = wall;
+                  
+                  if (r.id !== wallPopup.roomId) {
+                    if (wall === 'top' && Math.abs((r.y + r.h) - sourceRoom.y) < 0.5) {
+                      if (Math.max(r.x, sourceRoom.x) < Math.min(r.x + r.w, sourceRoom.x + sourceRoom.w) - 0.1) {
+                        isAdjacent = true; targetWall = 'bottom';
+                      }
+                    } else if (wall === 'bottom' && Math.abs(r.y - (sourceRoom.y + sourceRoom.h)) < 0.5) {
+                      if (Math.max(r.x, sourceRoom.x) < Math.min(r.x + r.w, sourceRoom.x + sourceRoom.w) - 0.1) {
+                        isAdjacent = true; targetWall = 'top';
+                      }
+                    } else if (wall === 'left' && Math.abs((r.x + r.w) - sourceRoom.x) < 0.5) {
+                      if (Math.max(r.y, sourceRoom.y) < Math.min(r.y + r.h, sourceRoom.y + sourceRoom.h) - 0.1) {
+                        isAdjacent = true; targetWall = 'right';
+                      }
+                    } else if (wall === 'right' && Math.abs(r.x - (sourceRoom.x + sourceRoom.w)) < 0.5) {
+                      if (Math.max(r.y, sourceRoom.y) < Math.min(r.y + r.h, sourceRoom.y + sourceRoom.h) - 0.1) {
+                        isAdjacent = true; targetWall = 'left';
+                      }
+                    }
+                  }
+
+                  if (isAdjacent) {
+                    const openWalls = r.openWalls || [];
+                    if (!openWalls.includes(targetWall as any)) {
+                      return { ...r, openWalls: [...openWalls, targetWall as any] };
+                    }
+                  }
+                  return r;
+                })
+              };
+              setPlan(updated);
+              onChange?.(updated);
+              setWallPopup(null);
+            }}
+            className="flex h-8 items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 size={12} /> Remove Wall
+          </button>
+        </div>
+      )}
     </div>
   );
 };
