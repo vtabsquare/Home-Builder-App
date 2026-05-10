@@ -460,8 +460,18 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
     if (existing) {
       existing.start = Math.min(existing.start, start);
       existing.end = Math.max(existing.end, end);
-      existing.doors.push(...doors);
-      existing.windows.push(...windows);
+      // Dedup doors/windows by absPos so shared-wall openings (e.g., hallway↔room)
+      // don't render twice when both rooms contribute the same wall segment.
+      for (const d of doors) {
+        if (!existing.doors.some((ed: any) => Math.abs(ed.absPos - d.absPos) < 0.3)) {
+          existing.doors.push(d);
+        }
+      }
+      for (const w of windows) {
+        if (!existing.windows.some((ew: any) => Math.abs(ew.absPos - w.absPos) < 0.3)) {
+          existing.windows.push(w);
+        }
+      }
     } else {
       extractedWalls.push({ type, coord, start, end, doors: [...doors], windows: [...windows] });
     }
@@ -469,9 +479,10 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
 
   (plan.rooms || []).forEach(room => {
     // Only extract solid walls for enclosed rooms.
-    // Hallways are floor-only corridors — their perimeter walls (if any)
-    // come from adjacent rooms (bedrooms, bathrooms, kitchen) via dedup.
-    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony' || room.type === 'hallway') return;
+    // Hallways still need to participate so user-added walls (via "Add Wall")
+    // facing exteriors / non-enclosed neighbors are rendered.
+    // Dedup at the same coord merges with adjacent room walls automatically.
+    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony') return;
 
     const rX = room.x;
     const rY = room.y;
