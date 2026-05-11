@@ -235,8 +235,47 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
   const safeD = plan.height || 0;
   const plotW = safeW + PLOT_PADDING_FT * 2;
   const plotD = safeD + PLOT_PADDING_FT * 2;
-  const gatePos = Math.max(0.1, Math.min(0.9, plan.plotEntranceX ?? 0.5));
-  const gateX = -plotW / 2 + gatePos * plotW;
+  const mainDoor = useMemo(() => findMainDoorWorld(plan), [plan]);
+  const gateConfig = useMemo(() => {
+    const hw = plotW / 2;
+    const hd = plotD / 2;
+    const gPos = Math.max(0.1, Math.min(0.9, plan.plotEntranceX ?? 0.5));
+    
+    // Default fallback
+    const defaultGate = { x: -hw + gPos * plotW, z: hd, side: 'bottom' as Side };
+
+    if (!mainDoor) return defaultGate;
+
+    // "Focusing main door" means aligning with it.
+    // We place the gate on the side the main door faces, at its X/Z coordinate.
+    if (mainDoor.nz === -1) return { x: mainDoor.x, z: -hd, side: 'top' as Side };
+    if (mainDoor.nz === 1) return { x: mainDoor.x, z: hd, side: 'bottom' as Side };
+    if (mainDoor.nx === -1) return { x: -hw, z: mainDoor.z, side: 'left' as Side };
+    if (mainDoor.nx === 1) return { x: hw, z: mainDoor.z, side: 'right' as Side };
+
+    return defaultGate;
+  }, [mainDoor, plan.plotEntranceX, plotW, plotD]);
+
+  const carportInfo = useMemo(() => getCarportInfo(plan), [plan]);
+
+  const gates = useMemo(() => {
+    const list = [{ ...gateConfig, isCarGate: false }];
+    if (addons.includes('carport') && carportInfo) {
+      // Add a wide car gate in front of the carport
+      const hw = plotW / 2;
+      const hd = plotD / 2;
+      const side = gateConfig.side;
+      let gx = carportInfo.cx;
+      let gz = hd;
+      if (side === 'top') gz = -hd;
+      else if (side === 'bottom') gz = hd;
+      else if (side === 'left') { gx = -hw; gz = carportInfo.cz; }
+      else if (side === 'right') { gx = hw; gz = carportInfo.cz; }
+      
+      list.push({ x: gx, z: gz, side, isCarGate: true });
+    }
+    return list;
+  }, [gateConfig, carportInfo, addons, plotW, plotD]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-2xl bg-gradient-to-b from-[hsl(210,35%,22%)] to-[hsl(210,30%,12%)]">
@@ -278,19 +317,19 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           )}
           
           
-          {addons.includes('carport') && <Carport plan={plan} plotW={plotW} plotD={plotD} />}
+          {addons.includes('carport') && <Carport plan={plan} plotW={plotW} plotD={plotD} gateSide={gateConfig.side} />}
 
           {addons.includes('landscaping') && (() => {
-            const corridors = computeCorridors(plan, plotW, plotD, gateX);
+            const corridors = computeCorridors(plan, plotW, plotD, gateConfig.x, gateConfig.z, gateConfig.side);
             return (
               <>
-                <FrontWalkway plan={plan} gateX={gateX} plotD={plotD} />
+                <FrontWalkway plan={plan} gateX={gateConfig.x} plotD={plotD} />
                 <Trees planW={plotW} planD={plotD} corridors={corridors} />
                 <Bushes planW={plotW} planD={plotD} corridors={corridors} />
               </>
             );
           })()}
-          {addons.includes('fence') && <FenceAround planW={plotW} planD={plotD} gateX={gateX} />}
+          {addons.includes('fence') && <FenceAround planW={plotW} planD={plotD} gates={gates} isNight={isNight} />}
           
           <CameraController activeRoom={activeRoom} plan={plan} />
           <ContactShadows position={[0, 0.02, 0]} opacity={isNight ? 0.28 : 0.32} scale={80} blur={2} far={40} />
@@ -362,27 +401,6 @@ const GrassField = ({ planW, planD }: { planW: number; planD: number }) => {
           <meshStandardMaterial color={p.c} roughness={1} />
         </mesh>
       ))}
-      {/* Front featured trees */}
-      <group position={[-planW * 0.18, 0, planD / 2 - 1.4]}>
-        <mesh castShadow position={[0, 2.8, 0]}>
-          <cylinderGeometry args={[0.24, 0.34, 5.4, 7]} />
-          <meshStandardMaterial color="#3a2a1a" roughness={0.9} />
-        </mesh>
-        <mesh castShadow position={[0, 5.8, 0]}>
-          <sphereGeometry args={[2.3, 10, 8]} />
-          <meshStandardMaterial color="#2f5f2f" roughness={0.85} />
-        </mesh>
-      </group>
-      <group position={[planW * 0.18, 0, planD / 2 - 1.3]}>
-        <mesh castShadow position={[0, 2.7, 0]}>
-          <cylinderGeometry args={[0.22, 0.33, 5.2, 7]} />
-          <meshStandardMaterial color="#3a2a1a" roughness={0.9} />
-        </mesh>
-        <mesh castShadow position={[0, 5.6, 0]}>
-          <sphereGeometry args={[2.2, 10, 8]} />
-          <meshStandardMaterial color="#366836" roughness={0.85} />
-        </mesh>
-      </group>
     </group>
   );
 };
@@ -1593,7 +1611,7 @@ const ParkedCar = ({ color = '#1f2937', accent = '#0a0a0a' }: { color?: string; 
   );
 };
 
-const Carport = ({ plan, plotW, plotD }: { plan: Plan; plotW: number; plotD: number }) => {
+const Carport = ({ plan, plotW, plotD, gateSide }: { plan: Plan; plotW: number; plotD: number; gateSide: Side }) => {
   const info = useMemo(() => getCarportInfo(plan), [plan]);
   if (!info) return null;
   const { cx, cz, w: cw, h: ch, side } = info;
@@ -1608,10 +1626,11 @@ const Carport = ({ plan, plotW, plotD }: { plan: Plan; plotW: number; plotD: num
   let dwMinX = 0, dwMaxX = 0, dwMinZ = 0, dwMaxZ = 0;
   let carYaw = 0; // car orientation
 
-  const isVertical = ch >= cw;
+  const openingSide = gateSide;
+  const isVertical = openingSide === 'top' || openingSide === 'bottom';
 
   if (isVertical) {
-    if (side === 'top') {
+    if (openingSide === 'top') {
       dwMinX = cx - cw / 2 + 0.6; dwMaxX = cx + cw / 2 - 0.6;
       dwMinZ = -halfPlotD; dwMaxZ = cz - ch / 2 - rampL;
       carYaw = Math.PI; // facing back
@@ -1621,7 +1640,7 @@ const Carport = ({ plan, plotW, plotD }: { plan: Plan; plotW: number; plotD: num
       carYaw = 0; // facing front
     }
   } else {
-    if (side === 'left') {
+    if (openingSide === 'left') {
       dwMinX = -halfPlotW; dwMaxX = cx - cw / 2 - rampL;
       dwMinZ = cz - ch / 2 + 0.6; dwMaxZ = cz + ch / 2 - 0.6;
       carYaw = -Math.PI / 2; // facing left
@@ -1661,7 +1680,7 @@ const Carport = ({ plan, plotW, plotD }: { plan: Plan; plotW: number; plotD: num
 
         {/* Ramp */}
         {isVertical ? (
-          side === 'top' ? (
+          openingSide === 'top' ? (
             <mesh position={[0, cpElevation / 2, -ch / 2 - rampL / 2]} rotation={[-rampAngle, 0, 0]} receiveShadow>
               <boxGeometry args={[cw - 1.2, 0.1, rampHypot]} />
               <meshStandardMaterial color="#9a9a96" roughness={0.95} />
@@ -1673,7 +1692,7 @@ const Carport = ({ plan, plotW, plotD }: { plan: Plan; plotW: number; plotD: num
             </mesh>
           )
         ) : (
-          side === 'left' ? (
+          openingSide === 'left' ? (
             <mesh position={[-cw / 2 - rampL / 2, cpElevation / 2, 0]} rotation={[0, 0, rampAngle]} receiveShadow>
               <boxGeometry args={[rampHypot, 0.1, ch - 1.2]} />
               <meshStandardMaterial color="#9a9a96" roughness={0.95} />
@@ -1686,46 +1705,17 @@ const Carport = ({ plan, plotW, plotD }: { plan: Plan; plotW: number; plotD: num
           )
         )}
 
-        {/* Four steel posts */}
-        {[
-          [-cw / 2 + 0.4, -ch / 2 + 0.4],
-          [-cw / 2 + 0.4, ch / 2 - 0.4],
-          [cw / 2 - 0.4, -ch / 2 + 0.4],
-          [cw / 2 - 0.4, ch / 2 - 0.4],
-        ].map(([x, z], i) => (
-          <group key={i} position={[x, cpElevation, z]}>
-            <mesh castShadow position={[0, 5.5, 0]}>
-              <cylinderGeometry args={[0.16, 0.18, 11, 12]} />
-              <meshStandardMaterial color="#2a2a2a" roughness={0.55} metalness={0.45} />
-            </mesh>
-            {/* Base plate */}
-            <mesh position={[0, 0.06, 0]}>
-              <boxGeometry args={[0.42, 0.12, 0.42]} />
-              <meshStandardMaterial color="#1a1a1a" roughness={0.6} metalness={0.4} />
-            </mesh>
-          </group>
-        ))}
-
-        {/* Roof slab — flat with subtle overhang */}
-        <mesh castShadow position={[0, cpElevation + 11.18, 0]}>
-          <boxGeometry args={[cw + 1.2, 0.36, ch + 1.2]} />
-          <meshStandardMaterial color="#2a2a2a" roughness={0.7} metalness={0.1} />
-        </mesh>
-        {/* Roof underside trim */}
-        <mesh position={[0, cpElevation + 10.96, 0]}>
-          <boxGeometry args={[cw + 1.0, 0.06, ch + 1.0]} />
-          <meshStandardMaterial color="#3a3a3a" roughness={0.6} />
-        </mesh>
+        {/* Car shed roof and pillars removed per user request for an open-air parking space */}
 
         {/* Wheel-stop curbs at the back of the bay */}
         {(() => {
           const stopGeom = isVertical ? [cw * 0.7, 0.18, 0.22] : [0.22, 0.18, ch * 0.7];
           let sp: [number, number, number] = [0, cpElevation + 0.09, 0];
           if (isVertical) {
-             if (side === 'top') sp = [0, cpElevation + 0.09, ch / 2 - 0.7]; // entrance -Z, back is +Z
+             if (openingSide === 'top') sp = [0, cpElevation + 0.09, ch / 2 - 0.7]; // entrance -Z, back is +Z
              else sp = [0, cpElevation + 0.09, -ch / 2 + 0.7]; // entrance +Z, back is -Z
           } else {
-             if (side === 'left') sp = [cw / 2 - 0.7, cpElevation + 0.09, 0]; // entrance -X, back is +X
+             if (openingSide === 'left') sp = [cw / 2 - 0.7, cpElevation + 0.09, 0]; // entrance -X, back is +X
              else sp = [-cw / 2 + 0.7, cpElevation + 0.09, 0]; // entrance +X, back is -X
           }
           return (
@@ -1773,7 +1763,7 @@ const Carport = ({ plan, plotW, plotD }: { plan: Plan; plotW: number; plotD: num
       )}
 
       {/* ── Parked car ── */}
-      <group position={[carX, cpElevation, carZ]} rotation={[0, carYaw, 0]} scale={[2.9, 2.9, 2.9]}>
+      <group position={[carX, cpElevation, carZ]} rotation={[0, carYaw, 0]} scale={[2.0, 2.0, 2.0]}>
         <ParkedCar color="#1f2a44" />
       </group>
     </group>
@@ -1786,6 +1776,8 @@ const computeCorridors = (
   plotW: number,
   plotD: number,
   gateX: number,
+  gateZ: number,
+  gateSide: Side,
 ): Rect[] => {
   const rects: Rect[] = [];
   const halfPlotW = plotW / 2;
@@ -1795,13 +1787,16 @@ const computeCorridors = (
   const ci = getCarportInfo(plan);
   if (ci) {
     const { cx, cz, w: cw, h: ch, side } = ci;
-    const isVertical = ch >= cw;
+    const openingSide = gateSide;
+    const isVertical = openingSide === 'top' || openingSide === 'bottom';
     if (isVertical) {
-      if (side === 'top') rects.push({ minX: cx - cw / 2 - 0.4, maxX: cx + cw / 2 + 0.4, minZ: -halfPlotD - 0.5, maxZ: cz - ch / 2 + 0.5 });
-      else rects.push({ minX: cx - cw / 2 - 0.4, maxX: cx + cw / 2 + 0.4, minZ: cz + ch / 2 - 0.5, maxZ: halfPlotD + 0.5 });
+      const clearW = Math.max(cw / 2 + 1.5, 7.5);
+      if (openingSide === 'top') rects.push({ minX: cx - clearW, maxX: cx + clearW, minZ: -halfPlotD - 1.0, maxZ: cz - ch / 2 + 1.0 });
+      else rects.push({ minX: cx - clearW, maxX: cx + clearW, minZ: cz + ch / 2 - 1.0, maxZ: halfPlotD + 1.0 });
     } else {
-      if (side === 'left') rects.push({ minX: -halfPlotW - 0.5, maxX: cx - cw / 2 + 0.5, minZ: cz - ch / 2 - 0.4, maxZ: cz + ch / 2 + 0.4 });
-      else rects.push({ minX: cx + cw / 2 - 0.5, maxX: halfPlotW + 0.5, minZ: cz - ch / 2 - 0.4, maxZ: cz + ch / 2 + 0.4 });
+      const clearH = Math.max(ch / 2 + 1.5, 7.5);
+      if (openingSide === 'left') rects.push({ minX: -halfPlotW - 1.0, maxX: cx - cw / 2 + 1.0, minZ: cz - clearH, maxZ: cz + clearH });
+      else rects.push({ minX: cx + cw / 2 - 1.0, maxX: halfPlotW + 1.0, minZ: cz - clearH, maxZ: cz + clearH });
     }
   }
 
@@ -1811,7 +1806,7 @@ const computeCorridors = (
     const wkW = 8.5; // Massive walkway clearance (17 units total width) to remove all surrounding bushes
     // Vertical leg from gate down toward door's z
     const aX = gateX;
-    const aZ1 = halfPlotD;
+    const aZ1 = gateZ;
     const aZ2 = door.z + door.nz * 1.0;
     rects.push({
       minX: Math.min(aX, door.x) - wkW,
@@ -1911,36 +1906,20 @@ const Trees = ({ planW, planD, corridors = [] }: { planW: number; planD: number;
     const hd = planD / 2;
     const blocked = (x: number, z: number) => pointInAnyRect(x, z, corridors, 1.2);
 
-    // Big anchor trees at far corners
-    arr.push({ x: -hw - 9, z: -hd - 8, s: 1.25, h: 11, kind: 'broadleaf', palette: 0 });
-    arr.push({ x: hw + 12, z: hd + 10, s: 1.15, h: 10.5, kind: 'broadleaf', palette: 2 });
-    arr.push({ x: hw + 13, z: -hd - 9, s: 1.05, h: 9, kind: 'broadleaf', palette: 1 });
-    arr.push({ x: -hw - 11, z: hd + 9, s: 1.1, h: 9.5, kind: 'broadleaf', palette: 3 });
-
-    // Cypress columns flanking the gate (front) — check if blocked by path
-    if (!blocked(-3.5, hd + 1.4)) arr.push({ x: -3.5, z: hd + 1.4, s: 0.9, h: 9, kind: 'cypress', palette: 0 });
-    if (!blocked(3.5, hd + 1.4)) arr.push({ x: 3.5, z: hd + 1.4, s: 0.9, h: 9, kind: 'cypress', palette: 1 });
-
-    // Side cypresses for accent
-    if (!blocked(-hw - 1.6, 0)) arr.push({ x: -hw - 1.6, z: 0, s: 0.8, h: 8, kind: 'cypress', palette: 2 });
-    if (!blocked(hw + 1.6, -0.5)) arr.push({ x: hw + 1.6, z: -0.5, s: 0.8, h: 8, kind: 'cypress', palette: 0 });
-
-    // Small ornamentals near front corners
-    if (!blocked(-hw + 2, hd - 2.2)) arr.push({ x: -hw + 2, z: hd - 2.2, s: 0.7, h: 4.5, kind: 'small', palette: 1 });
-    if (!blocked(hw - 2, hd - 2.2)) arr.push({ x: hw - 2, z: hd - 2.2, s: 0.7, h: 4.5, kind: 'small', palette: 4 });
+    // Background trees are now only placed at a significant distance from the plot
 
     // Distant background trees
     for (let i = 0; i < 18; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const dist = Math.max(hw, hd) + 16 + Math.random() * 36;
+      const dist = Math.max(hw, hd) + 32 + Math.random() * 40;
       const x = Math.cos(angle) * dist;
       const z = Math.sin(angle) * dist;
+      if (Math.abs(x) < planW / 2 + 12 && Math.abs(z) < planD / 2 + 12) continue;
       if (blocked(x, z)) continue;
       arr.push({ x, z, s: 0.85 + Math.random() * 0.5, h: 7 + Math.random() * 5, kind: Math.random() < 0.18 ? 'cypress' : 'broadleaf', palette: i });
     }
     return arr;
   }, [planW, planD, corridors]);
-
   return (
     <group>
       {treeData.map((t, i) => (
@@ -1952,98 +1931,104 @@ const Trees = ({ planW, planD, corridors = [] }: { planW: number; planD: number;
   );
 };
 
-const BUSH_GREENS = ['#3d6e3a', '#4a7a44', '#2f5f2f', '#356a36', '#5a8b50', '#3a6838', '#4f7d48'];
-const FLOWER_COLORS = ['#e85d75', '#f4a261', '#f7d046', '#9b5de5', '#f15bb5', '#fefae0', '#e76f51'];
+const POT_COLORS = ['#e85d75', '#f4a261', '#f7d046', '#9b5de5', '#f15bb5', '#fefae0', '#e76f51', '#8ac926', '#1982c4', '#ff595e'];
+
+const FlowerPot = ({ x, z, flowerColor, potType = 'square' }: { x: number; z: number; flowerColor: string; potType?: 'round' | 'square' }) => {
+  return (
+    <group position={[x, 0, z]}>
+      {/* Realistic Pot with Tapered Profile */}
+      <mesh castShadow position={[0, 0.35, 0]}>
+        {potType === 'square' ? <boxGeometry args={[0.8, 0.7, 0.8]} /> : <cylinderGeometry args={[0.5, 0.35, 0.8, 24]} />}
+        <meshStandardMaterial color="#1a1a1a" roughness={0.3} metalness={0.5} />
+      </mesh>
+      {/* Polished Gold Decorative Band */}
+      <mesh position={[0, 0.68, 0]}>
+        {potType === 'square' ? <boxGeometry args={[0.85, 0.06, 0.85]} /> : <cylinderGeometry args={[0.52, 0.52, 0.06, 24]} />}
+        <meshStandardMaterial color="#c9a84c" roughness={0.1} metalness={0.9} />
+      </mesh>
+      {/* Soil with dark organic texture */}
+      <mesh position={[0, 0.65, 0]}>
+        {potType === 'square' ? <boxGeometry args={[0.7, 0.1, 0.7]} /> : <cylinderGeometry args={[0.45, 0.45, 0.1, 16]} />}
+        <meshStandardMaterial color="#1e140a" roughness={1} />
+      </mesh>
+      
+      {/* Detailed Plant Structure */}
+      <group position={[0, 0.75, 0]}>
+        {/* Central Stem */}
+        <mesh position={[0, 0.25, 0]}>
+          <cylinderGeometry args={[0.03, 0.05, 0.6, 8]} />
+          <meshStandardMaterial color="#1b3b1b" />
+        </mesh>
+        
+        {/* Lush Base Leaves */}
+        <group scale={[1.2, 0.8, 1.2]}>
+          <mesh castShadow position={[0, 0.1, 0]}>
+            <sphereGeometry args={[0.5, 12, 10]} />
+            <meshStandardMaterial color="#2d5a2d" roughness={0.9} />
+          </mesh>
+        </group>
+
+        {/* Realistic Flowers with Petals */}
+        {[
+          { p: [-0.3, 0.6, 0.1], s: 0.22 },
+          { p: [0.25, 0.5, 0.3], s: 0.25 },
+          { p: [0.05, 0.7, -0.2], s: 0.2 }
+        ].map((f, i) => (
+          <group key={i} position={f.p as [number, number, number]}>
+            {/* Flower Center */}
+            <mesh castShadow>
+              <sphereGeometry args={[0.1, 8, 8]} />
+              <meshStandardMaterial color="#332211" />
+            </mesh>
+            {/* Petals - arranged in a circle */}
+            {Array.from({ length: 6 }).map((_, pi) => {
+              const angle = (pi / 6) * Math.PI * 2;
+              return (
+                <mesh 
+                  key={pi} 
+                  position={[Math.cos(angle) * 0.18, 0, Math.sin(angle) * 0.18]}
+                  rotation={[Math.PI / 4, angle, 0]}
+                >
+                  <sphereGeometry args={[0.14, 8, 4]} scale={[1, 0.3, 1]} />
+                  <meshStandardMaterial color={flowerColor} emissive={flowerColor} emissiveIntensity={0.4} />
+                </mesh>
+              );
+            })}
+          </group>
+        ))}
+      </group>
+    </group>
+  );
+};
 
 const Bushes = ({ planW, planD, corridors = [] }: { planW: number; planD: number; corridors?: Rect[] }) => {
-  const data = useMemo(() => {
+  const pots = useMemo(() => {
     const hw = planW / 2;
     const hd = planD / 2;
-    const arr: { x: number; z: number; s: number; c: string; h?: number }[] = [];
-    const blocked = (x: number, z: number) => pointInAnyRect(x, z, corridors, 0.5);
+    const arr: { x: number; z: number; c: string; type: 'round' | 'square' }[] = [];
+    const blocked = (x: number, z: number) => pointInAnyRect(x, z, corridors, 0.8);
 
-    // Foundation hedge along back wall (continuous)
-    for (let x = -hw + 1.5; x <= hw - 1.5; x += 3.2) {
-      if (blocked(x, -hd - 1.5)) continue;
-      const c = BUSH_GREENS[(Math.abs(Math.floor(x * 3)) % BUSH_GREENS.length)];
-      arr.push({ x, z: -hd - 1.5, s: 1.05 + ((Math.abs(x) * 1.3) % 0.35), c });
+    // RESTRICTED TO FRONT GARDEN ONLY
+    const spacing = 4.0;
+    // Front Garden Row (inside the fence area)
+    for (let x = -hw + 3; x <= hw - 3; x += spacing) {
+      const zPos = hd - 2.5; // Moved slightly further inside the plot
+      if (blocked(x, zPos)) continue;
+      arr.push({ 
+        x, 
+        z: zPos, 
+        c: POT_COLORS[Math.abs(Math.floor(x * 1.7)) % POT_COLORS.length],
+        type: (Math.abs(Math.floor(x)) % 2 === 0) ? 'square' : 'round'
+      });
     }
-    // Foundation hedge along left + right walls
-    for (let z = -hd + 2; z < hd - 2; z += 3.2) {
-      if (!blocked(-hw - 1.5, z)) arr.push({ x: -hw - 1.5, z, s: 1.0 + ((Math.abs(z) * 0.7) % 0.35), c: BUSH_GREENS[(Math.abs(Math.floor(z * 2)) % BUSH_GREENS.length)] });
-      if (!blocked(hw + 1.5, z)) arr.push({ x: hw + 1.5, z, s: 1.0 + ((Math.abs(z) * 0.6) % 0.35), c: BUSH_GREENS[(Math.abs(Math.floor(z * 2)) + 2) % BUSH_GREENS.length] });
-    }
-    // Front planting band
-    for (let x = -hw + 1.5; x <= hw - 1.5; x += 3.2) {
-      if (blocked(x, hd - 1.4)) continue;
-      arr.push({ x, z: hd - 1.4, s: 0.95 + ((Math.abs(x) * 1.7) % 0.35), c: BUSH_GREENS[(Math.abs(Math.floor(x * 5)) % BUSH_GREENS.length)] });
-    }
-    // Scatter accent ornamentals around the lawn
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * Math.PI * 2 + 0.3;
-      const dist = Math.max(hw, hd) * 0.7 + (i % 3) * 1.2;
-      const x = Math.cos(angle) * dist, z = Math.sin(angle) * dist;
-      if (blocked(x, z)) continue;
-      arr.push({ x, z, s: 0.6 + (i % 3) * 0.18, c: BUSH_GREENS[i % BUSH_GREENS.length] });
-    }
-    return arr;
-  }, [planW, planD, corridors]);
 
-  // Flower bed positions — colorful pops near front and along walls
-  const flowers = useMemo(() => {
-    const hw = planW / 2;
-    const hd = planD / 2;
-    const arr: { x: number; z: number; s: number; c: string }[] = [];
-    const blocked = (x: number, z: number) => pointInAnyRect(x, z, corridors, 0.5);
-    // Front-edge flowers (alternating colors)
-    for (let x = -hw + 1.2; x <= hw - 1.2; x += 0.7) {
-      if (blocked(x, hd - 0.9)) continue;
-      arr.push({ x, z: hd - 0.9, s: 0.16 + (Math.abs(x) % 0.08), c: FLOWER_COLORS[(Math.abs(Math.floor(x * 7))) % FLOWER_COLORS.length] });
-    }
-    // Side patches
-    for (let z = -hd + 3; z < hd - 3; z += 1.0) {
-      if (Math.random() < 0.55 && !blocked(-hw - 0.9, z)) {
-        arr.push({ x: -hw - 0.9, z, s: 0.14 + Math.random() * 0.06, c: FLOWER_COLORS[(Math.abs(Math.floor(z * 5))) % FLOWER_COLORS.length] });
-      }
-      if (Math.random() < 0.55 && !blocked(hw + 0.9, z)) {
-        arr.push({ x: hw + 0.9, z, s: 0.14 + Math.random() * 0.06, c: FLOWER_COLORS[(Math.abs(Math.floor(z * 7)) + 2) % FLOWER_COLORS.length] });
-      }
-    }
     return arr;
   }, [planW, planD, corridors]);
 
   return (
     <group>
-      {/* Lush layered bushes */}
-      {data.map((b, i) => (
-        <group key={`bush-${i}`} position={[b.x, 0, b.z]}>
-          <mesh castShadow receiveShadow position={[0, b.s * 0.55, 0]}>
-            <sphereGeometry args={[b.s, 12, 9]} />
-            <meshStandardMaterial color={b.c} roughness={0.92} />
-          </mesh>
-          <mesh castShadow position={[b.s * 0.35, b.s * 0.85, b.s * 0.2]}>
-            <sphereGeometry args={[b.s * 0.7, 10, 8]} />
-            <meshStandardMaterial color={BUSH_GREENS[(i + 2) % BUSH_GREENS.length]} roughness={0.92} />
-          </mesh>
-          <mesh castShadow position={[-b.s * 0.4, b.s * 0.5, -b.s * 0.15]}>
-            <sphereGeometry args={[b.s * 0.6, 10, 7]} />
-            <meshStandardMaterial color={BUSH_GREENS[(i + 4) % BUSH_GREENS.length]} roughness={0.92} />
-          </mesh>
-        </group>
-      ))}
-
-      {/* Flowers — small colorful spheres */}
-      {flowers.map((f, i) => (
-        <group key={`fl-${i}`} position={[f.x, 0, f.z]}>
-          <mesh position={[0, f.s * 1.1, 0]} castShadow>
-            <sphereGeometry args={[f.s, 8, 6]} />
-            <meshStandardMaterial color={f.c} roughness={0.7} emissive={f.c} emissiveIntensity={0.05} />
-          </mesh>
-          <mesh position={[0, f.s * 0.55, 0]}>
-            <cylinderGeometry args={[0.018, 0.024, f.s * 1.1, 5]} />
-            <meshStandardMaterial color="#3a6b3a" roughness={0.95} />
-          </mesh>
-        </group>
+      {pots.map((p, i) => (
+        <FlowerPot key={i} x={p.x} z={p.z} flowerColor={p.c} potType={p.type} />
       ))}
     </group>
   );
@@ -2093,18 +2078,34 @@ const FrontWalkway = ({ plan, gateX, plotD }: { plan: Plan; gateX: number; plotD
   return null; // Removed legacy white pathway in favor of the new custom marble pathway
 };
 
-const FenceAround = ({ planW, planD, gateX }: { planW: number; planD: number; gateX: number }) => {
+const FenceAround = ({ planW, planD, gates, isNight }: { planW: number; planD: number; gates: any[]; isNight?: boolean }) => {
   const hw = planW / 2;
   const hd = planD / 2;
-  const gateHalf = 2.2;
-  // Corner pillars and intermediate posts
+
+  // Corner pillars
   const pillars: [number, number][] = [[-hw, -hd], [-hw, hd], [hw, -hd], [hw, hd]];
+  
+  // Posts
   const posts: [number, number][] = [];
+  const isPointInAnyGate = (x: number, z: number) => {
+    return gates.some(g => {
+      const half = g.isCarGate ? 6.0 : 2.2;
+      if (g.side === 'top' || g.side === 'bottom') {
+        return Math.abs(z - g.z) < 0.1 && x > g.x - half && x < g.x + half;
+      } else {
+        return Math.abs(x - g.x) < 0.1 && z > g.z - half && z < g.z + half;
+      }
+    });
+  };
+
   for (let x = -hw; x <= hw; x += 3) {
-    posts.push([x, -hd]);
-    if (x < gateX - gateHalf || x > gateX + gateHalf) posts.push([x, hd]);
+    if (!isPointInAnyGate(x, -hd)) posts.push([x, -hd]);
+    if (!isPointInAnyGate(x, hd)) posts.push([x, hd]);
   }
-  for (let z = -hd + 3; z < hd; z += 3) { posts.push([-hw, z]); posts.push([hw, z]); }
+  for (let z = -hd + 3; z < hd; z += 3) {
+    if (!isPointInAnyGate(-hw, z)) posts.push([-hw, z]);
+    if (!isPointInAnyGate(hw, z)) posts.push([hw, z]);
+  }
 
   return (
     <group>
@@ -2112,51 +2113,143 @@ const FenceAround = ({ planW, planD, gateX }: { planW: number; planD: number; ga
       {pillars.map(([x, z], i) => (
         <group key={`pillar-${i}`} position={[x, 0, z]}>
           <mesh castShadow position={[0, 1.5, 0]}>
-            <boxGeometry args={[0.4, 3, 0.4]} />
-            <meshStandardMaterial color="#666" roughness={0.5} metalness={0.2} />
+            <boxGeometry args={[0.5, 3.2, 0.5]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.4} metalness={0.1} />
           </mesh>
-          <mesh position={[0, 3.1, 0]}>
-            <boxGeometry args={[0.5, 0.15, 0.5]} />
-            <meshStandardMaterial color="#777" roughness={0.4} metalness={0.3} />
+          <mesh position={[0, 3.2, 0]}>
+            <boxGeometry args={[0.6, 0.15, 0.6]} />
+            <meshStandardMaterial color="#333" roughness={0.3} metalness={0.5} />
           </mesh>
+          {/* Pillar cap light */}
+          <mesh position={[0, 3.25, 0]}>
+            <boxGeometry args={[0.22, 0.12, 0.22]} />
+            <meshStandardMaterial 
+              color="#fff" 
+              emissive="#ffcc80" 
+              emissiveIntensity={isNight ? 4 : 0.8} 
+            />
+          </mesh>
+          {isNight && (
+            <pointLight position={[0, 3.3, 0]} intensity={15} distance={12} color="#ffcc80" castShadow />
+          )}
         </group>
       ))}
       {/* Fence posts */}
       {posts.map(([x, z], i) => (
-        <mesh key={i} position={[x, 1.3, z]} castShadow>
-          <boxGeometry args={[0.12, 2.6, 0.12]} />
-          <meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} />
-        </mesh>
+        <group key={i} position={[x, 1.3, z]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.14, 2.6, 0.14]} />
+            <meshStandardMaterial color="#0a0a0a" roughness={0.3} metalness={0.6} />
+          </mesh>
+          {/* Post cap */}
+          <mesh position={[0, 1.35, 0]}>
+            <boxGeometry args={[0.18, 0.08, 0.18]} />
+            <meshStandardMaterial color="#c9a84c" roughness={0.2} metalness={0.9} />
+          </mesh>
+        </group>
       ))}
       {/* Horizontal rails (3 levels for modern look) */}
       {[0.6, 1.4, 2.2].map((y) => (
         <group key={y}>
-          <mesh position={[0, y, -hd]}><boxGeometry args={[hw * 2, 0.08, 0.06]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
-          <mesh position={[(gateX - gateHalf - hw) / 2, y, hd]}><boxGeometry args={[Math.max(0, gateX - gateHalf - (-hw)), 0.08, 0.06]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
-          <mesh position={[(hw + gateX + gateHalf) / 2, y, hd]}><boxGeometry args={[Math.max(0, hw - (gateX + gateHalf)), 0.08, 0.06]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
-          <mesh position={[-hw, y, 0]}><boxGeometry args={[0.06, 0.08, hd * 2]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
-          <mesh position={[hw, y, 0]}><boxGeometry args={[0.06, 0.08, hd * 2]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>
+          {/* Back Wall */}
+          {(() => {
+            const sideGates = gates.filter(g => g.side === 'top');
+            if (sideGates.length > 0) {
+              // Complicated: multiple gaps. For simplicity, we just check segments.
+              // We'll use a simpler approach: check if point is in any gate.
+              return null; // Handle below
+            }
+            return <mesh position={[0, y, -hd]}><boxGeometry args={[hw * 2, 0.08, 0.06]} /><meshStandardMaterial color="#555" roughness={0.5} metalness={0.15} /></mesh>;
+          })()}
+          
+          {/* Optimized Rail Rendering with multi-gate support */}
+          {['top', 'bottom', 'left', 'right'].map(side => {
+            const sideGates = gates.filter(g => g.side === side);
+            const isVert = side === 'left' || side === 'right';
+            const coord = (side === 'left' || side === 'top') ? (isVert ? -hw : -hd) : (isVert ? hw : hd);
+            
+            if (sideGates.length === 0) {
+            const pos: [number, number, number] = isVert ? [coord, y, 0] : [0, y, coord];
+            const size: [number, number, number] = isVert ? [0.08, 0.08, hd * 2] : [hw * 2, 0.08, 0.08];
+            return <mesh key={`${side}-${y}`} position={pos}><boxGeometry args={size} /><meshStandardMaterial color="#0a0a0a" roughness={0.3} metalness={0.6} /></mesh>;
+          }
+
+          // Render segments between gates
+          const segments: any[] = [];
+          const halfLen = isVert ? hd : hw;
+          const sortedGates = [...sideGates].sort((a, b) => (isVert ? a.z - b.z : a.x - b.x));
+          
+          let last = -halfLen;
+          sortedGates.forEach((g, idx) => {
+            const gHalf = g.isCarGate ? 6.0 : 2.2;
+            const gStart = (isVert ? g.z : g.x) - gHalf;
+            const gEnd = (isVert ? g.z : g.x) + gHalf;
+            
+            if (gStart > last) {
+              const len = gStart - last;
+              const mid = last + len / 2;
+              segments.push({ mid, len });
+            }
+            last = gEnd;
+          });
+          if (last < halfLen) {
+            const len = halfLen - last;
+            const mid = last + len / 2;
+            segments.push({ mid, len });
+          }
+
+          return segments.map((seg, i) => (
+            <mesh key={`${side}-${y}-${i}`} position={isVert ? [coord, y, seg.mid] : [seg.mid, y, coord]}>
+              <boxGeometry args={isVert ? [0.08, 0.08, seg.len] : [seg.len, 0.08, 0.08]} />
+              <meshStandardMaterial color="#0a0a0a" roughness={0.3} metalness={0.6} />
+            </mesh>
+          ));
+          })}
         </group>
       ))}
-      {/* Entrance gate on top side */}
-      <group position={[gateX, 0, hd]}>
-        <mesh castShadow position={[-gateHalf, 1.5, 0]}>
-          <boxGeometry args={[0.24, 3, 0.24]} />
-          <meshStandardMaterial color="#6b4f30" roughness={0.55} metalness={0.1} />
-        </mesh>
-        <mesh castShadow position={[gateHalf, 1.5, 0]}>
-          <boxGeometry args={[0.24, 3, 0.24]} />
-          <meshStandardMaterial color="#6b4f30" roughness={0.55} metalness={0.1} />
-        </mesh>
-        <mesh castShadow position={[-gateHalf / 2, 1.4, 0.02]}>
-          <boxGeometry args={[gateHalf, 2.1, 0.08]} />
-          <meshStandardMaterial color="#3f2f1f" roughness={0.6} metalness={0.05} />
-        </mesh>
-        <mesh castShadow position={[gateHalf / 2, 1.4, 0.02]}>
-          <boxGeometry args={[gateHalf, 2.1, 0.08]} />
-          <meshStandardMaterial color="#3f2f1f" roughness={0.6} metalness={0.05} />
-        </mesh>
-      </group>
+
+      {/* Entrance gates */}
+      {gates.map((g, i) => {
+        const gHalf = g.isCarGate ? 6.0 : 2.2;
+        return (
+          <group key={`gate-${i}`} position={[g.x, 0, g.z]} rotation={[0, (g.side === 'left' || g.side === 'right') ? Math.PI / 2 : 0, 0]}>
+            {/* Unified Gate Posts */}
+            <mesh castShadow position={[-gHalf, 1.5, 0]}>
+              <boxGeometry args={[0.32, 3.4, 0.32]} />
+              <meshStandardMaterial color="#1a1a1a" roughness={0.3} metalness={0.6} />
+            </mesh>
+            <mesh castShadow position={[gHalf, 1.5, 0]}>
+              <boxGeometry args={[0.32, 3.4, 0.32]} />
+              <meshStandardMaterial color="#1a1a1a" roughness={0.3} metalness={0.6} />
+            </mesh>
+            
+            {/* Premium Sliding/Panel Logic for Both Gates */}
+            <group position={[0, 1.4, 0.02]}>
+              {/* Left Panel */}
+              <mesh castShadow position={[-gHalf / 2, 0, 0]}>
+                <boxGeometry args={[gHalf - 0.2, 2.8, 0.12]} />
+                <meshPhysicalMaterial color="#0d0d0d" roughness={0.15} metalness={0.7} clearcoat={1} />
+              </mesh>
+              {/* Right Panel */}
+              <mesh castShadow position={[gHalf / 2, 0, 0]}>
+                <boxGeometry args={[gHalf - 0.2, 2.8, 0.12]} />
+                <meshPhysicalMaterial color="#0d0d0d" roughness={0.15} metalness={0.7} clearcoat={1} />
+              </mesh>
+              
+              {/* Unified Decorative Gold Slats */}
+              {Array.from({ length: 8 }).map((_, idx) => {
+                const sy = -1.2 + idx * 0.35;
+                return (
+                  <mesh key={idx} position={[0, sy, 0.08]}>
+                    <boxGeometry args={[gHalf * 2 - 0.4, 0.04, 0.03]} />
+                    <meshStandardMaterial color="#c9a84c" roughness={0.1} metalness={0.9} />
+                  </mesh>
+                );
+              })}
+            </group>
+          </group>
+        );
+      })}
     </group>
   );
 };

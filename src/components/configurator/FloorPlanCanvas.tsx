@@ -24,6 +24,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedDoor, setSelectedDoor] = useState<{ roomId: string, doorIndex: number } | null>(null);
+  const [selectedWindow, setSelectedWindow] = useState<{ roomId: string, windowIndex: number } | null>(null);
   const [isAddingDoor, setIsAddingDoor] = useState(false);
   const [isWallMode, setIsWallMode] = useState(false);
   const [wallPopup, setWallPopup] = useState<{ roomId: string, wall: string, x: number, y: number } | null>(null);
@@ -129,10 +130,34 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
       rooms: (localPlan.rooms || []).map((r) => {
         if (r.id !== roomId) return r;
         const newDoor: DoorInfo = { wall: 'top', position: 0.5, width: 3, swing: 'in' };
-        return { ...r, doors: [...r.doors, newDoor] };
+        return { ...r, doors: [...(r.doors || []), newDoor] };
       }),
     };
     commitLocalPlan(updated);
+  };
+
+  const handleAddWindow = (roomId: string) => {
+    const updated: Plan = {
+      ...localPlan,
+      rooms: (localPlan.rooms || []).map((r) => {
+        if (r.id !== roomId) return r;
+        const newWindow: WindowInfo = { wall: 'top', position: 0.5, width: 3 };
+        return { ...r, windows: [...(r.windows || []), newWindow] };
+      }),
+    };
+    commitLocalPlan(updated);
+  };
+
+  const handleRemoveAllWindows = (roomId: string) => {
+    const updated: Plan = {
+      ...localPlan,
+      rooms: (localPlan.rooms || []).map((r) => {
+        if (r.id !== roomId) return r;
+        return { ...r, windows: [] };
+      }),
+    };
+    commitLocalPlan(updated);
+    setSelectedWindow(null);
   };
 
   const handleDeleteRoom = (roomId: string) => {
@@ -177,6 +202,24 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
           </button>
           <div className="h-6 w-px bg-border" />
           <button
+            onClick={() => handleAddWindow(selectedRoomId)}
+            className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-ink hover:bg-surface transition-all active:scale-95"
+            title="Add Window to Room"
+          >
+            <Plus size={14} className="text-clay" />
+            Add Window
+          </button>
+          <div className="h-6 w-px bg-border" />
+          <button
+            onClick={() => handleRemoveAllWindows(selectedRoomId)}
+            className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-red-500 hover:bg-red-50 transition-all active:scale-95"
+            title="Remove all windows from this room"
+          >
+            <Trash2 size={14} className="text-red-400" />
+            Remove All Windows
+          </button>
+          <div className="h-6 w-px bg-border" />
+          <button
             onClick={() => {
               setIsWallMode(!isWallMode);
               setWallPopup(null);
@@ -213,6 +256,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
           if (e.target === e.target.getStage()) {
             setSelectedRoomId(null);
             setSelectedDoor(null);
+            setSelectedWindow(null);
             setWallPopup(null);
           }
         }}
@@ -352,6 +396,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
                       if (advanced) {
                         setSelectedDoor({ roomId: room.id, doorIndex: di });
                         setSelectedRoomId(null);
+                        setSelectedWindow(null);
                       }
                     }}
                     onDragMove={(newWall: string, newPos: number) => {
@@ -390,7 +435,51 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
                 );
               })}
               {(room.windows || []).map((w, wi) => (
-                <WindowShape key={`w-${wi}`} window={w} room={room} scale={scale} offsetX={buildingOffsetX} offsetY={buildingOffsetY} />
+                <WindowShape 
+                  key={`w-${wi}`} 
+                  window={w} 
+                  room={room} 
+                  scale={scale} 
+                  offsetX={buildingOffsetX} 
+                  offsetY={buildingOffsetY} 
+                  windowIndex={wi}
+                  selected={selectedWindow?.roomId === room.id && selectedWindow?.windowIndex === wi}
+                  onSelect={() => {
+                    if (advanced) {
+                      setSelectedWindow({ roomId: room.id, windowIndex: wi });
+                      setSelectedRoomId(null);
+                      setSelectedDoor(null);
+                    }
+                  }}
+                  onDragMove={(newWall: string, newPos: number) => {
+                    const updatedRooms = (localPlan.rooms || []).map(r => {
+                      if (r.id === room.id) {
+                        const newWindows = [...r.windows];
+                        newWindows[wi] = { ...newWindows[wi], wall: newWall as any, position: newPos };
+                        return { ...r, windows: newWindows };
+                      }
+                      return r;
+                    });
+                    const updatedPlan = { ...localPlan, rooms: updatedRooms };
+                    commitLocalPlan(updatedPlan, false);
+                  }}
+                  onDragEnd={() => {
+                    onChange?.(localPlanRef.current);
+                  }}
+                  onDelete={() => {
+                    if (advanced) {
+                      const updatedRooms = (localPlan.rooms || []).map(r => {
+                        if (r.id === room.id) {
+                          return { ...r, windows: r.windows.filter((_, idx) => idx !== wi) };
+                        }
+                        return r;
+                      });
+                      const updatedPlan = { ...localPlan, rooms: updatedRooms };
+                      commitLocalPlan(updatedPlan);
+                      setSelectedWindow(null);
+                    }
+                  }}
+                />
               ))}
             </Group>
           ))}
@@ -1064,36 +1153,79 @@ const DoorShape = ({ door, room, scale, offsetX, offsetY, doorIndex, selected, o
 };
 
 /* ─── Window ─── */
-const WindowShape = ({ window: win, room, scale, offsetX, offsetY }: any) => {
+const WindowShape = ({ window: win, room, scale, offsetX, offsetY, windowIndex, selected, onSelect, onDelete, onDragMove, onDragEnd }: any) => {
   const rx = offsetX + room.x * scale;
   const ry = offsetY + room.y * scale;
   const rw = room.w * scale;
   const rh = room.h * scale;
   const ww = win.width * scale;
 
-  let x1=0, y1=0, x2=0, y2=0;
+  let cx = 0, cy = 0, rot = 0;
   switch (win.wall) {
-    case 'top': x1 = rx + rw * win.position - ww / 2; y1 = ry; x2 = x1 + ww; y2 = ry; break;
-    case 'bottom': x1 = rx + rw * win.position - ww / 2; y1 = ry + rh; x2 = x1 + ww; y2 = y1; break;
-    case 'left': x1 = rx; y1 = ry + rh * win.position - ww / 2; x2 = rx; y2 = y1 + ww; break;
-    case 'right': x1 = rx + rw; y1 = ry + rh * win.position - ww / 2; x2 = x1; y2 = y1 + ww; break;
+    case 'top': cx = rx + rw * win.position; cy = ry; rot = 0; break;
+    case 'bottom': cx = rx + rw * win.position; cy = ry + rh; rot = 180; break;
+    case 'left': cx = rx; cy = ry + rh * win.position; rot = 270; break;
+    case 'right': cx = rx + rw; cy = ry + rh * win.position; rot = 90; break;
   }
 
+  const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    const stage = e.target.getStage();
+    if (!stage) return;
+    const pos = stage.getPointerPosition();
+    if (!pos) return;
+
+    const mx = (pos.x - stage.x()) / stage.scaleX() - rx;
+    const my = (pos.y - stage.y()) / stage.scaleY() - ry;
+
+    const dists = [
+      { wall: 'top', d: Math.abs(my), p: mx / rw },
+      { wall: 'bottom', d: Math.abs(my - rh), p: mx / rw },
+      { wall: 'left', d: Math.abs(mx), p: my / rh },
+      { wall: 'right', d: Math.abs(mx - rw), p: my / rh },
+    ];
+    const closest = dists.reduce((prev, curr) => (prev.d < curr.d ? prev : curr));
+    const clampedPos = Math.max(0.1, Math.min(0.9, closest.p));
+
+    onDragMove(closest.wall, clampedPos);
+  };
+
   const isHoriz = win.wall === 'top' || win.wall === 'bottom';
+  
   return (
-    <Group>
+    <Group 
+      x={cx} y={cy} rotation={rot} 
+      onPointerDown={onSelect}
+      draggable={selected}
+      onDragMove={handleDragMove}
+      onDragEnd={onDragEnd}
+      onMouseEnter={(e) => {
+        const container = e.target.getStage()?.container();
+        if (container) container.style.cursor = 'pointer';
+      }}
+      onMouseLeave={(e) => {
+        const container = e.target.getStage()?.container();
+        if (container) container.style.cursor = 'default';
+      }}
+    >
       {/* Break the wall behind the window */}
-      <Line points={[x1, y1, x2, y2]} stroke="#f8f9fa" strokeWidth={4} />
+      <Rect x={-ww / 2 - 1} y={-2} width={ww + 2} height={4} fill="#f8f9fa" />
       
       {/* Window glass and frame */}
-      <Line points={[x1, y1, x2, y2]} stroke="#94a3b8" strokeWidth={4} />
-      <Line points={[x1, y1, x2, y2]} stroke="#e0f2fe" strokeWidth={2} />
+      <Rect x={-ww / 2} y={-2} width={ww} height={4} fill={selected ? "#ef4444" : "#94a3b8"} stroke={selected ? "#ef4444" : "#64748b"} strokeWidth={1} />
+      <Rect x={-ww / 2} y={-1} width={ww} height={2} fill="#e0f2fe" />
       
       {/* Center partition */}
-      {isHoriz ? (
-        <Line points={[(x1 + x2) / 2, y1 - 2, (x1 + x2) / 2, y1 + 2]} stroke="#64748b" strokeWidth={1.5} />
-      ) : (
-        <Line points={[x1 - 2, (y1 + y2) / 2, x1 + 2, (y1 + y2) / 2]} stroke="#64748b" strokeWidth={1.5} />
+      <Line points={[0, -2, 0, 2]} stroke={selected ? "#ef4444" : "#64748b"} strokeWidth={1.5} />
+
+      {selected && (
+        <Group x={0} y={15} rotation={-rot} 
+          onPointerDown={(e) => {
+            e.cancelBubble = true;
+            onDelete();
+          }}>
+          <Circle radius={12} fill="#ef4444" stroke="white" strokeWidth={2} shadowColor="black" shadowBlur={4} shadowOpacity={0.3} />
+          <Text text="×" x={-4} y={-6} fontSize={16} fill="white" fontStyle="bold" />
+        </Group>
       )}
     </Group>
   );
