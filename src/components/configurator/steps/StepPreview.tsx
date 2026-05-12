@@ -8,6 +8,7 @@ import { Plan, splitPlanToFloors, Room, generateEmptyPlan, regenerateFurniture }
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash, Copy, ClipboardPaste, Upload, Plus, Image as ImageIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   plan: Plan;
@@ -58,7 +59,112 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   const [stagedPlan, setStagedPlan] = useState<Plan | null>(null);
   const [roomCounter, setRoomCounter] = useState(0);
   const [hasCopiedPlan, setHasCopiedPlan] = useState(!!floorPlanClipboard);
+  const [remoteElevationImages, setRemoteElevationImages] = useState<Record<string, { id: string; image_url: string; image_path: string }[]>>({});
+  const [uploadingElevation, setUploadingElevation] = useState(false);
   const tabScrollRef = useRef<HTMLDivElement>(null);
+
+  const currentPresetKey = useMemo(
+    () => getBuiltInPresetKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }, presetId),
+    [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, presetId]
+  );
+
+  const fetchElevationImages = useCallback(async (presetKey: string) => {
+    const { data, error } = await supabase
+      .from('elevation_images')
+      .select('id, image_url, image_path')
+      .eq('preset_key', presetKey)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    setRemoteElevationImages((prev) => ({
+      ...prev,
+      [presetKey]: data || [],
+    }));
+  }, []);
+
+  const handleElevationUpload = useCallback(async (file: File) => {
+    if (!file) return;
+    const safePresetKey = currentPresetKey.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${safePresetKey}/${Date.now()}-${safeFileName}`;
+
+    setUploadingElevation(true);
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('elevation-images')
+        .upload(filePath, file, { upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('elevation-images')
+        .getPublicUrl(filePath);
+
+      const imageUrl = publicUrlData.publicUrl;
+
+      const { error: insertError } = await supabase
+        .from('elevation_images')
+        .insert({
+          preset_key: currentPresetKey,
+          image_path: filePath,
+          image_url: imageUrl,
+        });
+
+      if (insertError) throw insertError;
+
+      addElevationImage(currentPresetKey, imageUrl);
+      await fetchElevationImages(currentPresetKey);
+      toast({ title: 'Image uploaded successfully' });
+    } catch (error: any) {
+      toast({
+        title: 'Upload failed',
+        description: error?.message || 'Unable to upload image to Supabase.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingElevation(false);
+    }
+  }, [addElevationImage, currentPresetKey, fetchElevationImages]);
+
+  const handleElevationDelete = useCallback(async (presetKey: string, index: number) => {
+    const images = remoteElevationImages[presetKey] || [];
+    const target = images[index];
+    if (!target) {
+      removeElevationImage(presetKey, index);
+      return;
+    }
+
+    try {
+      const { error: storageError } = await supabase.storage
+        .from('elevation-images')
+        .remove([target.image_path]);
+      if (storageError) throw storageError;
+
+      const { error: deleteError } = await supabase
+        .from('elevation_images')
+        .delete()
+        .eq('id', target.id);
+      if (deleteError) throw deleteError;
+
+      removeElevationImage(presetKey, index);
+      await fetchElevationImages(presetKey);
+      toast({ title: 'Image removed' });
+    } catch (error: any) {
+      toast({
+        title: 'Delete failed',
+        description: error?.message || 'Unable to remove image from Supabase.',
+        variant: 'destructive',
+      });
+    }
+  }, [fetchElevationImages, remoteElevationImages, removeElevationImage]);
+
+  useEffect(() => {
+    if (view !== 'elevation') return;
+    fetchElevationImages(currentPresetKey).catch(() => undefined);
+  }, [currentPresetKey, fetchElevationImages, view]);
 
   // Double storey floor splitting
   const canDoubleStorey = homeType === 'family' || homeType === 'premium';
@@ -671,24 +777,20 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       <p className="text-[10px] text-muted-foreground/60 uppercase tracking-[0.1em] mt-1">Manage architectural visuals for this preset</p>
                     </div>
                     
-                    <label className="flex items-center gap-2 h-10 rounded-xl bg-primary text-white px-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:brightness-110 transition-all active:scale-95 cursor-pointer shadow-lg">
+                    <label className={`flex items-center gap-2 h-10 rounded-xl bg-primary text-white px-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:brightness-110 transition-all active:scale-95 cursor-pointer shadow-lg ${uploadingElevation ? 'opacity-70 pointer-events-none' : ''}`}>
                       <Upload size={14} />
-                      Upload Image
+                      {uploadingElevation ? 'Uploading...' : 'Upload Image'}
                       <input 
                         type="file" 
                         accept="image/*" 
                         className="hidden" 
+                        disabled={uploadingElevation}
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              const presetKey = getBuiltInPresetKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }, presetId);
-                              addElevationImage(presetKey, reader.result as string);
-                              toast({ title: 'Image uploaded successfully' });
-                            };
-                            reader.readAsDataURL(file);
+                            handleElevationUpload(file);
                           }
+                          e.currentTarget.value = '';
                         }}
                       />
                     </label>
@@ -697,8 +799,11 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   {/* Gallery Grid */}
                   <div className="flex-1 overflow-y-auto pr-2">
                     {(() => {
-                      const presetKey = getBuiltInPresetKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }, presetId);
-                      const images = elevationImages[presetKey] || [];
+                      const presetKey = currentPresetKey;
+                      const remoteImages = remoteElevationImages[presetKey] || [];
+                      const images = remoteImages.length > 0
+                        ? remoteImages.map((img) => img.image_url)
+                        : (elevationImages[presetKey] || []);
                       
                       if (images.length === 0) {
                         return (
@@ -721,7 +826,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                               <img src={img} alt={`Elevation ${idx + 1}`} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <button 
-                                  onClick={() => removeElevationImage(presetKey, idx)}
+                                  onClick={() => remoteImages.length > 0 ? handleElevationDelete(presetKey, idx) : removeElevationImage(presetKey, idx)}
                                   className="h-10 w-10 flex items-center justify-center rounded-xl bg-red-500 text-white shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform"
                                 >
                                   <Trash size={18} />
@@ -738,16 +843,13 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                               type="file" 
                               accept="image/*" 
                               className="hidden" 
+                              disabled={uploadingElevation}
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    addElevationImage(presetKey, reader.result as string);
-                                    toast({ title: 'Image added' });
-                                  };
-                                  reader.readAsDataURL(file);
+                                  handleElevationUpload(file);
                                 }
+                                e.currentTarget.value = '';
                               }}
                             />
                           </label>

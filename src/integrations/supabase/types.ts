@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      elevation_images: {
+        Row: {
+          created_at: string
+          id: string
+          image_path: string
+          image_url: string
+          preset_key: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_path: string
+          image_url: string
+          preset_key: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_path?: string
+          image_url?: string
+          preset_key?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           config: Json
