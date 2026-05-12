@@ -367,11 +367,6 @@ const Ground = () => (
       <planeGeometry args={[120, 120]} />
       <meshStandardMaterial color="#345e38" roughness={0.92} />
     </mesh>
-    {/* Driveway/courtyard pad */}
-    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 35]}>
-      <planeGeometry args={[12, 25]} />
-      <meshStandardMaterial color="#9a9088" roughness={0.85} />
-    </mesh>
   </group>
 );
 
@@ -565,23 +560,44 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Foundation */}
-      <mesh receiveShadow position={[roofCX, 0.4, roofCZ]}>
-        <boxGeometry args={[roofW + 1, 0.8, roofD + 1]} />
-        <meshStandardMaterial color="#8a8478" roughness={0.9} />
-      </mesh>
-
-      {/* Render Room Floors & Furniture */}
+      {/* Per-room Foundations for perfect spatial accuracy */}
       <group position={[0, 0.8, 0]}>
         {mainRooms.map(r => {
-          // 3. Consistent Coordinate System centered translation
           const cx = round2(r.x + r.w / 2 - W / 2);
           const cz = round2(r.y + r.h / 2 - D / 2);
           const isActive = activeRoom === r.type;
+
+          // Detect adjacency to carport to prevent overhang/overlap
+          const isNextToCarportLeft = hasCarport && Math.abs(r.x - (carportRoom.x + carportRoom.w)) < 0.1;
+          const isNextToCarportRight = hasCarport && Math.abs((r.x + r.w) - carportRoom.x) < 0.1;
+          const isNextToCarportTop = hasCarport && Math.abs(r.y - (carportRoom.y + carportRoom.h)) < 0.1;
+          const isNextToCarportBottom = hasCarport && Math.abs((r.y + r.h) - carportRoom.y) < 0.1;
+
+          // Foundation dimensions
+          const fW = r.w;
+          const fH = r.h;
           
+          // Plinth band dimensions (conditional overhang)
+          const pW = r.w + (isNextToCarportLeft || isNextToCarportRight ? 0.05 : 0.15);
+          const pH = r.h + (isNextToCarportTop || isNextToCarportBottom ? 0.05 : 0.15);
+          const pCX = cx + (isNextToCarportLeft ? 0.05 : 0) - (isNextToCarportRight ? 0.05 : 0);
+          const pCZ = cz + (isNextToCarportTop ? 0.05 : 0) - (isNextToCarportBottom ? 0.05 : 0);
+
           return (
-            <group key={r.id} position={[0, 0, 0]}>
-              {/* Floor — per-room realistic PBR materials */}
+            <group key={`room-found-${r.id}`}>
+              {/* Individual Foundation Slab */}
+              <mesh receiveShadow position={[cx, -0.4, cz]}>
+                <boxGeometry args={[fW, 0.8, fH]} />
+                <meshStandardMaterial color="#8a8478" roughness={0.9} />
+              </mesh>
+
+              {/* Individual Plinth Trim */}
+              <mesh position={[pCX, -0.15, pCZ]}>
+                <boxGeometry args={[pW, 0.3, pH]} />
+                <meshStandardMaterial color="#4a453e" roughness={0.7} />
+              </mesh>
+
+              {/* Floor Plane */}
               {(() => {
                 const isLivingDining = ['living', 'dining', 'hall', 'lobby', 'foyer', 'entry'].includes(r.type);
                 const isBedroom = ['bedroom', 'master', 'guest'].includes(r.type);
@@ -630,21 +646,18 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
                   </mesh>
                 );
               })()}
-              
-              {/* Ceiling — false ceiling with recessed depth */}
+
+              {/* Ceiling Elements */}
               {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
                 <>
-                  {/* Main ceiling slab */}
                   <mesh position={[cx, wallH - 0.01, cz]}>
                     <boxGeometry args={[r.w - 0.1, 0.02, r.h - 0.1]} />
                     <meshStandardMaterial color="#fafaf6" roughness={0.95} />
                   </mesh>
-                  {/* Cove drop band — perimeter false-ceiling */}
                   <mesh position={[cx, wallH - 0.18, cz]}>
                     <boxGeometry args={[r.w - 1.2, 0.08, r.h - 1.2]} />
                     <meshStandardMaterial color="#f4f1eb" roughness={0.9} />
                   </mesh>
-                  {/* Cove warm LED strip emissive border (subtle) */}
                   {[
                     { p: [cx, wallH - 0.18, cz - r.h / 2 + 0.65], a: [r.w - 1.2, 0.04, 0.04] },
                     { p: [cx, wallH - 0.18, cz + r.h / 2 - 0.65], a: [r.w - 1.2, 0.04, 0.04] },
@@ -659,139 +672,12 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
                 </>
               )}
 
-              {/* Recessed ceiling downlights — array based on room size */}
-              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (() => {
-                const cols = Math.max(1, Math.min(3, Math.floor(r.w / 4)));
-                const rows = Math.max(1, Math.min(3, Math.floor(r.h / 4)));
-                const lights: any[] = [];
-                for (let ri = 0; ri < rows; ri++) {
-                  for (let ci = 0; ci < cols; ci++) {
-                    const lx = cx - r.w / 2 + (r.w / (cols + 1)) * (ci + 1);
-                    const lz = cz - r.h / 2 + (r.h / (rows + 1)) * (ri + 1);
-                    lights.push(
-                      <group key={`dl-${ri}-${ci}`} position={[lx, wallH - 0.05, lz]}>
-                        {/* Recessed housing */}
-                        <mesh>
-                          <cylinderGeometry args={[0.18, 0.18, 0.06, 18]} />
-                          <meshStandardMaterial color="#e8e4dc" roughness={0.5} metalness={0.2} />
-                        </mesh>
-                        {/* Warm emissive LED face */}
-                        <mesh position={[0, -0.04, 0]}>
-                          <cylinderGeometry args={[0.13, 0.13, 0.02, 18]} />
-                          <meshStandardMaterial color="#fff5dc" emissive="#ffd9a0" emissiveIntensity={isNight ? 2.2 : 0.7} />
-                        </mesh>
-                      </group>
-                    );
-                  }
-                }
-                return <>{lights}</>;
-              })()}
-
-              {/* Interior view: warm fill + recessed downlight array */}
-              {hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (() => {
-                const cols = Math.max(1, Math.min(3, Math.floor(r.w / 4)));
-                const rows = Math.max(1, Math.min(3, Math.floor(r.h / 4)));
-                const items: any[] = [];
-                for (let ri = 0; ri < rows; ri++) {
-                  for (let ci = 0; ci < cols; ci++) {
-                    const lx = cx - r.w / 2 + (r.w / (cols + 1)) * (ci + 1);
-                    const lz = cz - r.h / 2 + (r.h / (rows + 1)) * (ri + 1);
-                    items.push(
-                      <pointLight key={`il-${ri}-${ci}`} position={[lx, wallH - 0.5, lz]} intensity={isNight ? 1.8 : 0.9} distance={14} color="#ffe0b8" castShadow={false} />
-                    );
-                  }
-                }
-                items.push(
-                  <pointLight key="fill" position={[cx, wallH - 1, cz]} intensity={isNight ? 0.6 : 0.5} distance={Math.max(r.w, r.h) * 1.2} color="#fff2dc" castShadow={false} />
-                );
-                return <>{items}</>;
-              })()}
-              
-              {/* Skirting boards — slim modern profile */}
-              {r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
-                <>
-                  <mesh position={[cx, 0.18, cz - r.h / 2 + 0.04]}>
-                    <boxGeometry args={[r.w, 0.36, 0.06]} />
-                    <meshStandardMaterial color="#f0ece2" roughness={0.55} />
-                  </mesh>
-                  <mesh position={[cx, 0.18, cz + r.h / 2 - 0.04]}>
-                    <boxGeometry args={[r.w, 0.36, 0.06]} />
-                    <meshStandardMaterial color="#f0ece2" roughness={0.55} />
-                  </mesh>
-                  <mesh position={[cx - r.w / 2 + 0.04, 0.18, cz]}>
-                    <boxGeometry args={[0.06, 0.36, r.h]} />
-                    <meshStandardMaterial color="#f0ece2" roughness={0.55} />
-                  </mesh>
-                  <mesh position={[cx + r.w / 2 - 0.04, 0.18, cz]}>
-                    <boxGeometry args={[0.06, 0.36, r.h]} />
-                    <meshStandardMaterial color="#f0ece2" roughness={0.55} />
-                  </mesh>
-                </>
-              )}
-
-              {/* ── Living room accent wall ── (wood vertical slats on the longest interior wall) */}
-              {hideRoof && ['living', 'hall', 'lobby'].includes(r.type) && (() => {
-                // Pick one short edge of the room (whichever has more depth potential)
-                const onLongSide = r.w >= r.h;
-                const accentWidth = onLongSide ? r.w * 0.85 : 0.18;
-                const accentDepth = onLongSide ? 0.18 : r.h * 0.85;
-                const accentY = wallH * 0.5;
-                const accentH = wallH * 0.92;
-                const px = cx;
-                const pz = onLongSide ? cz - r.h / 2 + 0.12 : cz;
-                const pxAlt = onLongSide ? cx : cx - r.w / 2 + 0.12;
-                return (
-                  <group position={[onLongSide ? px : pxAlt, accentY, onLongSide ? pz : cz]}>
-                    {/* Backing panel */}
-                    <mesh receiveShadow>
-                      <boxGeometry args={[accentWidth, accentH, accentDepth]} />
-                      <meshStandardMaterial color="#5a3d24" map={doorTextures?.map} normalMap={doorTextures?.normal} normalScale={new THREE.Vector2(0.4, 0.4)} roughness={0.5} envMapIntensity={0.6} />
-                    </mesh>
-                    {/* Vertical slat reveals */}
-                    {Array.from({ length: 9 }).map((_, si) => {
-                      const off = (si - 4) * (onLongSide ? accentWidth / 9 : 0);
-                      const offZ = (si - 4) * (onLongSide ? 0 : accentDepth / 9);
-                      return (
-                        <mesh key={`slat-${si}`} position={[onLongSide ? off : 0, 0, onLongSide ? accentDepth / 2 + 0.005 : offZ]}>
-                          <boxGeometry args={[onLongSide ? 0.05 : 0.02, accentH, onLongSide ? 0.02 : 0.05]} />
-                          <meshStandardMaterial color="#1a1208" roughness={0.7} />
-                        </mesh>
-                      );
-                    })}
-                  </group>
-                );
-              })()}
-
-              {/* ── Bathroom: interior wall tile cladding (only in interior view) ── */}
-              {hideRoof && r.type === 'bathroom' && (
-                <>
-                  {/* Back wall tile up to ~6ft */}
-                  <mesh position={[cx, 3.0, cz - r.h / 2 + 0.06]} receiveShadow>
-                    <boxGeometry args={[r.w - 0.05, 6.0, 0.04]} />
-                    <meshStandardMaterial color="#e6e8e7" roughness={0.22} metalness={0.04} envMapIntensity={1.2} />
-                  </mesh>
-                  {/* Side wall tile */}
-                  <mesh position={[cx - r.w / 2 + 0.06, 3.0, cz]} receiveShadow>
-                    <boxGeometry args={[0.04, 6.0, r.h - 0.05]} />
-                    <meshStandardMaterial color="#e6e8e7" roughness={0.22} metalness={0.04} envMapIntensity={1.2} />
-                  </mesh>
-                </>
-              )}
-
-              {/* ── Kitchen backsplash inside (when interior) ── */}
-              {hideRoof && r.type === 'kitchen' && (
-                <mesh position={[cx, 4.5, cz - r.h / 2 + 0.06]} receiveShadow>
-                  <boxGeometry args={[r.w - 0.5, 2.8, 0.04]} />
-                  <meshStandardMaterial color="#eef0ef" roughness={0.18} metalness={0.06} envMapIntensity={1.4} />
-                </mesh>
-              )}
-              
               {/* Furniture */}
-              {(hideRoof || isActive || true) && r.furniture.map((f: any, i: number) => {
+              {(hideRoof || isActive || true) && r.furniture.map((f: any, fi: number) => {
                 const fx = round2(r.x + f.x + f.w/2 - W/2);
                 const fz = round2(r.y + f.y + f.h/2 - D/2);
                 return (
-                  <group key={`f-${i}`} position={[fx, 0.02, fz]} rotation={[0, f.rotation ? f.rotation * Math.PI / 180 : 0, 0]}>
+                  <group key={`f-${fi}`} position={[fx, 0.02, fz]} rotation={[0, f.rotation ? f.rotation * Math.PI / 180 : 0, 0]}>
                     <Furniture3D item={f} isNight={isNight} />
                   </group>
                 );
@@ -800,12 +686,10 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
           );
         })}
 
-        {/* Render Deduplicated, Perfectly Aligned Walls */}
+        {/* Interior Walls */}
         {extractedWalls.map((wall, i) => {
           const len = wall.end - wall.start;
-          const w = len + t; // Extend length by thickness to seamlessly merge corners
-          
-          // Map absolute positions back to wall-local relative percentages
+          const w = len + t;
           const mappedDoors = wall.doors.map((d:any) => ({...d, relPos: (d.absPos - wall.start + t/2) / w}));
           const mappedWindows = wall.windows.map((win:any) => ({...win, relPos: (win.absPos - wall.start + t/2) / w}));
 
@@ -829,43 +713,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
         })}
       </group>
 
-      {/* Façade Accent Elements */}
-      {/* Black Stone Pathway */}
-      {mainDoorPos && <BlackStonePathway doorPos={mainDoorPos} />}
-
-      {/* Stepped foundation base */}
-      <mesh receiveShadow position={[roofCX, 0.15, roofCZ]}>
-        <boxGeometry args={[roofW + 2, 0.3, roofD + 2]} />
-        <meshStandardMaterial color="#6a6258" roughness={0.95} />
-      </mesh>
-
-      {/* Plinth band — darker base strip around perimeter */}
-      {[
-        { p: [roofCX, 1.3, roofCZ - roofD/2 - 0.06], a: [roofW + 0.4, 1, 0.12], skip: cpAtTop },
-        { p: [roofCX, 1.3, roofCZ + roofD/2 + 0.06], a: [roofW + 0.4, 1, 0.12], skip: cpAtBottom },
-        { p: [roofCX - roofW/2 - 0.06, 1.3, roofCZ], a: [0.12, 1, roofD + 0.4], skip: cpAtLeft },
-        { p: [roofCX + roofW/2 + 0.06, 1.3, roofCZ], a: [0.12, 1, roofD + 0.4], skip: cpAtRight },
-      ].map((item, idx) => !item.skip && (
-        <mesh key={`plinth-${idx}`} position={item.p as any}>
-          <boxGeometry args={item.a as any} />
-          <meshStandardMaterial color={colors.accent} roughness={0.7} />
-        </mesh>
-      ))}
-
-      {/* Mid-wall horizontal accent line */}
-      {[
-        { p: [roofCX, 0.8 + wallH * 0.42, roofCZ - roofD/2 - 0.04], a: [roofW + 0.2, 0.18, 0.08], skip: cpAtTop },
-        { p: [roofCX, 0.8 + wallH * 0.42, roofCZ + roofD/2 + 0.04], a: [roofW + 0.2, 0.18, 0.08], skip: cpAtBottom },
-        { p: [roofCX - roofW/2 - 0.04, 0.8 + wallH * 0.42, roofCZ], a: [0.08, 0.18, roofD + 0.2], skip: cpAtLeft },
-        { p: [roofCX + roofW/2 + 0.04, 0.8 + wallH * 0.42, roofCZ], a: [0.08, 0.18, roofD + 0.2], skip: cpAtRight },
-      ].map((item, idx) => !item.skip && (
-        <mesh key={`mid-${idx}`} position={item.p as any}>
-          <boxGeometry args={item.a as any} />
-          <meshStandardMaterial color={colors.trim} roughness={0.45} metalness={0.05} />
-        </mesh>
-      ))}
-
-      {/* Enhanced cornice / crown molding */}
+      {/* Exterior Architecture */}
       {!hideRoof && (
         <>
           <mesh position={[roofCX, wallH + 0.8, roofCZ]}>
@@ -878,73 +726,59 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
           </mesh>
         </>
       )}
-      {/* Landscaping & Pathway */}
-      {mainDoorPos && <BlackStonePathway doorPos={mainDoorPos} />}
 
-      {/* Entrance Canopy */}
-      {mainDoorPos && !hideRoof && (
-        <group position={[mainDoorPos.x, wallH * 0.85 + 0.8, mainDoorPos.z + mainDoorPos.nz * 2 + mainDoorPos.nx * 2]}>
-          <mesh castShadow rotation={[0, mainDoorPos.nx !== 0 ? Math.PI/2 : 0, 0]}>
-            <boxGeometry args={[6, 0.2, 3.5]} />
-            <meshStandardMaterial color={colors.roof} roughness={0.6} />
-          </mesh>
-          <mesh position={[0, -0.02, 0]} rotation={[0, mainDoorPos.nx !== 0 ? Math.PI/2 : 0, 0]}>
-            <boxGeometry args={[6.3, 0.08, 0.12]} />
-            <meshStandardMaterial color={colors.trim} roughness={0.4} metalness={0.15} />
-          </mesh>
-          {[-2.6, 2.6].map((o, bi) => (
-            <mesh key={`brk-${bi}`} position={[mainDoorPos.nz !== 0 ? o : 0, -0.6, mainDoorPos.nx !== 0 ? o : 0]}>
-              <boxGeometry args={[0.12, 1, 0.12]} />
-              <meshStandardMaterial color={colors.trim} roughness={0.4} metalness={0.15} />
-            </mesh>
-          ))}
-        </group>
-      )}
-
-      {/* Wall sconce lights near entrance */}
+      {/* Entrance Features */}
       {mainDoorPos && (
-        <>{[-3, 3].map((o, li) => (
-          <group key={`sconce-${li}`} position={[
-            mainDoorPos.x + (mainDoorPos.nz !== 0 ? o : 0),
-            wallH * 0.5 + 0.8,
-            mainDoorPos.z + (mainDoorPos.nx !== 0 ? o : 0)
-          ]}>
-            <mesh><boxGeometry args={[0.2, 0.5, 0.15]} />
-              <meshStandardMaterial color={colors.trim} roughness={0.3} metalness={0.5} /></mesh>
-            <pointLight intensity={0.5} distance={8} color="#ffe8c0" castShadow={false}
-              position={[mainDoorPos.nx * 0.3, -0.15, mainDoorPos.nz * 0.3]} />
-          </group>
-        ))}</>
+        <>
+          <BlackStonePathway doorPos={mainDoorPos} />
+          {!hideRoof && (
+            <group position={[mainDoorPos.x, wallH * 0.85 + 0.8, mainDoorPos.z + mainDoorPos.nz * 2 + mainDoorPos.nx * 2]}>
+              <mesh castShadow rotation={[0, mainDoorPos.nx !== 0 ? Math.PI/2 : 0, 0]}>
+                <boxGeometry args={[6, 0.2, 3.5]} />
+                <meshStandardMaterial color={colors.roof} roughness={0.6} />
+              </mesh>
+              <mesh position={[0, -0.02, 0]} rotation={[0, mainDoorPos.nx !== 0 ? Math.PI/2 : 0, 0]}>
+                <boxGeometry args={[6.3, 0.08, 0.12]} />
+                <meshStandardMaterial color={colors.trim} roughness={0.4} metalness={0.15} />
+              </mesh>
+            </group>
+          )}
+          {[-3, 3].map((o, li) => (
+            <group key={`sconce-${li}`} position={[
+              mainDoorPos.x + (mainDoorPos.nz !== 0 ? o : 0),
+              wallH * 0.5 + 0.8,
+              mainDoorPos.z + (mainDoorPos.nx !== 0 ? o : 0)
+            ]}>
+              <mesh><boxGeometry args={[0.2, 0.5, 0.15]} /><meshStandardMaterial color={colors.trim} roughness={0.3} metalness={0.5} /></mesh>
+              <pointLight intensity={0.5} distance={8} color="#ffe8c0" position={[mainDoorPos.nx * 0.3, -0.15, mainDoorPos.nz * 0.3]} />
+            </group>
+          ))}
+        </>
       )}
 
-      {/* Roof */}
+      {/* Roof System */}
       {roof === 'gable' ? (
-        <GableRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
+        <GableRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} cpAtLeft={cpAtLeft} cpAtRight={cpAtRight} cpAtTop={cpAtTop} cpAtBottom={cpAtBottom} />
       ) : (
-        <FlatRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
+        <FlatRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} cpAtLeft={cpAtLeft} cpAtRight={cpAtRight} cpAtTop={cpAtTop} cpAtBottom={cpAtBottom} />
       )}
 
-      {/* Rooftop Add-ons tied to Building Bounds */}
+      {/* Rooftop Equipment */}
       {addons.includes('solar') && !hideRoof && <SolarPanels minX={minX - W/2} maxX={maxX - W/2} minZ={minZ - D/2} maxZ={maxZ - D/2} roofType={roof} wallH={wallH} />}
       {addons.includes('water_tank') && !hideRoof && <WaterTank maxX={maxX - W/2} maxZ={maxZ - D/2} wallH={wallH} roofType={roof} />}
 
-      {/* Floating Labels */}
+      {/* Room Labels */}
       {(plan.rooms || []).map(r => {
-        if (r.type === 'garden' || r.type === 'carport') return null;
+        if (r.type === 'garden' || r.type === 'carport' || r.type === 'balcony') return null;
         const isActive = activeRoom === r.type;
         return (
           <Html key={`label-${r.id}`} position={[r.x - W/2 + r.w/2, hideRoof ? 3 : wallH + 3, r.y - D/2 + r.h/2]} center zIndexRange={[100, 0]}>
-            <div className={`transition-all duration-300 pointer-events-none px-4 py-1.5 rounded-sm border shadow-lg whitespace-nowrap font-display font-bold text-[11px] tracking-widest ${
-              isActive 
-                ? 'bg-[hsl(28,40%,55%)] text-white border-transparent scale-110 shadow-[0_4px_12px_rgba(200,100,50,0.4)]' 
-                : 'bg-white/95 text-black border-black/10 scale-100'
-            }`}>
+            <div className={`transition-all duration-300 pointer-events-none px-4 py-1.5 rounded-sm border shadow-lg whitespace-nowrap font-display font-bold text-[11px] tracking-widest ${isActive ? 'bg-[hsl(28,40%,55%)] text-white border-transparent scale-110 shadow-[0_4px_12px_rgba(200,100,50,0.4)]' : 'bg-white/95 text-black border-black/10 scale-100'}`}>
               {r.label}
             </div>
           </Html>
         );
       })}
-
     </group>
   );
 };
@@ -1312,9 +1146,27 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
 };
 
 /* ─── Roofs ─── */
-const GableRoof = ({ W, D, cx, cz, wallH, color, trimColor, rodColor, transparent, opacity }: any) => {
+const GableRoof = ({ 
+  W, D, cx, cz, wallH, color, trimColor, rodColor, transparent, opacity,
+  cpAtLeft, cpAtRight, cpAtTop, cpAtBottom 
+}: any) => {
   const roofH = 6;
   const overhang = 2.5;
+  
+  // Adjust horizontal bounds based on carport adjacency to prevent floating gutters
+  const leftOverhang = cpAtLeft ? 0.2 : overhang;
+  const rightOverhang = cpAtRight ? 0.2 : overhang;
+  const topOverhang = cpAtTop ? 0.2 : overhang;
+  const bottomOverhang = cpAtBottom ? 0.2 : overhang;
+
+  const hw_l = W / 2 + leftOverhang;
+  const hw_r = W / 2 + rightOverhang;
+  const hd_t = D / 2 + topOverhang;
+  const hd_b = D / 2 + bottomOverhang;
+  
+  // For simplicity in the shape, we'll use a symmetrical base for the main gable if both sides are free
+  // but if one side is blocked, we shift the peak? No, let's just use the max overhang for the shape width 
+  // but truncate the visuals.
   const hw = W / 2 + overhang;
   const hd = D / 2 + overhang;
 
@@ -1370,53 +1222,77 @@ const GableRoof = ({ W, D, cx, cz, wallH, color, trimColor, rodColor, transparen
         </group>
       ))}
       {/* Eave / soffit trim (left & right overhangs) */}
-      {[-1, 1].map((side, ei) => (
-        <mesh key={`eave-${ei}`} position={[side * hw, -0.1, hd]}>
-          <boxGeometry args={[0.18, 0.3, hd * 2 + 0.5]} />
-          <meshStandardMaterial color={trimColor} roughness={0.5} metalness={0.1} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
-        </mesh>
-      ))}
+      {[-1, 1].map((side, ei) => {
+        if (side === -1 && cpAtLeft) return null;
+        if (side === 1 && cpAtRight) return null;
+        return (
+          <mesh key={`eave-${ei}`} position={[side * hw, -0.1, hd]}>
+            <boxGeometry args={[0.18, 0.3, hd * 2 + 0.5]} />
+            <meshStandardMaterial color={trimColor} roughness={0.5} metalness={0.1} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
+          </mesh>
+        );
+      })}
       {/* Gutter line */}
-      {[-1, 1].map((side, gi) => (
-        <mesh key={`gutter-${gi}`} position={[side * (hw + 0.08), -0.2, hd]}>
-          <boxGeometry args={[0.1, 0.12, hd * 2 + 0.3]} />
-          <meshStandardMaterial color="#8a8a8a" roughness={0.3} metalness={0.4} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
-        </mesh>
-      ))}
+      {[-1, 1].map((side, gi) => {
+        if (side === -1 && cpAtLeft) return null;
+        if (side === 1 && cpAtRight) return null;
+        return (
+          <mesh key={`gutter-${gi}`} position={[side * (hw + 0.08), -0.2, hd]}>
+            <boxGeometry args={[0.1, 0.12, hd * 2 + 0.3]} />
+            <meshStandardMaterial color="#8a8a8a" roughness={0.3} metalness={0.4} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
+          </mesh>
+        );
+      })}
     </group>
   );
 };
 
-const FlatRoof = ({ W, D, cx, cz, wallH, color, transparent, opacity }: any) => (
-  <group position={[cx, wallH + 1.2, cz]}>
-    {/* Main slab */}
-    <mesh castShadow>
-      <boxGeometry args={[W + 2.5, 0.8, D + 2.5]} />
-      <meshStandardMaterial color={color} roughness={0.65} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
-    </mesh>
-    {/* Parapet walls */}
-    {[[-1, 0], [1, 0], [0, -1], [0, 1]].map(([dx, dz], i) => (
-      <mesh key={i} position={[dx * (W / 2 + 1), 0.7, dz * (D / 2 + 1)]}>
-        <boxGeometry args={[dx ? 0.35 : W + 2.5, 1, dz ? 0.35 : D + 2.5]} />
+const FlatRoof = ({ 
+  W, D, cx, cz, wallH, color, transparent, opacity,
+  cpAtLeft, cpAtRight, cpAtTop, cpAtBottom 
+}: any) => {
+  const overhang = 2.5;
+  const lw = cpAtLeft ? 0.2 : overhang / 2;
+  const rw = cpAtRight ? 0.2 : overhang / 2;
+  const tw = cpAtTop ? 0.2 : overhang / 2;
+  const bw = cpAtBottom ? 0.2 : overhang / 2;
+
+  return (
+    <group position={[cx, wallH + 1.2, cz]}>
+      {/* Main slab */}
+      <mesh castShadow>
+        <boxGeometry args={[W + (cpAtLeft ? 0 : 1.25) + (cpAtRight ? 0 : 1.25), 0.8, D + (cpAtTop ? 0 : 1.25) + (cpAtBottom ? 0 : 1.25)]} />
         <meshStandardMaterial color={color} roughness={0.65} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
       </mesh>
-    ))}
-    {/* Parapet cap / coping */}
-    {[[-1, 0], [1, 0], [0, -1], [0, 1]].map(([dx, dz], i) => (
-      <mesh key={`cap-${i}`} position={[dx * (W / 2 + 1), 1.25, dz * (D / 2 + 1)]}>
-        <boxGeometry args={[dx ? 0.5 : W + 2.8, 0.12, dz ? 0.5 : D + 2.8]} />
-        <meshStandardMaterial color="#888" roughness={0.35} metalness={0.2} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
-      </mesh>
-    ))}
-    {/* Gutter line at base */}
-    {[[-1, 0], [1, 0], [0, -1], [0, 1]].map(([dx, dz], i) => (
-      <mesh key={`gut-${i}`} position={[dx * (W / 2 + 1.15), 0.05, dz * (D / 2 + 1.15)]}>
-        <boxGeometry args={[dx ? 0.08 : W + 2.6, 0.1, dz ? 0.08 : D + 2.6]} />
-        <meshStandardMaterial color="#7a7a7a" roughness={0.3} metalness={0.4} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
-      </mesh>
-    ))}
-  </group>
-);
+      {/* Parapet walls */}
+      {[[-1, 0], [1, 0], [0, -1], [0, 1]].map(([dx, dz], i) => {
+        if (dx === -1 && cpAtLeft) return null;
+        if (dx === 1 && cpAtRight) return null;
+        if (dz === -1 && cpAtTop) return null;
+        if (dz === 1 && cpAtBottom) return null;
+        return (
+          <mesh key={i} position={[dx * (W / 2 + 1), 0.7, dz * (D / 2 + 1)]}>
+            <boxGeometry args={[dx ? 0.35 : W + 2.5, 1, dz ? 0.35 : D + 2.5]} />
+            <meshStandardMaterial color={color} roughness={0.65} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
+          </mesh>
+        );
+      })}
+      {/* Parapet cap / coping */}
+      {[[-1, 0], [1, 0], [0, -1], [0, 1]].map(([dx, dz], i) => {
+        if (dx === -1 && cpAtLeft) return null;
+        if (dx === 1 && cpAtRight) return null;
+        if (dz === -1 && cpAtTop) return null;
+        if (dz === 1 && cpAtBottom) return null;
+        return (
+          <mesh key={`cap-${i}`} position={[dx * (W / 2 + 1), 1.25, dz * (D / 2 + 1)]}>
+            <boxGeometry args={[dx ? 0.5 : W + 2.8, 0.12, dz ? 0.5 : D + 2.8]} />
+            <meshStandardMaterial color="#888" roughness={0.35} metalness={0.2} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+};
 
 /* ─── Add-ons ─── */
 const SolarPanels = ({ minX, maxX, minZ, maxZ, roofType, wallH }: any) => {
@@ -1667,9 +1543,9 @@ const Carport = ({ plan, plotW, plotD, gateSide }: { plan: Plan; plotW: number; 
     <group>
       {/* ── Carport pad + structure ── */}
       <group position={[cx, 0, cz]}>
-        {/* Concrete pad — elevated to house foundation level */}
-        <mesh receiveShadow position={[0, cpElevation / 2, 0]}>
-          <boxGeometry args={[cw, cpElevation, ch]} />
+        {/* Concrete pad — slightly thicker than house foundation to prevent ground bleed */}
+        <mesh receiveShadow position={[0, 0.41, 0]}>
+          <boxGeometry args={[cw, 0.82, ch]} />
           <meshStandardMaterial color="#9a9a96" roughness={0.95} />
         </mesh>
         {/* Painted parking bay outline */}
@@ -1730,8 +1606,8 @@ const Carport = ({ plan, plotW, plotD, gateSide }: { plan: Plan; plotW: number; 
       {/* ── Driveway: tarmac/asphalt slab from carport opening to plot edge ── */}
       {dwW > 0.5 && dwD > 0.5 && (
         <group>
-          {/* Asphalt base */}
-          <mesh receiveShadow position={[dwCX, 0.012, dwCZ]} rotation={[-Math.PI / 2, 0, 0]}>
+          {/* Asphalt base — slightly higher to prevent lawn bleed */}
+          <mesh receiveShadow position={[dwCX, 0.02, dwCZ]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[dwW, dwD]} />
             <meshStandardMaterial color="#3c3c40" roughness={1} />
           </mesh>

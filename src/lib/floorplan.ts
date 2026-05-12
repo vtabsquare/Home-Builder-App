@@ -1116,9 +1116,9 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
       id: 'addon-carport',
       type: 'carport',
       label: 'CARPORT',
-      x: reserveLeft,
+      x: 0,            // Start at the left edge — this IS the reserved strip
       y: buildY,
-      w: Math.max(6, carportStrip - 1),
+      w: carportStrip, // Fill the full reserved width so no gap is left
       h: buildH,
       color: COLORS.carport,
       furniture: [],

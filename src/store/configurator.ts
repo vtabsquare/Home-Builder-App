@@ -55,6 +55,8 @@ export interface ConfigState {
   savedPresets: any[];
   packageLayouts: Record<string, any>;
   presetOverrides: Record<string, { ground: any; first: any | null }>;
+  // Elevation images: keyed by composite preset key, each value is an array of base64 image data URLs
+  elevationImages: Record<string, string[]>;
 }
 
 export interface ConfigActions {
@@ -90,6 +92,8 @@ export interface ConfigActions {
   fetchSavedPresets: () => Promise<void>;
   fetchPackageLayouts: () => Promise<void>;
   savePackageLayout: (packageKey: string, groundPlan: any, firstFloorPlan: any) => Promise<void>;
+  addElevationImage: (presetKey: string, imageDataUrl: string) => void;
+  removeElevationImage: (presetKey: string, index: number) => void;
   reset: () => void;
 }
 
@@ -133,6 +137,7 @@ const initial: ConfigState = {
   savedPresets: [],
   packageLayouts: {},
   presetOverrides: {},
+  elevationImages: {},
 };
 
 export const useConfig = create<ConfigState & ConfigActions>()(
@@ -345,11 +350,24 @@ export const useConfig = create<ConfigState & ConfigActions>()(
           isDoubleStorey: hasFirstFloor ? true : s.isDoubleStorey
         };
       }),
+      addElevationImage: (presetKey, imageDataUrl) => set((s) => ({
+        elevationImages: {
+          ...s.elevationImages,
+          [presetKey]: [...(s.elevationImages[presetKey] || []), imageDataUrl],
+        },
+      })),
+      removeElevationImage: (presetKey, index) => set((s) => ({
+        elevationImages: {
+          ...s.elevationImages,
+          [presetKey]: (s.elevationImages[presetKey] || []).filter((_, i) => i !== index),
+        },
+      })),
       reset: () => set((state) => ({
         ...initial,
         savedPresets: state.savedPresets,
         packageLayouts: state.packageLayouts,
         presetOverrides: state.presetOverrides,
+        elevationImages: state.elevationImages,
       })),
     }),
     { name: 'gbti-configurator' }

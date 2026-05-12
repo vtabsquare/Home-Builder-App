@@ -7,7 +7,7 @@ import { CustomEditorCanvas, ROOM_BLOCKS } from '../CustomEditorCanvas';
 import { Plan, splitPlanToFloors, Room, generateEmptyPlan, regenerateFurniture } from '@/lib/floorplan';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash, Copy, ClipboardPaste } from 'lucide-react';
+import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash, Copy, ClipboardPaste, Upload, Plus, Image as ImageIcon } from 'lucide-react';
 
 interface Props {
   plan: Plan;
@@ -50,9 +50,9 @@ function getRoomTabs(plan: Plan): RoomTab[] {
 }
 
 export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
-  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset, presetOverrides } = useConfig();
+  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset, presetOverrides, elevationImages, addElevationImage, removeElevationImage } = useConfig();
   const isCustomPreset = presetId === -1;
-  const [view, setView] = useState<'2d' | '3d'>('2d');
+  const [view, setView] = useState<'2d' | '3d' | 'elevation'>('2d');
   const [advanced, setAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [stagedPlan, setStagedPlan] = useState<Plan | null>(null);
@@ -251,7 +251,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex items-center gap-6">
               <div className="inline-flex rounded-xl bg-soft-section p-1 border border-border shadow-inner">
-                {(['2d', '3d'] as const).map((v) => (
+                {(['2d', '3d', 'elevation'] as const).map((v) => (
                   <button
                     key={v}
                     onClick={() => { setView(v); setAdvancedEditorMode(false); }}
@@ -263,12 +263,14 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       <motion.div layoutId="view-pill" className="absolute inset-0 rounded-lg bg-primary shadow-lg"
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
                     )}
-                    <span className="relative z-10">{v === '2d' ? '2D View' : '3D View'}</span>
+                    <span className="relative z-10">
+                      {v === '2d' ? '2D View' : v === '3d' ? '3D View' : 'Elevation View'}
+                    </span>
                   </button>
                 ))}
               </div>
 
-              {view === '2d' && !advancedEditorMode && (
+              {(view === '2d' || view === 'elevation') && !advancedEditorMode && (
                 <div className="inline-flex rounded-xl bg-soft-section/50 p-1 border border-border/50">
                   {[0].map((id) => (
                     <button
@@ -651,11 +653,108 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                     }
                   }} />
                 </motion.div>
-              ) : (
+              ) : view === '3d' ? (
                 <motion.div key="3d" className="h-full w-full"
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
                   <ElevationCanvas plan={currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={isDoubleStorey && floors ? ((isCustomPreset ? customFirstFloorPlan : null) || floors.first) : undefined} hideHelpers={true} />
+                </motion.div>
+              ) : (
+                <motion.div key="elevation" className="h-full w-full bg-white p-8 flex flex-col"
+                  initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
+                  
+                  {/* Elevation Header with Upload */}
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground">Elevation Gallery</h3>
+                      <p className="text-[10px] text-muted-foreground/60 uppercase tracking-[0.1em] mt-1">Manage architectural visuals for this preset</p>
+                    </div>
+                    
+                    <label className="flex items-center gap-2 h-10 rounded-xl bg-primary text-white px-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:brightness-110 transition-all active:scale-95 cursor-pointer shadow-lg">
+                      <Upload size={14} />
+                      Upload Image
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              const presetKey = getBuiltInPresetKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }, presetId);
+                              addElevationImage(presetKey, reader.result as string);
+                              toast({ title: 'Image uploaded successfully' });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Gallery Grid */}
+                  <div className="flex-1 overflow-y-auto pr-2">
+                    {(() => {
+                      const presetKey = getBuiltInPresetKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }, presetId);
+                      const images = elevationImages[presetKey] || [];
+                      
+                      if (images.length === 0) {
+                        return (
+                          <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-border rounded-3xl p-12 text-center">
+                            <div className="h-16 w-16 flex items-center justify-center rounded-2xl bg-soft-section text-muted-foreground/40 mb-4">
+                              <ImageIcon size={32} strokeWidth={1.5} />
+                            </div>
+                            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground mb-2">No Images Yet</h4>
+                            <p className="text-[10px] text-muted-foreground/60 max-w-[240px] leading-relaxed">
+                              Upload architectural elevation drawings or site photos to visualize this specific layout configuration.
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                          {images.map((img, idx) => (
+                            <div key={idx} className="group relative aspect-[4/3] rounded-2xl overflow-hidden border border-border bg-soft-section shadow-soft transition-all hover:shadow-elev">
+                              <img src={img} alt={`Elevation ${idx + 1}`} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <button 
+                                  onClick={() => removeElevationImage(presetKey, idx)}
+                                  className="h-10 w-10 flex items-center justify-center rounded-xl bg-red-500 text-white shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform"
+                                >
+                                  <Trash size={18} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          <label className="aspect-[4/3] rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-3 text-muted-foreground hover:bg-soft-section hover:border-primary/20 hover:text-primary transition-all cursor-pointer group">
+                            <div className="h-10 w-10 flex items-center justify-center rounded-full bg-soft-section group-hover:bg-primary/5">
+                              <Plus size={20} />
+                            </div>
+                            <span className="text-[9px] font-bold uppercase tracking-[0.2em]">Add More</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    addElevationImage(presetKey, reader.result as string);
+                                    toast({ title: 'Image added' });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
