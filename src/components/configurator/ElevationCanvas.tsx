@@ -400,6 +400,121 @@ const GrassField = ({ planW, planD }: { planW: number; planD: number }) => {
   );
 };
 
+const round2 = (num: number) => Math.round(num * 100) / 100;
+
+/* ─── Garden Area ─── */
+const GardenArea = ({ room: r, W, D, isNight, mainDoorPos }: { room: any, W: number, D: number, isNight: boolean, mainDoorPos: any }) => {
+  const cx = round2(r.x + r.w / 2 - W / 2);
+  const cz = round2(r.y + r.h / 2 - D / 2);
+
+  // Pathway "Forbidden Zone" detection
+  const isPointInPathway = (px: number, pz: number) => {
+    if (!mainDoorPos) return false;
+    // Main pathway width is 6.4, we add 1.0 buffer for plants
+    const buffer = 4.2;
+    const dx = px - mainDoorPos.x;
+    const dz = pz - mainDoorPos.z;
+    
+    // Project point onto pathway axis (nx, nz)
+    const proj = dx * mainDoorPos.nx + dz * mainDoorPos.nz;
+    // Distance from axis
+    const perp = Math.abs(dx * (-mainDoorPos.nz) + dz * mainDoorPos.nx);
+    
+    // Pathway extends from door outwards. We clip anything within 'buffer' of the center line
+    // and extending from door (proj > -1) outwards.
+    return proj > -1.0 && perp < buffer;
+  };
+
+  const extraGreenery = useMemo(() => {
+    const hasPlants = r.furniture && r.furniture.length > 0;
+    if (hasPlants && r.furniture.length >= 3) return [];
+
+    const arr = [];
+    const count = Math.max(3, Math.floor(r.w * r.h / 15));
+    for (let i = 0; i < count; i++) {
+      // Balanced distribution of types
+      const types = ['plant', 'tall_plant', 'flower_pot', 'plant', 'flower_pot']; 
+      const seed = (parseInt(r.id.replace(/\D/g, '') || '1') + i) * 1337;
+      const pseudoRandom = (s: number) => {
+        const x = Math.sin(s) * 10000;
+        return x - Math.floor(x);
+      };
+
+      const rx = 1 + pseudoRandom(seed) * (r.w - 2);
+      const ry = 1 + pseudoRandom(seed + 1) * (r.h - 2);
+      
+      const absX = round2(r.x + rx - W / 2);
+      const absZ = round2(r.y + ry - D / 2);
+      
+      if (isPointInPathway(absX, absZ)) continue;
+
+      arr.push({
+        id: `auto-plant-${i}-${seed}`, // Provide stable ID for variant selection
+        type: types[i % types.length],
+        x: rx,
+        y: ry,
+        rotation: pseudoRandom(seed + 2) * Math.PI * 2,
+        w: 1.5, h: 1.5
+      });
+    }
+    return arr;
+  }, [r.id, r.w, r.h, r.furniture, mainDoorPos]);
+
+  return (
+    <group>
+      {/* Garden Bed - Soil & Grass (Slightly lower at 0.35 to sit BELOW the path at 0.2-0.5) */}
+      <mesh receiveShadow position={[cx, 0.35, cz]}>
+        <boxGeometry args={[r.w, 0.1, r.h]} />
+        <meshStandardMaterial color="#3a2a1c" roughness={1} />
+      </mesh>
+      <mesh receiveShadow position={[cx, 0.41, cz]}>
+        <boxGeometry args={[r.w - 0.2, 0.05, r.h - 0.2]} />
+        <meshStandardMaterial color="#345e38" roughness={0.9} />
+      </mesh>
+
+      {/* Modern Stone Border - Rendered as 4 segments to allow clipping at doorway */}
+      {[
+        { p: [cx, 0.5, cz - r.h/2 - 0.2], a: [r.w + 0.4, 0.3, 0.4], id: 'top' },
+        { p: [cx, 0.5, cz + r.h/2 + 0.2], a: [r.w + 0.4, 0.3, 0.4], id: 'bottom' },
+        { p: [cx - r.w/2 - 0.2, 0.5, cz], a: [0.4, 0.3, r.h + 0.4], id: 'left' },
+        { p: [cx + r.w/2 + 0.2, 0.5, cz], a: [0.4, 0.3, r.h + 0.4], id: 'right' },
+      ].map((seg, i) => {
+        // Skip border segment if it directly intersects the doorway path
+        if (isPointInPathway(seg.p[0], seg.p[2])) return null;
+        return (
+          <group key={`border-${i}`}>
+            <mesh position={seg.p as any}>
+              <boxGeometry args={seg.a as any} />
+              <meshStandardMaterial color="#5a554e" roughness={0.8} />
+            </mesh>
+            <mesh position={[seg.p[0], seg.p[1], seg.p[2]]}>
+              <boxGeometry args={[seg.a[0] - 0.05, 0.4, seg.a[2] - 0.05]} />
+              <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {/* Plants & Pots */}
+      <group position={[0, 0.42, 0]}>
+        {[...(r.furniture || []), ...extraGreenery].map((f: any, fi: number) => {
+          const fx = round2(r.x + f.x + (f.w || 1) / 2 - W / 2);
+          const fz = round2(r.y + f.y + (f.h || 1) / 2 - D / 2);
+          
+          // Double check manual furniture too
+          if (isPointInPathway(fx, fz)) return null;
+
+          return (
+            <group key={`gf-${fi}`} position={[fx, 0, fz]} rotation={[0, f.rotation || 0, 0]}>
+              <Furniture3D item={f} isNight={isNight} />
+            </group>
+          );
+        })}
+      </group>
+    </group>
+  );
+};
+
 /* ─── Main House Component ─── */
 const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hideRoof = false }: {
   plan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons: AddOn[]; isNight?: boolean; hideRoof?: boolean;
@@ -409,8 +524,6 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
   const D = plan.height;
   const wallH = 13;
   const t = 0.4; // Realistic wall thickness
-
-  const round2 = (num: number) => Math.round(num * 100) / 100;
 
   // PBR Floor Textures from materials factory
   const floorTextures = useMemo(() => ({
@@ -558,8 +671,15 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
     || mainDoorCandidates[0] 
     || null;
 
+  const gardenRooms = (plan.rooms || []).filter(r => r.type === 'garden');
+
   return (
     <group position={[0, 0, 0]}>
+      {/* Gardens & Landscaping */}
+      {gardenRooms.map(r => (
+        <GardenArea key={`garden-area-${r.id}`} room={r} W={W} D={D} isNight={isNight} mainDoorPos={mainDoorPos} />
+      ))}
+
       {/* Per-room Foundations for perfect spatial accuracy */}
       <group position={[0, 0.8, 0]}>
         {mainRooms.map(r => {

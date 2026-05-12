@@ -602,33 +602,110 @@ export const Furniture3D = ({ item, isNight }: Props) => {
     }
 
     case 'plant':
+    case 'tall_plant':
+    case 'flower_pot': {
+      const isFlower = type === 'flower_pot';
+      const isTall = type === 'tall_plant';
+      
+      // Use item.id to derive stable but unique variations
+      const seed = (parseInt(item.id?.replace(/\D/g, '') || '1')) * 997;
+      const pseudoRandom = (s: number) => {
+        const x = Math.sin(s) * 10000;
+        return x - Math.floor(x);
+      };
+
+      const variant = Math.floor(pseudoRandom(seed) * 4);
+      const potColor = ["#d4cdbf", "#8b4513", "#2a2a2a", "#5a5a5a"][variant];
+      const flowerColor = ["#ff5555", "#ffaa55", "#ffcc00", "#ff66cc", "#9966ff"][variant % 5];
+      const leafColor = ["#3d6b3a", "#4a7a44", "#2f5f2f", "#5b8c5a"][variant];
+
       return (
         <group>
-          {/* Ceramic planter */}
-          <mesh position={[0, 0.9, 0]} castShadow receiveShadow>
-            <cylinderGeometry args={[0.65, 0.5, 1.8, 18]} />
-            <meshStandardMaterial color="#d4cdbf" roughness={0.35} metalness={0.05} envMapIntensity={0.8} />
+          {/* Planter/Pot */}
+          <mesh position={[0, isFlower ? 0.35 : 0.9, 0]} castShadow receiveShadow>
+            {isFlower ? (
+              <cylinderGeometry args={[0.5, 0.35, 0.7, 12]} />
+            ) : isTall ? (
+              <cylinderGeometry args={[0.7, 0.55, 2.2, 18]} />
+            ) : (
+              <cylinderGeometry args={[0.65, 0.5, 1.8, 18]} />
+            )}
+            <meshStandardMaterial color={potColor} roughness={0.6} metalness={0.1} />
           </mesh>
           {/* Soil */}
-          <mesh position={[0, 1.78, 0]}>
-            <cylinderGeometry args={[0.6, 0.6, 0.08, 18]} />
+          <mesh position={[0, isFlower ? 0.65 : isTall ? 1.95 : 1.78, 0]}>
+            <cylinderGeometry args={[isFlower ? 0.45 : 0.6, isFlower ? 0.45 : 0.6, 0.08, 12]} />
             <meshStandardMaterial color="#3a2418" roughness={0.95} />
           </mesh>
-          {/* Layered foliage */}
-          <mesh position={[0, 2.6, 0]} castShadow>
-            <sphereGeometry args={[1.2, 14, 12]} />
-            <meshStandardMaterial color="#3d6b3a" roughness={0.92} />
-          </mesh>
-          <mesh position={[0.4, 3.4, 0.2]} castShadow>
-            <sphereGeometry args={[0.9, 12, 10]} />
-            <meshStandardMaterial color="#4a7a44" roughness={0.92} />
-          </mesh>
-          <mesh position={[-0.3, 3.7, -0.1]} castShadow>
-            <sphereGeometry args={[0.7, 10, 8]} />
-            <meshStandardMaterial color="#2f5f2f" roughness={0.92} />
-          </mesh>
+
+          {/* Foliage / Flowers */}
+          {isFlower ? (
+            <group position={[0, 0.8, 0]}>
+              {/* Main green bush */}
+              <mesh castShadow>
+                <sphereGeometry args={[0.45, 12, 10]} />
+                <meshStandardMaterial color="#3d6b3a" roughness={0.9} />
+              </mesh>
+              {/* Clustered Blossoms */}
+              {Array.from({ length: 6 }).map((_, i) => {
+                const ang = i * (Math.PI * 2 / 6);
+                const r = 0.3 + pseudoRandom(seed + i) * 0.2;
+                return (
+                  <mesh key={i} position={[Math.cos(ang) * r, 0.2 + pseudoRandom(seed + i) * 0.3, Math.sin(ang) * r]} castShadow>
+                    <sphereGeometry args={[0.15, 8, 8]} />
+                    <meshStandardMaterial color={["#ff5555", "#ffaa55", "#ffcc00", "#ff66cc", "#9966ff"][(variant + i) % 5]} />
+                  </mesh>
+                );
+              })}
+            </group>
+          ) : isTall ? (
+            <group position={[0, 2.2, 0]}>
+              {/* Conical Cypress-style */}
+              {Array.from({ length: 3 }).map((_, i) => (
+                <mesh key={i} position={[0, i * 1.2, 0]} castShadow>
+                  <coneGeometry args={[1.5 - i * 0.4, 2.5, 12]} />
+                  <meshStandardMaterial color={leafColor} roughness={0.9} />
+                </mesh>
+              ))}
+              {/* Random colored "berries" or accents */}
+              {variant > 2 && Array.from({ length: 8 }).map((_, i) => (
+                <mesh key={`b-${i}`} position={[Math.cos(i) * 0.8, 2.5 + i * 0.2, Math.sin(i) * 0.8]} castShadow>
+                  <sphereGeometry args={[0.1, 6, 6]} />
+                  <meshStandardMaterial color="#ff3333" emissive="#aa0000" emissiveIntensity={0.2} />
+                </mesh>
+              ))}
+            </group>
+          ) : variant === 0 ? (
+            /* Broad-leaf Tropical style */
+            <group position={[0, 2.2, 0]}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <mesh key={i} position={[0, 0, 0]} rotation={[0.4, i * (Math.PI * 2 / 5), 0]} castShadow>
+                  <boxGeometry args={[0.1, 3.5, 1.2]} />
+                  <meshStandardMaterial color="#2d5a2d" roughness={0.8} />
+                </mesh>
+              ))}
+            </group>
+          ) : variant === 1 ? (
+            /* Fern / Wispy style */
+            <group position={[0, 1.8, 0]}>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <mesh key={i} position={[0, 0.5, 0]} rotation={[1.1, i * (Math.PI * 2 / 12), 0.2]} castShadow>
+                  <cylinderGeometry args={[0.02, 0.05, 3.5, 6]} />
+                  <meshStandardMaterial color="#4a7a44" roughness={0.9} />
+                </mesh>
+              ))}
+            </group>
+          ) : (
+            /* Classic Rounded/Tiered Bush */
+            <group position={[0, 2.6, 0]}>
+              <mesh castShadow><sphereGeometry args={[1.2, 14, 12]} /><meshStandardMaterial color={leafColor} roughness={0.92} /></mesh>
+              <mesh position={[0.4, 0.8, 0.2]} castShadow><sphereGeometry args={[0.9, 12, 10]} /><meshStandardMaterial color={leafColor} roughness={0.92} /></mesh>
+              <mesh position={[-0.3, 1.1, -0.1]} castShadow><sphereGeometry args={[0.7, 10, 8]} /><meshStandardMaterial color={leafColor} roughness={0.92} /></mesh>
+            </group>
+          )}
         </group>
       );
+    }
 
     case 'nightstand': {
       const wood = sharedWood();
