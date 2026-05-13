@@ -1,7 +1,7 @@
 import { useConfig, AddOn, KitchenType, HOME_TYPE_LIMITS } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { formatMoney } from '@/lib/cost';
-import { useAddonMeta } from '@/hooks/PricingContext';
+import { ADDON_META } from '@/lib/cost';
 import { Minus, Plus, Sun, Car, Droplets, Cpu, Check, Fence, Trees } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -22,7 +22,6 @@ const KITCHENS: { id: KitchenType; label: string; desc: string }[] = [
 
 export const StepFeatures = () => {
   const { homeType, bedrooms, bathrooms, kitchen, addons, setBedrooms, setBathrooms, setKitchen, toggleAddon, next, prev } = useConfig();
-  const ADDON_META = useAddonMeta();
   const bedroomLimits = HOME_TYPE_LIMITS[homeType].bedrooms;
   const bathroomLimits = HOME_TYPE_LIMITS[homeType].bathrooms;
 

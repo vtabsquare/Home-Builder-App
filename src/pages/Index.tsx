@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getFamilyDoubleStoreyPackageKey, useConfig } from '@/store/configurator';
 import { computeCost } from '@/lib/cost';
-import { PricingProvider, usePricing } from '@/hooks/PricingContext';
-import { computeCostDynamic } from '@/hooks/useDynamicPricing';
+import { useDynamicPricing, computeCostDynamic } from '@/hooks/useDynamicPricing';
 import { applyAddOnsToPlan, generatePlan, Plan } from '@/lib/floorplan';
 import { ProgressHeader } from '@/components/configurator/ProgressHeader';
 import { CostPanel } from '@/components/configurator/CostPanel';
@@ -17,12 +16,12 @@ import { LandingPage } from '@/components/LandingPage';
 import { useInactivityReset } from '@/hooks/useInactivityReset';
 import { Maximize2, Minimize2, Sparkles } from 'lucide-react';
 
-const IndexInner = () => {
+const Index = () => {
   const config = useConfig();
   const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts, presetOverrides } = config;
 
   const [showLanding, setShowLanding] = useState(true);
-  const pricing = usePricing();
+  const { pricing } = useDynamicPricing();
 
   const cost = useMemo(() => computeCostDynamic(config, pricing), [config, pricing]);
   const basePlan = useMemo(() => {
@@ -201,11 +200,5 @@ const IndexInner = () => {
     </>
   );
 };
-
-const Index = () => (
-  <PricingProvider>
-    <IndexInner />
-  </PricingProvider>
-);
 
 export default Index;
