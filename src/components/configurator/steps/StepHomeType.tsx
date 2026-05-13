@@ -1,6 +1,7 @@
-import { useConfig, HOME_TYPE_DEFAULTS, HomeType } from '@/store/configurator';
+import { useConfig, HomeType } from '@/store/configurator';
 import { StepShell, SelectableCard } from '../StepShell';
 import { formatMoney } from '@/lib/cost';
+import { useHomeTypeMeta } from '@/hooks/PricingContext';
 import { motion } from 'framer-motion';
 
 const TYPES: { id: HomeType; tag: string; desc: string }[] = [
@@ -11,6 +12,7 @@ const TYPES: { id: HomeType; tag: string; desc: string }[] = [
 
 export const StepHomeType = () => {
   const { homeType, setHomeType, next, prev } = useConfig();
+  const HOME_TYPE_META = useHomeTypeMeta();
 
   return (
     <StepShell
@@ -22,7 +24,7 @@ export const StepHomeType = () => {
     >
       <div className="grid gap-8 md:grid-cols-3">
         {TYPES.map(({ id, tag, desc }, i) => {
-          const d = HOME_TYPE_DEFAULTS[id];
+          const d = HOME_TYPE_META[id];
           const active = homeType === id;
           return (
             <motion.div

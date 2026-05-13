@@ -103,13 +103,20 @@ function computeArea(c: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms'>
 export function computeCostDynamic(c: ConfigState, p: PricingConfig, opts: { interestRate?: number; tenureYears?: number } = {}): CostBreakdown {
   const { interestRate = 0.065, tenureYears = 25 } = opts;
   const area = computeArea(c, p);
-  const baseStructure = area * p.sqft_rate;
+  const includedArea = p.home_types[c.homeType].baseArea;
+  const extraArea = Math.max(0, area - includedArea);
+  const dynamicLandAreas = {
+    small: p.home_types.starter.baseArea,
+    medium: p.home_types.family.baseArea,
+    large: p.home_types.premium.baseArea,
+  };
+  const baseStructure = p.home_types[c.homeType].baseCost + extraArea * p.sqft_rate;
   const bedroomCost = c.bedrooms * p.bedroom_cost;
   const bathroomCost = c.bathrooms * p.bathroom_cost;
   const kitchenCost = p.kitchen_costs[c.kitchen];
   const addonsCost = c.addons.reduce((sum, a) => sum + (p.addon_costs[a] || 0), 0);
   const landCost = c.land === 'need' && c.landSize
-    ? (c.landSize === 'custom' ? c.customLandArea * p.land_sqft_rate : LAND_PACKAGES_STATIC[c.landSize].baseArea * p.land_sqft_rate)
+    ? (c.landSize === 'custom' ? c.customLandArea * p.land_sqft_rate : dynamicLandAreas[c.landSize] * p.land_sqft_rate)
     : 0;
 
   const total = Math.round(baseStructure + bedroomCost + bathroomCost + kitchenCost + addonsCost + landCost);

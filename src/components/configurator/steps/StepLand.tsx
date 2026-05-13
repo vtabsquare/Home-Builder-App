@@ -1,8 +1,8 @@
 import { useConfig, LandSize } from '@/store/configurator';
 import { StepShell, SelectableCard } from '../StepShell';
 import { Home, MapPin } from 'lucide-react';
-import { formatMoney, LAND_PACKAGES } from '@/lib/cost';
-import { useLandSqftRate } from '@/hooks/PricingContext';
+import { formatMoney } from '@/lib/cost';
+import { useLandPackages, useLandSqftRate } from '@/hooks/PricingContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const PACKAGE_IDS: { id: Exclude<LandSize, 'custom' | null>; tag: string }[] = [
@@ -28,6 +28,7 @@ const MiniHouse = ({ active }: { active?: boolean }) => (
 export const StepLand = () => {
   const { land, setLand, landSize, setLandSize, customLandArea, setCustomLandArea, next } = useConfig();
   const LAND_SQFT_RATE = useLandSqftRate();
+  const LAND_PACKAGES = useLandPackages();
 
   const handleLandChoice = (choice: 'own' | 'need') => {
     setLand(choice);

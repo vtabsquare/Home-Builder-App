@@ -5,8 +5,9 @@
  * Wraps the app via <PricingProvider> and consumed via usePricing().
  */
 import { createContext, useContext, ReactNode } from 'react';
-import { useDynamicPricing, PricingConfig, computeCostDynamic, formatMoneyDynamic } from './useDynamicPricing';
-import type { AddOn } from '@/store/configurator';
+import { useDynamicPricing, PricingConfig, computeCostDynamic, formatMoneyDynamic, LAND_PACKAGES_STATIC } from './useDynamicPricing';
+import { HOME_TYPE_DEFAULTS } from '@/store/configurator';
+import type { AddOn, HomeType, KitchenType } from '@/store/configurator';
 
 interface PricingCtx {
   pricing: PricingConfig;
@@ -40,6 +41,61 @@ export function useAddonMeta() {
   return Object.fromEntries(
     (Object.keys(ADDON_LABELS) as AddOn[]).map((k) => [k, { label: ADDON_LABELS[k], cost: p.addon_costs[k] }])
   ) as Record<AddOn, { label: string; cost: number }>;
+}
+
+export function useKitchenMeta() {
+  const p = usePricing();
+  const KITCHEN_LABELS: Record<KitchenType, string> = {
+    standard: 'Standard',
+    open: 'Open Plan',
+    galley: 'Galley',
+  };
+
+  return Object.fromEntries(
+    (Object.keys(KITCHEN_LABELS) as KitchenType[]).map((k) => [k, { label: KITCHEN_LABELS[k], cost: p.kitchen_costs[k] }])
+  ) as Record<KitchenType, { label: string; cost: number }>;
+}
+
+export function useRoomPricingMeta() {
+  const p = usePricing();
+  return {
+    bedroomCost: p.bedroom_cost,
+    bathroomCost: p.bathroom_cost,
+  };
+}
+
+export function useHomeTypeMeta() {
+  const p = usePricing();
+
+  return Object.fromEntries(
+    (Object.keys(HOME_TYPE_DEFAULTS) as HomeType[]).map((homeType) => [
+      homeType,
+      {
+        ...HOME_TYPE_DEFAULTS[homeType],
+        baseArea: p.home_types[homeType].baseArea,
+        baseCost: p.home_types[homeType].baseCost,
+      },
+    ])
+  ) as Record<HomeType, (typeof HOME_TYPE_DEFAULTS)[HomeType]>;
+}
+
+export function useLandPackages() {
+  const p = usePricing();
+
+  return {
+    small: {
+      ...LAND_PACKAGES_STATIC.small,
+      baseArea: p.home_types.starter.baseArea,
+    },
+    medium: {
+      ...LAND_PACKAGES_STATIC.medium,
+      baseArea: p.home_types.family.baseArea,
+    },
+    large: {
+      ...LAND_PACKAGES_STATIC.large,
+      baseArea: p.home_types.premium.baseArea,
+    },
+  };
 }
 
 /** Utility: get the dynamic land sqft rate */

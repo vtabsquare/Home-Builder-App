@@ -1,7 +1,7 @@
 import { useConfig, AddOn, KitchenType, HOME_TYPE_LIMITS } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { formatMoney } from '@/lib/cost';
-import { useAddonMeta } from '@/hooks/PricingContext';
+import { useAddonMeta, useKitchenMeta, useRoomPricingMeta } from '@/hooks/PricingContext';
 import { Minus, Plus, Sun, Car, Droplets, Cpu, Check, Fence, Trees } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -23,6 +23,8 @@ const KITCHENS: { id: KitchenType; label: string; desc: string }[] = [
 export const StepFeatures = () => {
   const { homeType, bedrooms, bathrooms, kitchen, addons, setBedrooms, setBathrooms, setKitchen, toggleAddon, next, prev } = useConfig();
   const ADDON_META = useAddonMeta();
+  const KITCHEN_META = useKitchenMeta();
+  const { bedroomCost, bathroomCost } = useRoomPricingMeta();
   const bedroomLimits = HOME_TYPE_LIMITS[homeType].bedrooms;
   const bathroomLimits = HOME_TYPE_LIMITS[homeType].bathrooms;
 
@@ -42,6 +44,7 @@ export const StepFeatures = () => {
             onChange={setBedrooms}
             min={bedroomLimits.min}
             max={bedroomLimits.max}
+            price={bedroomCost}
             hint="Min 10×10 ft"
             note={bedroomLimits.min === bedroomLimits.max ? `Fixed at ${bedroomLimits.min}` : `${bedroomLimits.min} to ${bedroomLimits.max}`}
           />
@@ -51,6 +54,7 @@ export const StepFeatures = () => {
             onChange={setBathrooms}
             min={bathroomLimits.min}
             max={bathroomLimits.max}
+            price={bathroomCost}
             hint="Min 5×7 ft"
             note={bathroomLimits.min === bathroomLimits.max ? `Fixed at ${bathroomLimits.min}` : `${bathroomLimits.min} to ${bathroomLimits.max}`}
           />
@@ -64,6 +68,7 @@ export const StepFeatures = () => {
           <div className="grid gap-6 md:grid-cols-3">
             {KITCHENS.map((k) => {
               const active = kitchen === k.id;
+              const kitchenMeta = KITCHEN_META[k.id];
               return (
                 <button
                   key={k.id}
@@ -76,7 +81,10 @@ export const StepFeatures = () => {
                 >
                   <div className="relative z-10 flex items-center justify-between mb-2">
                     <span className={`font-display font-medium tracking-tight text-base ${active ? 'text-foreground' : 'text-foreground/80'}`}>{k.label}</span>
-                    {active && <div className="h-1.5 w-1.5 rounded-full bg-clay" />}
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-clay num">+{formatMoney(kitchenMeta.cost)}</span>
+                      {active && <div className="h-1.5 w-1.5 rounded-full bg-clay" />}
+                    </div>
                   </div>
                   <p className="relative z-10 text-[11px] text-muted-foreground leading-relaxed font-light">{k.desc}</p>
                 </button>
@@ -127,12 +135,15 @@ export const StepFeatures = () => {
 };
 
 const Stepper = ({
-  label, value, onChange, min, max, hint, note,
-}: { label: string; value: number; onChange: (n: number) => void; min: number; max: number; hint?: string; note?: string }) => (
+  label, value, onChange, min, max, price, hint, note,
+}: { label: string; value: number; onChange: (n: number) => void; min: number; max: number; price?: number; hint?: string; note?: string }) => (
   <div className="relative rounded-xl bg-surface border border-border p-6 shadow-soft transition-all hover:shadow-soft group">
     <div className="flex items-baseline justify-between mb-5">
       <span className="font-display text-lg tracking-tight text-foreground/80 font-normal">{label}</span>
-      {hint && <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">{hint}</span>}
+      <div className="flex items-center gap-3">
+        {price !== undefined && <span className="text-[10px] uppercase tracking-[0.2em] text-clay font-bold num">+{formatMoney(price)}</span>}
+        {hint && <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">{hint}</span>}
+      </div>
     </div>
     <div className="flex items-center justify-between bg-soft-section/50 rounded-xl p-2 border border-border/50">
       <button
