@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getFamilyDoubleStoreyPackageKey, useConfig } from '@/store/configurator';
 import { computeCost } from '@/lib/cost';
+import { useDynamicPricing, computeCostDynamic } from '@/hooks/useDynamicPricing';
 import { applyAddOnsToPlan, generatePlan, Plan } from '@/lib/floorplan';
 import { ProgressHeader } from '@/components/configurator/ProgressHeader';
 import { CostPanel } from '@/components/configurator/CostPanel';
@@ -20,8 +21,9 @@ const Index = () => {
   const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts, presetOverrides } = config;
 
   const [showLanding, setShowLanding] = useState(true);
+  const { pricing } = useDynamicPricing();
 
-  const cost = useMemo(() => computeCost(config), [config]);
+  const cost = useMemo(() => computeCostDynamic(config, pricing), [config, pricing]);
   const basePlan = useMemo(() => {
     if (config.presetId !== -1) {
       const override = presetOverrides[getBuiltInPresetKey(config, config.presetId)];
