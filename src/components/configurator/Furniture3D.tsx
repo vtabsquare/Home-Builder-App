@@ -604,103 +604,183 @@ export const Furniture3D = ({ item, isNight }: Props) => {
     case 'plant':
     case 'tall_plant':
     case 'flower_pot': {
-      const isFlower = type === 'flower_pot';
+      const isFlower = type === 'flower_pot' || type === 'plant';
       const isTall = type === 'tall_plant';
       
-      // Use item.id to derive stable but unique variations
       const seed = (parseInt(item.id?.replace(/\D/g, '') || '1')) * 997;
       const pseudoRandom = (s: number) => {
         const x = Math.sin(s) * 10000;
         return x - Math.floor(x);
       };
 
-      const variant = Math.floor(pseudoRandom(seed) * 4);
-      const potColor = ["#d4cdbf", "#8b4513", "#2a2a2a", "#5a5a5a"][variant];
-      const flowerColor = ["#ff5555", "#ffaa55", "#ffcc00", "#ff66cc", "#9966ff"][variant % 5];
-      const leafColor = ["#3d6b3a", "#4a7a44", "#2f5f2f", "#5b8c5a"][variant];
+      const variant = Math.floor(pseudoRandom(seed) * 5);
+      const potColor = ["#d4cdbf", "#8b4513", "#2a2a2a", "#5a5a5a", "#3d3d3d"][variant];
+      const leafColor = ["#3d6b3a", "#4a7a44", "#2f5f2f", "#5b8c5a", "#385e38"][variant];
 
       return (
         <group>
-          {/* Planter/Pot */}
-          <mesh position={[0, isFlower ? 0.35 : 0.9, 0]} castShadow receiveShadow>
-            {isFlower ? (
-              <cylinderGeometry args={[0.5, 0.35, 0.7, 12]} />
-            ) : isTall ? (
-              <cylinderGeometry args={[0.7, 0.55, 2.2, 18]} />
-            ) : (
-              <cylinderGeometry args={[0.65, 0.5, 1.8, 18]} />
-            )}
-            <meshStandardMaterial color={potColor} roughness={0.6} metalness={0.1} />
-          </mesh>
-          {/* Soil */}
-          <mesh position={[0, isFlower ? 0.65 : isTall ? 1.95 : 1.78, 0]}>
-            <cylinderGeometry args={[isFlower ? 0.45 : 0.6, isFlower ? 0.45 : 0.6, 0.08, 12]} />
-            <meshStandardMaterial color="#3a2418" roughness={0.95} />
+          {/* Detailed Planter/Pot */}
+          <group position={[0, isFlower ? 0.35 : 0.9, 0]}>
+            <mesh castShadow receiveShadow>
+              {isFlower ? (
+                <cylinderGeometry args={[0.55, 0.4, 0.7, 24]} />
+              ) : isTall ? (
+                <cylinderGeometry args={[0.75, 0.6, 2.2, 24]} />
+              ) : (
+                <cylinderGeometry args={[0.7, 0.55, 1.8, 24]} />
+              )}
+              <meshStandardMaterial color={potColor} roughness={0.4} metalness={0.1} />
+            </mesh>
+            {/* Decorative Rim */}
+            <mesh position={[0, isFlower ? 0.36 : isTall ? 1.11 : 0.91, 0]} castShadow>
+               <cylinderGeometry args={[isFlower ? 0.62 : isTall ? 0.82 : 0.78, isFlower ? 0.58 : isTall ? 0.78 : 0.74, 0.12, 24]} />
+               <meshStandardMaterial color={potColor} roughness={0.3} metalness={0.2} />
+            </mesh>
+          </group>
+
+          {/* Soil with slight mound */}
+          <mesh position={[0, isFlower ? 0.66 : isTall ? 1.96 : 1.79, 0]}>
+            <cylinderGeometry args={[isFlower ? 0.5 : 0.65, isFlower ? 0.5 : 0.65, 0.08, 16]} />
+            <meshStandardMaterial color="#2a1a12" roughness={1} />
           </mesh>
 
           {/* Foliage / Flowers */}
           {isFlower ? (
-            <group position={[0, 0.8, 0]}>
-              {/* Main green bush */}
-              <mesh castShadow>
-                <sphereGeometry args={[0.45, 12, 10]} />
-                <meshStandardMaterial color="#3d6b3a" roughness={0.9} />
-              </mesh>
-              {/* Clustered Blossoms */}
-              {Array.from({ length: 6 }).map((_, i) => {
-                const ang = i * (Math.PI * 2 / 6);
-                const r = 0.3 + pseudoRandom(seed + i) * 0.2;
-                return (
-                  <mesh key={i} position={[Math.cos(ang) * r, 0.2 + pseudoRandom(seed + i) * 0.3, Math.sin(ang) * r]} castShadow>
-                    <sphereGeometry args={[0.15, 8, 8]} />
-                    <meshStandardMaterial color={["#ff5555", "#ffaa55", "#ffcc00", "#ff66cc", "#9966ff"][(variant + i) % 5]} />
-                  </mesh>
-                );
-              })}
+            <group position={[0, 0.7, 0]}>
+              {variant === 0 ? (
+                /* Enhanced Lavender */
+                <group>
+                  {Array.from({ length: 9 }).map((_, i) => {
+                    const ang = i * (Math.PI * 2 / 9);
+                    const r = 0.12 + pseudoRandom(seed + i) * 0.15;
+                    const h = 1.0 + pseudoRandom(seed + i) * 0.4;
+                    return (
+                      <group key={i} rotation={[0.15, ang, 0]} position={[Math.cos(ang) * r, 0, Math.sin(ang) * r]}>
+                        <mesh position={[0, h/2, 0]}><cylinderGeometry args={[0.015, 0.025, h, 6]} /><meshStandardMaterial color="#2d5a2d" /></mesh>
+                        {/* Leaf blades */}
+                        {Array.from({ length: 3 }).map((__, li) => (
+                          <mesh key={li} position={[0, 0.2 + li * 0.15, 0]} rotation={[0.8, li * 2, 0]}>
+                            <boxGeometry args={[0.01, 0.4, 0.08]} />
+                            <meshStandardMaterial color="#3d6b3a" />
+                          </mesh>
+                        ))}
+                        <mesh position={[0, h - 0.2, 0]}>
+                          <cylinderGeometry args={[0.1, 0.05, 0.6, 8]} />
+                          <meshStandardMaterial color="#9966ff" emissive="#6633cc" emissiveIntensity={0.3} />
+                        </mesh>
+                      </group>
+                    );
+                  })}
+                </group>
+              ) : variant === 1 ? (
+                /* Detailed Red Roses - Multi-petal geometry */
+                <group>
+                  <mesh castShadow><sphereGeometry args={[0.5, 16, 14]} /><meshStandardMaterial color="#2d5a2d" roughness={0.9} /></mesh>
+                  {Array.from({ length: 7 }).map((_, i) => {
+                    const ang = i * (Math.PI * 2 / 7);
+                    const r = 0.35 + pseudoRandom(seed + i) * 0.15;
+                    const y = 0.25 + pseudoRandom(seed + i) * 0.35;
+                    return (
+                      <group key={i} position={[Math.cos(ang) * r, y, Math.sin(ang) * r]} rotation={[0, ang, 0]}>
+                        {/* 5 Layered petals for Rose look */}
+                        {Array.from({ length: 5 }).map((__, pi) => (
+                          <mesh key={pi} rotation={[0.4, (pi * Math.PI * 2 / 5), 0]} position={[0, 0, 0]}>
+                            <boxGeometry args={[0.18, 0.22, 0.02]} />
+                            <meshStandardMaterial color="#ff1133" roughness={0.4} side={THREE.DoubleSide} />
+                          </mesh>
+                        ))}
+                        {/* Tiny yellow center */}
+                        <mesh position={[0, 0.05, 0]}><sphereGeometry args={[0.06, 6, 6]} /><meshStandardMaterial color="#ffcc00" /></mesh>
+                      </group>
+                    );
+                  })}
+                </group>
+              ) : variant === 2 ? (
+                /* Field Daisies - Already petal based, but adding more depth */
+                <group>
+                  {Array.from({ length: 8 }).map((_, i) => {
+                    const ang = i * (Math.PI * 2 / 8);
+                    const r = 0.18 + pseudoRandom(seed + i) * 0.25;
+                    const h = 0.4 + pseudoRandom(seed + i) * 0.5;
+                    return (
+                      <group key={i} position={[Math.cos(ang) * r, 0, Math.sin(ang) * r]}>
+                        <mesh position={[0, h/2, 0]}><cylinderGeometry args={[0.015, 0.02, h, 6]} /><meshStandardMaterial color="#3d6b3a" /></mesh>
+                        <group position={[0, h, 0]} rotation={[0.2, ang, 0]}>
+                          <mesh><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#443300" /></mesh>
+                          {Array.from({ length: 12 }).map((__, pi) => (
+                            <mesh key={pi} rotation={[0, pi * Math.PI / 6, 0]} position={[0.2, 0, 0]}>
+                              <boxGeometry args={[0.24, 0.01, 0.06]} />
+                              <meshStandardMaterial color="#ffffff" roughness={0.3} />
+                            </mesh>
+                          ))}
+                        </group>
+                      </group>
+                    );
+                  })}
+                </group>
+              ) : variant === 3 ? (
+                /* Lush Cherry Blossoms - Small planes for petals */
+                <group>
+                   <mesh castShadow><sphereGeometry args={[0.55, 20, 16]} /><meshStandardMaterial color="#386330" roughness={0.9} /></mesh>
+                   {Array.from({ length: 15 }).map((_, i) => {
+                    const ang = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const r = 0.55;
+                    const px = r * Math.sin(phi) * Math.cos(ang);
+                    const py = r * Math.sin(phi) * Math.sin(ang);
+                    const pz = r * Math.cos(phi);
+                    return (
+                      <group key={i} position={[px, py, pz]} rotation={[phi, ang, 0]}>
+                         {/* 4 Petals per blossom */}
+                         {Array.from({ length: 4 }).map((__, pi) => (
+                           <mesh key={pi} rotation={[0, pi * Math.PI / 2, 0.4]}>
+                              <boxGeometry args={[0.12, 0.01, 0.1]} />
+                              <meshStandardMaterial color="#ff88cc" emissive="#aa4466" emissiveIntensity={0.2} />
+                           </mesh>
+                         ))}
+                      </group>
+                    );
+                  })}
+                </group>
+              ) : (
+                /* Trumpet Lilies */
+                <group>
+                  {Array.from({ length: 5 }).map((_, i) => {
+                    const ang = i * (Math.PI * 2 / 5);
+                    const h = 0.7 + pseudoRandom(seed + i) * 0.4;
+                    return (
+                      <group key={i} position={[Math.cos(ang) * 0.25, 0, Math.sin(ang) * 0.25]}>
+                         <mesh position={[0, h/2, 0]}><cylinderGeometry args={[0.02, 0.035, h, 6]} /><meshStandardMaterial color="#2d5a2d" /></mesh>
+                         <group position={[0, h, 0]} rotation={[0.5, ang, 0]}>
+                            <mesh rotation={[Math.PI, 0, 0]}>
+                               <coneGeometry args={[0.25, 0.4, 12, 1, true]} />
+                               <meshStandardMaterial color="#fffef0" side={THREE.DoubleSide} roughness={0.3} />
+                            </mesh>
+                            <mesh position={[0, 0.1, 0]}>
+                               <cylinderGeometry args={[0.01, 0.01, 0.3, 6]} />
+                               <meshStandardMaterial color="#ffcc00" emissive="#aa8800" emissiveIntensity={0.5} />
+                            </mesh>
+                         </group>
+                      </group>
+                    );
+                  })}
+                </group>
+              )}
             </group>
           ) : isTall ? (
             <group position={[0, 2.2, 0]}>
-              {/* Conical Cypress-style */}
               {Array.from({ length: 3 }).map((_, i) => (
                 <mesh key={i} position={[0, i * 1.2, 0]} castShadow>
-                  <coneGeometry args={[1.5 - i * 0.4, 2.5, 12]} />
+                  <coneGeometry args={[1.6 - i * 0.4, 2.8, 16]} />
                   <meshStandardMaterial color={leafColor} roughness={0.9} />
-                </mesh>
-              ))}
-              {/* Random colored "berries" or accents */}
-              {variant > 2 && Array.from({ length: 8 }).map((_, i) => (
-                <mesh key={`b-${i}`} position={[Math.cos(i) * 0.8, 2.5 + i * 0.2, Math.sin(i) * 0.8]} castShadow>
-                  <sphereGeometry args={[0.1, 6, 6]} />
-                  <meshStandardMaterial color="#ff3333" emissive="#aa0000" emissiveIntensity={0.2} />
-                </mesh>
-              ))}
-            </group>
-          ) : variant === 0 ? (
-            /* Broad-leaf Tropical style */
-            <group position={[0, 2.2, 0]}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <mesh key={i} position={[0, 0, 0]} rotation={[0.4, i * (Math.PI * 2 / 5), 0]} castShadow>
-                  <boxGeometry args={[0.1, 3.5, 1.2]} />
-                  <meshStandardMaterial color="#2d5a2d" roughness={0.8} />
-                </mesh>
-              ))}
-            </group>
-          ) : variant === 1 ? (
-            /* Fern / Wispy style */
-            <group position={[0, 1.8, 0]}>
-              {Array.from({ length: 12 }).map((_, i) => (
-                <mesh key={i} position={[0, 0.5, 0]} rotation={[1.1, i * (Math.PI * 2 / 12), 0.2]} castShadow>
-                  <cylinderGeometry args={[0.02, 0.05, 3.5, 6]} />
-                  <meshStandardMaterial color="#4a7a44" roughness={0.9} />
                 </mesh>
               ))}
             </group>
           ) : (
-            /* Classic Rounded/Tiered Bush */
             <group position={[0, 2.6, 0]}>
-              <mesh castShadow><sphereGeometry args={[1.2, 14, 12]} /><meshStandardMaterial color={leafColor} roughness={0.92} /></mesh>
-              <mesh position={[0.4, 0.8, 0.2]} castShadow><sphereGeometry args={[0.9, 12, 10]} /><meshStandardMaterial color={leafColor} roughness={0.92} /></mesh>
-              <mesh position={[-0.3, 1.1, -0.1]} castShadow><sphereGeometry args={[0.7, 10, 8]} /><meshStandardMaterial color={leafColor} roughness={0.92} /></mesh>
+              <mesh castShadow><sphereGeometry args={[1.3, 16, 14]} /><meshStandardMaterial color={leafColor} roughness={0.9} /></mesh>
+              <mesh position={[0.5, 0.9, 0.2]} castShadow><sphereGeometry args={[0.95, 14, 12]} /><meshStandardMaterial color={leafColor} roughness={0.9} /></mesh>
+              <mesh position={[-0.4, 1.2, -0.2]} castShadow><sphereGeometry args={[0.75, 12, 10]} /><meshStandardMaterial color={leafColor} roughness={0.9} /></mesh>
             </group>
           )}
         </group>

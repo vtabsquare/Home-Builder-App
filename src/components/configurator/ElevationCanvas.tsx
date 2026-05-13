@@ -144,23 +144,72 @@ const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, pl
   return null;
 };
 
-const PottedPlant = ({ position, scale = 1 }: { position: [number, number, number], scale?: number }) => (
-  <group position={position} scale={scale}>
-    {/* Minimalist Ceramic Pot */}
-    <mesh position={[0, 0.4, 0]} castShadow>
-      <cylinderGeometry args={[0.6, 0.45, 0.8, 20]} />
-      <meshStandardMaterial color="#2a2a2a" roughness={0.4} metalness={0.1} />
-    </mesh>
-    {/* Lush Foliage (Stacked Spheres for a manicured look) */}
-    <group position={[0, 0.8, 0]}>
-      <mesh position={[0, 0.4, 0]} castShadow><sphereGeometry args={[0.7, 16, 12]} /><meshStandardMaterial color="#2d5a27" roughness={0.9} /></mesh>
-      <mesh position={[0, 1.0, 0]} castShadow><sphereGeometry args={[0.5, 16, 12]} /><meshStandardMaterial color="#3a6d32" roughness={0.9} /></mesh>
-      <mesh position={[0, 1.4, 0]} castShadow><sphereGeometry args={[0.3, 16, 12]} /><meshStandardMaterial color="#4b8042" roughness={0.9} /></mesh>
-    </group>
-  </group>
-);
+const PottedPlant = ({ position, scale = 1 }: { position: [number, number, number], scale?: number }) => {
+  const flowerColors = ["#ff5555", "#ffaa55", "#ffcc00", "#ff66cc", "#9966ff"];
+  const color = useMemo(() => flowerColors[Math.floor(Math.random() * flowerColors.length)], []);
 
-const BlackStonePathway = ({ doorPos }: { doorPos: { x: number, z: number, nx: number, nz: number } }) => {
+  return (
+    <group position={position} scale={scale}>
+      {/* Architectural Ceramic Pot */}
+      <group position={[0, 0.4, 0]}>
+        <mesh castShadow>
+          <cylinderGeometry args={[0.6, 0.45, 0.8, 24]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.3} metalness={0.6} />
+        </mesh>
+        {/* Pot Rim Detailing */}
+        <mesh position={[0, 0.36, 0]} castShadow>
+          <cylinderGeometry args={[0.68, 0.62, 0.12, 24]} />
+          <meshStandardMaterial color="#222222" roughness={0.2} metalness={0.7} />
+        </mesh>
+      </group>
+
+      {/* Lush Foliage & Detailed Flowers */}
+      <group position={[0, 0.8, 0]}>
+        {/* Foundation Bush */}
+        <mesh position={[0, 0.3, 0]} castShadow>
+          <sphereGeometry args={[0.65, 16, 12]} />
+          <meshStandardMaterial color="#2d5a27" roughness={0.9} />
+        </mesh>
+        
+        {/* Individual Flower Stems and Blossoms */}
+        {Array.from({ length: 6 }).map((_, i) => {
+          const ang = i * (Math.PI * 2 / 6);
+          const r = 0.35 + Math.sin(i * 1.5) * 0.1;
+          const h = 0.4 + Math.cos(i * 0.8) * 0.2;
+          return (
+            <group key={i} position={[Math.cos(ang) * r, 0.2, Math.sin(ang) * r]}>
+              {/* Thin Stem */}
+              <mesh position={[0, h/2, 0]}>
+                <cylinderGeometry args={[0.015, 0.015, h, 6]} />
+                <meshStandardMaterial color="#1b3b1b" />
+              </mesh>
+              {/* Multi-layered Blossom - Petal based */}
+              <group position={[0, h, 0]}>
+                {/* 5 Petals arranged in a cup */}
+                {Array.from({ length: 5 }).map((__, pi) => {
+                  const pAng = (pi / 5) * Math.PI * 2;
+                  return (
+                    <mesh key={pi} rotation={[0.4, pAng, 0]} position={[Math.cos(pAng) * 0.08, 0, Math.sin(pAng) * 0.08]}>
+                      <boxGeometry args={[0.18, 0.22, 0.01]} />
+                      <meshStandardMaterial color={flowerColors[i % flowerColors.length]} roughness={0.4} side={THREE.DoubleSide} />
+                    </mesh>
+                  );
+                })}
+                {/* Yellow center stamen */}
+                <mesh position={[0, 0.05, 0]}>
+                  <sphereGeometry args={[0.06, 6, 6]} />
+                  <meshStandardMaterial color="#ffcc00" emissive="#ffcc00" emissiveIntensity={0.5} />
+                </mesh>
+              </group>
+            </group>
+          );
+        })}
+      </group>
+    </group>
+  );
+};
+
+const BlackStonePathway = ({ doorPos, plotW, plotD }: { doorPos: { x: number, z: number, nx: number, nz: number }, plotW: number, plotD: number }) => {
   const marbleTextures = useMemo(() => ({
     map: createMarbleTexture(1, 1),
     roughness: createMarbleRoughness(1, 1),
@@ -199,13 +248,22 @@ const BlackStonePathway = ({ doorPos }: { doorPos: { x: number, z: number, nx: n
         </mesh>
       );
 
-      // Potted Plants
+      // Potted Plants - Restrict from being inside the fence
       if (i % 2 === 0 && i < count - 1) {
         const sideDist = pathWidth / 2 + 1.8;
-        items.push(
-          <PottedPlant key={`plant-l-${i}`} position={[x + px * sideDist, 0, z + pz * sideDist]} scale={0.85 + Math.random() * 0.15} />,
-          <PottedPlant key={`plant-r-${i}`} position={[x - px * sideDist, 0, z - pz * sideDist]} scale={0.85 + Math.random() * 0.15} />
-        );
+        
+        const posL: [number, number, number] = [x + px * sideDist, 0, z + pz * sideDist];
+        const posR: [number, number, number] = [x - px * sideDist, 0, z - pz * sideDist];
+
+        const isInside = (p: [number, number, number]) => 
+          Math.abs(p[0]) < plotW / 2 - 0.5 && Math.abs(p[2]) < plotD / 2 - 0.5;
+
+        if (!isInside(posL)) {
+          items.push(<PottedPlant key={`plant-l-${i}`} position={posL} scale={0.85 + Math.random() * 0.15} />);
+        }
+        if (!isInside(posR)) {
+          items.push(<PottedPlant key={`plant-r-${i}`} position={posR} scale={0.85 + Math.random() * 0.15} />);
+        }
       }
     }
 
@@ -309,7 +367,7 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           <EnhancedGround isNight={isNight} />
           {addons.includes('landscaping') && <GrassField planW={safeW} planD={safeD} />}
           
-          <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={!!hideRoof} />
+          <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={!!hideRoof} plotW={plotW} plotD={plotD} />
           
           {/* Second Floor (Double Storey) */}
           {isDoubleStorey && firstFloorPlan && (
@@ -432,8 +490,8 @@ const GardenArea = ({ room: r, W, D, isNight, mainDoorPos }: { room: any, W: num
     const arr = [];
     const count = Math.max(3, Math.floor(r.w * r.h / 15));
     for (let i = 0; i < count; i++) {
-      // Balanced distribution of types
-      const types = ['plant', 'tall_plant', 'flower_pot', 'plant', 'flower_pot']; 
+      // High-variety floral distribution
+      const types = ['flower_pot', 'flower_pot', 'flower_pot', 'tall_plant', 'flower_pot']; 
       const seed = (parseInt(r.id.replace(/\D/g, '') || '1') + i) * 1337;
       const pseudoRandom = (s: number) => {
         const x = Math.sin(s) * 10000;
@@ -516,8 +574,8 @@ const GardenArea = ({ room: r, W, D, isNight, mainDoorPos }: { room: any, W: num
 };
 
 /* ─── Main House Component ─── */
-const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hideRoof = false }: {
-  plan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons: AddOn[]; isNight?: boolean; hideRoof?: boolean;
+const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hideRoof = false, plotW, plotD }: {
+  plan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons: AddOn[]; isNight?: boolean; hideRoof?: boolean; plotW: number; plotD: number;
 }) => {
   const colors = MATERIAL_COLORS[material];
   const W = plan.width;
@@ -850,7 +908,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
       {/* Entrance Features */}
       {mainDoorPos && (
         <>
-          <BlackStonePathway doorPos={mainDoorPos} />
+          <BlackStonePathway doorPos={mainDoorPos} plotW={plotW} plotD={plotD} />
           {!hideRoof && (
             <group position={[mainDoorPos.x, wallH * 0.85 + 0.8, mainDoorPos.z + mainDoorPos.nz * 2 + mainDoorPos.nx * 2]}>
               <mesh castShadow rotation={[0, mainDoorPos.nx !== 0 ? Math.PI/2 : 0, 0]}>
@@ -1964,32 +2022,32 @@ const FlowerPot = ({ x, z, flowerColor, potType = 'square' }: { x: number; z: nu
           </mesh>
         </group>
 
-        {/* Realistic Flowers with Petals */}
+        {/* Realistic Flowers with Detailed Petals */}
         {[
-          { p: [-0.3, 0.6, 0.1], s: 0.22 },
-          { p: [0.25, 0.5, 0.3], s: 0.25 },
-          { p: [0.05, 0.7, -0.2], s: 0.2 }
+          { p: [-0.3, 0.65, 0.1], s: 0.22 },
+          { p: [0.25, 0.55, 0.3], s: 0.25 },
+          { p: [0.05, 0.75, -0.2], s: 0.2 }
         ].map((f, i) => (
           <group key={i} position={f.p as [number, number, number]}>
-            {/* Flower Center */}
-            <mesh castShadow>
-              <sphereGeometry args={[0.1, 8, 8]} />
-              <meshStandardMaterial color="#332211" />
-            </mesh>
-            {/* Petals - arranged in a circle */}
+            {/* 6 Petals arranged in a bloom */}
             {Array.from({ length: 6 }).map((_, pi) => {
               const angle = (pi / 6) * Math.PI * 2;
               return (
                 <mesh 
                   key={pi} 
-                  position={[Math.cos(angle) * 0.18, 0, Math.sin(angle) * 0.18]}
-                  rotation={[Math.PI / 4, angle, 0]}
+                  position={[Math.cos(angle) * 0.12, 0, Math.sin(angle) * 0.12]}
+                  rotation={[0.5, angle, 0]}
                 >
-                  <sphereGeometry args={[0.14, 8, 4]} scale={[1, 0.3, 1]} />
-                  <meshStandardMaterial color={flowerColor} emissive={flowerColor} emissiveIntensity={0.4} />
+                  <boxGeometry args={[0.2, 0.25, 0.01]} />
+                  <meshStandardMaterial color={flowerColor} roughness={0.3} side={THREE.DoubleSide} />
                 </mesh>
               );
             })}
+            {/* Detailed center */}
+            <mesh position={[0, 0.05, 0]}>
+              <sphereGeometry args={[0.08, 8, 8]} />
+              <meshStandardMaterial color="#443300" emissive="#ffcc00" emissiveIntensity={0.2} />
+            </mesh>
           </group>
         ))}
       </group>
