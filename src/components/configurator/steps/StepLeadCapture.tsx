@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { z } from 'zod';
-import { getBuiltInPresetKey, useConfig } from '@/store/configurator';
+import { getBuiltInPresetKey, getElevationPresetKey, useConfig } from '@/store/configurator';
+import type { ConfigActions, ConfigState } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { CostBreakdown, formatMoney } from '@/lib/cost';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
+
+type ConfigStore = ConfigState & ConfigActions;
 
 const TIMELINES = ['0–3 months', '3–6 months', '6–12 months', '12+ months'];
 const BREVO_API_KEY = import.meta.env.VITE_BREVO_API_KEY;
@@ -48,7 +51,7 @@ const buildBrevoHtml = ({
   leadId: string;
   timeline: string;
   cost: CostBreakdown;
-  c: ReturnType<typeof useConfig>;
+  c: ConfigStore;
 }) => {
   const addons = c.addons.length ? c.addons.join(', ') : 'None';
   const landText = c.land === 'need'
@@ -110,7 +113,7 @@ const sendBrevoFromFrontend = async ({
   leadId: string;
   timeline: string;
   cost: CostBreakdown;
-  c: ReturnType<typeof useConfig>;
+  c: ConfigStore;
 }) => {
   if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) {
     throw new Error('Brevo env is not configured');
@@ -182,10 +185,11 @@ export const StepLeadCapture = ({ cost }: Props) => {
     setErrors({});
     setSubmitting(true);
     const presetKey = getBuiltInPresetKey(c, c.presetId);
+    const elevationPresetKey = getElevationPresetKey(c, c.presetId);
     const { data: elevationRows } = await supabase
       .from('elevation_images')
       .select('image_url, image_path')
-      .eq('preset_key', presetKey)
+      .eq('preset_key', elevationPresetKey)
       .order('created_at', { ascending: true });
 
     const config = {

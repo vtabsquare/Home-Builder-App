@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getFamilyDoubleStoreyPackageKey, useConfig, RoofType, Material } from '@/store/configurator';
+import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getElevationPresetKey, getFamilyDoubleStoreyPackageKey, useConfig, RoofType, Material } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { FloorPlanCanvas } from '../FloorPlanCanvas';
 import { ElevationCanvas } from '../ElevationCanvas';
@@ -68,6 +68,11 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, presetId]
   );
 
+  const currentElevationPresetKey = useMemo(
+    () => getElevationPresetKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, roof, material }, presetId),
+    [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, roof, material, presetId]
+  );
+
   const fetchElevationImages = useCallback(async (presetKey: string) => {
     const { data, error } = await supabase
       .from('elevation_images')
@@ -87,7 +92,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
   const handleElevationUpload = useCallback(async (file: File) => {
     if (!file) return;
-    const safePresetKey = currentPresetKey.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safePresetKey = currentElevationPresetKey.replace(/[^a-zA-Z0-9_-]/g, '_');
     const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const filePath = `${safePresetKey}/${Date.now()}-${safeFileName}`;
 
@@ -108,15 +113,15 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
       const { error: insertError } = await supabase
         .from('elevation_images')
         .insert({
-          preset_key: currentPresetKey,
+          preset_key: currentElevationPresetKey,
           image_path: filePath,
           image_url: imageUrl,
         });
 
       if (insertError) throw insertError;
 
-      addElevationImage(currentPresetKey, imageUrl);
-      await fetchElevationImages(currentPresetKey);
+      addElevationImage(currentElevationPresetKey, imageUrl);
+      await fetchElevationImages(currentElevationPresetKey);
       toast({ title: 'Image uploaded successfully' });
     } catch (error: any) {
       toast({
@@ -127,7 +132,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     } finally {
       setUploadingElevation(false);
     }
-  }, [addElevationImage, currentPresetKey, fetchElevationImages]);
+  }, [addElevationImage, currentElevationPresetKey, fetchElevationImages]);
 
   const handleElevationDelete = useCallback(async (presetKey: string, index: number) => {
     const images = remoteElevationImages[presetKey] || [];
@@ -163,8 +168,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
   useEffect(() => {
     if (view !== 'elevation') return;
-    fetchElevationImages(currentPresetKey).catch(() => undefined);
-  }, [currentPresetKey, fetchElevationImages, view]);
+    fetchElevationImages(currentElevationPresetKey).catch(() => undefined);
+  }, [currentElevationPresetKey, fetchElevationImages, view]);
 
   // Double storey floor splitting
   const canDoubleStorey = homeType === 'family' || homeType === 'premium';
@@ -799,7 +804,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   {/* Gallery Grid */}
                   <div className="flex-1 overflow-y-auto pr-2">
                     {(() => {
-                      const presetKey = currentPresetKey;
+                      const presetKey = currentElevationPresetKey;
                       const remoteImages = remoteElevationImages[presetKey] || [];
                       const images = remoteImages.length > 0
                         ? remoteImages.map((img) => img.image_url)

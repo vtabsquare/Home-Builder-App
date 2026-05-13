@@ -11,12 +11,18 @@ export type RoofType = 'gable' | 'flat';
 export type Material = 'budget' | 'modern' | 'luxury';
 export const FAMILY_DOUBLE_STOREY_PACKAGE_KEY = 'family-double-storey';
 const BUILT_IN_PRESET_PREFIX = '__builtin_floor_plan__';
+const ELEVATION_PRESET_PREFIX = '__elevation_variant__';
 
 export const getBuiltInPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>, presetId: number) => {
   // Exclude visual-only addons from the key (smart_home, solar, water_tank, fence)
   // Only layout-affecting addons (carport, landscaping) should trigger different preset overrides
   const layoutAffectingAddons = (state.addons || []).filter(a => a === 'carport' || a === 'landscaping');
   return `${BUILT_IN_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_addons_${layoutAffectingAddons.sort().join('-') || 'none'}_${presetId}`;
+};
+
+export const getElevationPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons' | 'roof' | 'material'>, presetId: number) => {
+  const visualAddons = [...(state.addons || [])].sort();
+  return `${ELEVATION_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_roof_${state.roof}_material_${state.material}_addons_${visualAddons.join('-') || 'none'}_${presetId}`;
 };
 
 export const getFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>) =>
