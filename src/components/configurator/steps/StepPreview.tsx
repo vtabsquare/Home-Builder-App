@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getElevationPresetKey, getFamilyDoubleStoreyPackageKey, useConfig, RoofType, Material } from '@/store/configurator';
+import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getElevationLookupKeys, getElevationPresetKey, getFamilyDoubleStoreyPackageKey, useConfig, RoofType, Material } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { FloorPlanCanvas } from '../FloorPlanCanvas';
 import { ElevationCanvas } from '../ElevationCanvas';
 import { CustomEditorCanvas, ROOM_BLOCKS } from '../CustomEditorCanvas';
 import { Plan, splitPlanToFloors, Room, generateEmptyPlan, regenerateFurniture } from '@/lib/floorplan';
+import { fetchElevationImagesByVariant, fetchElevationVariantFamily, normalizeParsedVariantAddons, resolveElevationVariant } from '@/lib/elevationVariants';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash, Copy, ClipboardPaste, Upload, Plus, Image as ImageIcon } from 'lucide-react';
@@ -59,8 +60,12 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   const [stagedPlan, setStagedPlan] = useState<Plan | null>(null);
   const [roomCounter, setRoomCounter] = useState(0);
   const [hasCopiedPlan, setHasCopiedPlan] = useState(!!floorPlanClipboard);
-  const [remoteElevationImages, setRemoteElevationImages] = useState<Record<string, { id: string; image_url: string; image_path: string }[]>>({});
+  const [remoteElevationImages, setRemoteElevationImages] = useState<Record<string, { id: string; image_url: string; image_path: string; variant_id?: string | null; preset_key?: string }[]>>({});
+  const [fetchedElevationKeys, setFetchedElevationKeys] = useState<Record<string, boolean>>({});
   const [uploadingElevation, setUploadingElevation] = useState(false);
+  const [availableVariants, setAvailableVariants] = useState<{ id: string; preset_key: string; image_count: number; sample_url: string; roof?: string | null; material?: string | null; visual_addons?: string[] }[]>([]);
+  const [showVariantRecovery, setShowVariantRecovery] = useState(false);
+  const [currentElevationVariantId, setCurrentElevationVariantId] = useState<string | null>(null);
   const tabScrollRef = useRef<HTMLDivElement>(null);
 
   const currentPresetKey = useMemo(
@@ -73,20 +78,23 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, roof, material, presetId]
   );
 
-  const fetchElevationImages = useCallback(async (presetKey: string) => {
-    const { data, error } = await supabase
-      .from('elevation_images')
-      .select('id, image_url, image_path')
-      .eq('preset_key', presetKey)
-      .order('created_at', { ascending: true });
+  const elevationLookupKeys = useMemo(
+    () => getElevationLookupKeys({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, roof, material }, presetId),
+    [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, roof, material, presetId]
+  );
 
-    if (error) {
-      throw error;
-    }
+  const fetchElevationImages = useCallback(async (presetKey: string, variantId: string | null, lookupKeys: string[] = []) => {
+    const collected = variantId
+      ? await fetchElevationImagesByVariant(variantId, lookupKeys)
+      : [];
 
     setRemoteElevationImages((prev) => ({
       ...prev,
-      [presetKey]: data || [],
+      [presetKey]: collected,
+    }));
+    setFetchedElevationKeys((prev) => ({
+      ...prev,
+      [presetKey]: true,
     }));
   }, []);
 
@@ -109,6 +117,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
         .getPublicUrl(filePath);
 
       const imageUrl = publicUrlData.publicUrl;
+      const variant = await resolveElevationVariant({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, roof, material }, presetId);
+      setCurrentElevationVariantId(variant.id);
 
       const { error: insertError } = await supabase
         .from('elevation_images')
@@ -116,12 +126,13 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
           preset_key: currentElevationPresetKey,
           image_path: filePath,
           image_url: imageUrl,
+          variant_id: variant.id,
         });
 
       if (insertError) throw insertError;
 
       addElevationImage(currentElevationPresetKey, imageUrl);
-      await fetchElevationImages(currentElevationPresetKey);
+      await fetchElevationImages(currentElevationPresetKey, variant.id, elevationLookupKeys);
       toast({ title: 'Image uploaded successfully' });
     } catch (error: any) {
       toast({
@@ -132,7 +143,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     } finally {
       setUploadingElevation(false);
     }
-  }, [addElevationImage, currentElevationPresetKey, fetchElevationImages]);
+  }, [addElevationImage, addons, bathrooms, bedrooms, currentElevationPresetKey, elevationLookupKeys, fetchElevationImages, homeType, isDoubleStorey, kitchen, material, presetId, roof]);
 
   const handleElevationDelete = useCallback(async (presetKey: string, index: number) => {
     const images = remoteElevationImages[presetKey] || [];
@@ -155,7 +166,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
       if (deleteError) throw deleteError;
 
       removeElevationImage(presetKey, index);
-      await fetchElevationImages(presetKey);
+      await fetchElevationImages(presetKey, currentElevationVariantId);
       toast({ title: 'Image removed' });
     } catch (error: any) {
       toast({
@@ -164,12 +175,108 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
         variant: 'destructive',
       });
     }
-  }, [fetchElevationImages, remoteElevationImages, removeElevationImage]);
+  }, [currentElevationVariantId, fetchElevationImages, remoteElevationImages, removeElevationImage]);
 
   useEffect(() => {
     if (view !== 'elevation') return;
-    fetchElevationImages(currentElevationPresetKey).catch(() => undefined);
-  }, [currentElevationPresetKey, fetchElevationImages, view]);
+    let cancelled = false;
+    (async () => {
+      const variant = await resolveElevationVariant({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, roof, material }, presetId);
+      if (cancelled) return;
+      setCurrentElevationVariantId(variant.id);
+      await fetchElevationImages(currentElevationPresetKey, variant.id, elevationLookupKeys);
+    })().catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [addons, bathrooms, bedrooms, currentElevationPresetKey, elevationLookupKeys, fetchElevationImages, homeType, isDoubleStorey, kitchen, material, presetId, roof, view]);
+
+  // Recovery: when the gallery is empty, fetch any uploaded variants matching
+  // the current preset family (homeType + bedrooms + bathrooms + kitchen +
+  // storey + presetId) so users can jump to the exact uploaded variant.
+  useEffect(() => {
+    if (view !== 'elevation') return;
+    const remote = remoteElevationImages[currentElevationPresetKey] || [];
+    if (remote.length > 0) {
+      setAvailableVariants([]);
+      setShowVariantRecovery(false);
+      return;
+    }
+
+    const familyPrefix = `__elevation_variant__${homeType}_${bedrooms}bed_${bathrooms}bath_${kitchen}_${isDoubleStorey ? 'double' : 'single'}_`;
+    const familySuffix = `_${presetId}`;
+
+    let cancelled = false;
+    (async () => {
+      const data = await fetchElevationVariantFamily({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey }, presetId);
+      if (cancelled) return;
+
+      const mapped = data
+        .filter((row: any) => (row.legacy_preset_key || '').startsWith(familyPrefix) && (row.legacy_preset_key || '').endsWith(familySuffix))
+        .map((row: any) => ({
+          id: row.id,
+          preset_key: row.legacy_preset_key || row.variant_signature,
+          image_count: row.image_count,
+          sample_url: row.sample_url,
+          roof: row.roof,
+          material: row.material,
+          visual_addons: row.visual_addons || [],
+        }))
+        .filter((row: any) => row.image_count > 0 && row.sample_url);
+
+      setAvailableVariants(mapped);
+      setShowVariantRecovery(mapped.length > 0);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [view, currentElevationPresetKey, remoteElevationImages, homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, presetId]);
+
+  const parseVariantKey = useCallback((presetKey: string) => {
+    const match = presetKey.match(/^__elevation_variant__.*?_roof_(gable|flat)_material_(budget|modern|luxury)_addons_(.+?)_(\d+)$/);
+    if (!match) return null;
+    return {
+      roof: match[1] as RoofType,
+      material: match[2] as Material,
+      addons: match[3] === 'none' ? [] : match[3].split('-'),
+    };
+  }, []);
+
+  const applyVariant = useCallback((presetKey: string) => {
+    const variant = availableVariants.find((item) => item.preset_key === presetKey);
+    const parsed = variant ? {
+      roof: variant.roof as RoofType,
+      material: variant.material as Material,
+      addons: normalizeParsedVariantAddons(variant.visual_addons || []),
+    } : parseVariantKey(presetKey);
+    if (!parsed) {
+      toast({
+        title: 'Variant not recognized',
+        description: 'This image was uploaded under an older key format and cannot be auto-applied.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setRoof(parsed.roof);
+    setMaterial(parsed.material);
+    const state = useConfig.getState();
+    const currentAddons = state.addons;
+    const visualAddons = new Set(['carport', 'landscaping', 'fence', 'solar', 'water_tank']);
+    const desiredVisual = new Set(parsed.addons);
+    parsed.addons.forEach((addon) => {
+      if (!currentAddons.includes(addon as any)) {
+        useConfig.getState().toggleAddon(addon as any);
+      }
+    });
+    useConfig.getState().addons.forEach((addon) => {
+      if (visualAddons.has(addon) && !desiredVisual.has(addon)) {
+        useConfig.getState().toggleAddon(addon as any);
+      }
+    });
+    setShowVariantRecovery(false);
+    toast({ title: 'Switched to uploaded variant', description: 'Your images for this variant should now appear.' });
+  }, [availableVariants, parseVariantKey, setRoof, setMaterial]);
 
   // Double storey floor splitting
   const canDoubleStorey = homeType === 'family' || homeType === 'premium';
@@ -806,7 +913,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                     {(() => {
                       const presetKey = currentElevationPresetKey;
                       const remoteImages = remoteElevationImages[presetKey] || [];
-                      const images = remoteImages.length > 0
+                      const hasFetchedRemoteImages = !!fetchedElevationKeys[presetKey];
+                      const images = hasFetchedRemoteImages
                         ? remoteImages.map((img) => img.image_url)
                         : (elevationImages[presetKey] || []);
                       
@@ -817,9 +925,43 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                               <ImageIcon size={32} strokeWidth={1.5} />
                             </div>
                             <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground mb-2">No Images Yet</h4>
-                            <p className="text-[10px] text-muted-foreground/60 max-w-[240px] leading-relaxed">
+                            <p className="text-[10px] text-muted-foreground/60 max-w-[320px] leading-relaxed">
                               Upload architectural elevation drawings or site photos to visualize this specific layout configuration.
                             </p>
+                            <p className="mt-4 text-[9px] text-muted-foreground/50 font-mono break-all max-w-md">
+                              Current key: <span className="text-foreground/70">{currentElevationPresetKey}</span>
+                            </p>
+                            {showVariantRecovery && availableVariants.length > 0 && (
+                              <div className="mt-8 w-full max-w-2xl text-left">
+                                <h5 className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground mb-3">
+                                  Found {availableVariants.length} uploaded {availableVariants.length === 1 ? 'variant' : 'variants'} for this preset
+                                </h5>
+                                <p className="text-[10px] text-muted-foreground/70 mb-4 leading-relaxed">
+                                  Click a variant below to switch the configuration and view its uploaded images.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  {availableVariants.map((variant) => {
+                                    const parsed = parseVariantKey(variant.preset_key);
+                                    const label = parsed
+                                      ? `${parsed.roof} · ${parsed.material} · ${parsed.addons.length ? parsed.addons.join(', ') : 'no add-ons'}`
+                                      : variant.preset_key;
+                                    return (
+                                      <button
+                                        key={variant.preset_key}
+                                        onClick={() => applyVariant(variant.preset_key)}
+                                        className="group flex items-center gap-3 rounded-xl border border-border bg-white hover:border-primary/40 hover:shadow-soft transition-all p-3 text-left"
+                                      >
+                                        <img src={variant.sample_url} alt="variant" className="h-14 w-14 rounded-lg object-cover" />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-foreground truncate">{label}</div>
+                                          <div className="text-[9px] text-muted-foreground/60 mt-1">{variant.image_count} image{variant.image_count === 1 ? '' : 's'}</div>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       }

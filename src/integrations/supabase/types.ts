@@ -39,6 +39,7 @@ export type Database = {
           image_path: string
           image_url: string
           preset_key: string
+          variant_id: string | null
         }
         Insert: {
           created_at?: string
@@ -46,6 +47,7 @@ export type Database = {
           image_path: string
           image_url: string
           preset_key: string
+          variant_id?: string | null
         }
         Update: {
           created_at?: string
@@ -53,6 +55,66 @@ export type Database = {
           image_path?: string
           image_url?: string
           preset_key?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "elevation_images_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "elevation_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      elevation_variants: {
+        Row: {
+          bathrooms: number | null
+          bedrooms: number | null
+          created_at: string
+          home_type: string | null
+          id: string
+          is_double_storey: boolean | null
+          kitchen: string | null
+          legacy_preset_key: string | null
+          material: string | null
+          preset_id: number | null
+          roof: string | null
+          updated_at: string
+          variant_signature: string
+          visual_addons: string[]
+        }
+        Insert: {
+          bathrooms?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          home_type?: string | null
+          id?: string
+          is_double_storey?: boolean | null
+          kitchen?: string | null
+          legacy_preset_key?: string | null
+          material?: string | null
+          preset_id?: number | null
+          roof?: string | null
+          updated_at?: string
+          variant_signature: string
+          visual_addons?: string[]
+        }
+        Update: {
+          bathrooms?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          home_type?: string | null
+          id?: string
+          is_double_storey?: boolean | null
+          kitchen?: string | null
+          legacy_preset_key?: string | null
+          material?: string | null
+          preset_id?: number | null
+          roof?: string | null
+          updated_at?: string
+          variant_signature?: string
+          visual_addons?: string[]
         }
         Relationships: []
       }

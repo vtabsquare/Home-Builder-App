@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { z } from 'zod';
-import { getBuiltInPresetKey, getElevationPresetKey, useConfig } from '@/store/configurator';
+import { getBuiltInPresetKey, getElevationLookupKeys, useConfig } from '@/store/configurator';
 import type { ConfigActions, ConfigState } from '@/store/configurator';
 import { StepShell } from '../StepShell';
 import { CostBreakdown, formatMoney } from '@/lib/cost';
+import { fetchElevationImagesByVariant, resolveElevationVariant } from '@/lib/elevationVariants';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -185,12 +186,16 @@ export const StepLeadCapture = ({ cost }: Props) => {
     setErrors({});
     setSubmitting(true);
     const presetKey = getBuiltInPresetKey(c, c.presetId);
-    const elevationPresetKey = getElevationPresetKey(c, c.presetId);
-    const { data: elevationRows } = await supabase
-      .from('elevation_images')
-      .select('image_url, image_path')
-      .eq('preset_key', elevationPresetKey)
-      .order('created_at', { ascending: true });
+    const elevationKeyOrder = getElevationLookupKeys(c, c.presetId);
+    const elevationVariant = await resolveElevationVariant(c, c.presetId);
+    const elevationRows = await fetchElevationImagesByVariant(elevationVariant.id, elevationKeyOrder);
+    const serializedElevationRows = elevationRows.map((row) => ({
+      id: row.id,
+      image_url: row.image_url,
+      image_path: row.image_path,
+      variant_id: row.variant_id ?? null,
+      preset_key: row.preset_key ?? null,
+    }));
 
     const config = {
       land: c.land,
@@ -212,7 +217,7 @@ export const StepLeadCapture = ({ cost }: Props) => {
       preset_key: presetKey,
       selected_plan: c.customPlan,
       first_floor_plan: c.customFirstFloorPlan,
-      elevation_images: elevationRows || [],
+      elevation_images: serializedElevationRows,
       estimate: {
         total: cost.total,
         down_payment: cost.downPayment,

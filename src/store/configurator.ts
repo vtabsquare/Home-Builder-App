@@ -12,6 +12,11 @@ export type Material = 'budget' | 'modern' | 'luxury';
 export const FAMILY_DOUBLE_STOREY_PACKAGE_KEY = 'family-double-storey';
 const BUILT_IN_PRESET_PREFIX = '__builtin_floor_plan__';
 const ELEVATION_PRESET_PREFIX = '__elevation_variant__';
+export const ELEVATION_VARIANT_VERSION = 'v1';
+const ELEVATION_VISUAL_ADDONS: AddOn[] = ['carport', 'landscaping', 'fence', 'solar', 'water_tank'];
+
+export const getElevationVisualAddons = (addons: AddOn[] = []) =>
+  [...addons].filter((addon) => ELEVATION_VISUAL_ADDONS.includes(addon)).sort();
 
 export const getBuiltInPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>, presetId: number) => {
   // Exclude visual-only addons from the key (smart_home, solar, water_tank, fence)
@@ -21,8 +26,30 @@ export const getBuiltInPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedro
 };
 
 export const getElevationPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons' | 'roof' | 'material'>, presetId: number) => {
-  const visualAddons = [...(state.addons || [])].sort();
+  const visualAddons = getElevationVisualAddons(state.addons || []);
   return `${ELEVATION_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_roof_${state.roof}_material_${state.material}_addons_${visualAddons.join('-') || 'none'}_${presetId}`;
+};
+
+export const getElevationVariantSignature = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons' | 'roof' | 'material'>, presetId: number) => {
+  const visualAddons = getElevationVisualAddons(state.addons || []);
+  return [
+    ELEVATION_VARIANT_VERSION,
+    state.homeType,
+    `${state.bedrooms}bed`,
+    `${state.bathrooms}bath`,
+    state.kitchen,
+    state.isDoubleStorey ? 'double' : 'single',
+    state.roof,
+    state.material,
+    visualAddons.join(',') || 'none',
+    `${presetId}`,
+  ].join('|');
+};
+
+export const getElevationLookupKeys = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons' | 'roof' | 'material'>, presetId: number) => {
+  const exactKey = getElevationPresetKey(state, presetId);
+  const rawAddonKey = `${ELEVATION_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_roof_${state.roof}_material_${state.material}_addons_${[...(state.addons || [])].sort().join('-') || 'none'}_${presetId}`;
+  return [exactKey, rawAddonKey].filter((key, index, keys) => key && keys.indexOf(key) === index);
 };
 
 export const getFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>) =>
