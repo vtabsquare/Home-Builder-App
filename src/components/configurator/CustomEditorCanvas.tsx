@@ -3,7 +3,7 @@ import { Stage, Layer, Rect, Text, Line, Group, Transformer } from 'react-konva'
 import { Plan, Room, FurnitureItem, generateEmptyPlan, regenerateFurniture } from '@/lib/floorplan';
 import { useConfig, HomeType } from '@/store/configurator';
 import Konva from 'konva';
-import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed } from 'lucide-react';
+import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed, Waypoints } from 'lucide-react';
 
 interface Props {
   homeType: HomeType;
@@ -17,6 +17,7 @@ export const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaul
   { type: 'bedroom', label: 'Bedroom', icon: BedDouble, defaultW: 12, defaultH: 10, color: 'hsl(33 35% 82%)' },
   { type: 'living', label: 'Hall/Living', icon: Sofa, defaultW: 16, defaultH: 14, color: 'hsl(40 30% 87%)' },
   { type: 'hallway', label: 'Hallway', icon: Move, defaultW: 10, defaultH: 4, color: 'hsl(38 20% 88%)' },
+  { type: 'staircase', label: 'Staircase', icon: Waypoints, defaultW: 10, defaultH: 8, color: 'hsl(38 20% 88%)' },
   { type: 'bathroom', label: 'Bathroom', icon: Bath, defaultW: 7, defaultH: 7, color: 'hsl(200 30% 82%)' },
   { type: 'kitchen', label: 'Kitchen', icon: CookingPot, defaultW: 12, defaultH: 10, color: 'hsl(28 38% 72%)' },
   { type: 'dining', label: 'Dining', icon: UtensilsCrossed, defaultW: 10, defaultH: 10, color: 'hsl(36 28% 82%)' },
@@ -117,6 +118,8 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
     let label = block.label.toUpperCase();
     if (blockType === 'bedroom') {
       label = existingCount === 0 ? 'MASTER BEDROOM' : `BEDROOM ${existingCount + 1}`;
+    } else if (blockType === 'staircase') {
+      label = existingCount === 0 ? 'STAIRCASE' : `STAIRCASE ${existingCount + 1}`;
     } else if (existingCount > 0) {
       label = `${block.label.toUpperCase()} ${existingCount + 1}`;
     }

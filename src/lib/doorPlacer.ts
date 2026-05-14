@@ -91,12 +91,12 @@ function isExcludedType(type: Room['type']): boolean {
 
 // "Corridor" rooms that serve as connectors
 function isCorridorType(type: Room['type']): boolean {
-  return type === 'hallway' || type === 'living';
+  return type === 'hallway' || type === 'staircase' || type === 'living';
 }
 
 // Can this room serve as an entrance source for a bedroom?
 function isEntranceType(type: Room['type']): boolean {
-  return type === 'hallway' || type === 'living' || type === 'kitchen' || type === 'dining';
+  return type === 'hallway' || type === 'staircase' || type === 'living' || type === 'kitchen' || type === 'dining';
 }
 
 // ── Adjacency graph builder ────────────────────────────────────────────────
@@ -210,7 +210,7 @@ export function intelligentlyPlaceDoors(plan: Plan): Plan {
     if (hasEntrance.has(bed.id)) continue;
 
     // Priority: hallway > living > kitchen > dining
-    const priority: Room['type'][] = ['hallway', 'living', 'kitchen', 'dining'];
+    const priority: Room['type'][] = ['hallway', 'staircase', 'living', 'kitchen', 'dining'];
 
     let bestAdj: Adjacency | null = null;
     let bestPriority = priority.length;
@@ -250,7 +250,7 @@ export function intelligentlyPlaceDoors(plan: Plan): Plan {
     if ((bathroomDoorCount.get(bath.id) || 0) > 0) continue;
 
     // Priority: hallway > living > bedroom (as fallback) > kitchen > dining
-    const priority: Room['type'][] = ['hallway', 'living', 'bedroom', 'kitchen', 'dining'];
+    const priority: Room['type'][] = ['hallway', 'staircase', 'living', 'bedroom', 'kitchen', 'dining'];
 
     let bestAdj: Adjacency | null = null;
     let bestPriority = priority.length;

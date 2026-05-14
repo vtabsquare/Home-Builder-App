@@ -302,24 +302,36 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     return splitPlanToFloors(plan, homeType);
   }, [isDoubleStorey, plan, homeType, familyPackageLayout, builtInOverride]);
 
+  const isEditingFirstFloor = isDoubleStorey && activeFloor === 1;
+
+  const savedGroundPlan = useMemo(() => {
+    if (!isDoubleStorey || !floors) return plan;
+    return (isCustomPreset ? customPlan : null) || floors.ground;
+  }, [isDoubleStorey, floors, plan, isCustomPreset, customPlan]);
+
+  const savedFirstFloorPlan = useMemo(() => {
+    if (!isDoubleStorey || !floors) return null;
+    return (isCustomPreset ? customFirstFloorPlan : null) || floors.first || null;
+  }, [isDoubleStorey, floors, isCustomPreset, customFirstFloorPlan]);
+
   // Determine which plan to show based on floor selection
   const displayPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return plan;
-    if (activeFloor === 0) return (isCustomPreset ? customPlan : null) || floors.ground;
-    return (isCustomPreset ? customFirstFloorPlan : null) || floors.first;
-  }, [isDoubleStorey, floors, activeFloor, plan, customFirstFloorPlan, customPlan, isCustomPreset]);
+    if (isEditingFirstFloor) return savedFirstFloorPlan || floors.first;
+    return savedGroundPlan;
+  }, [isDoubleStorey, floors, plan, isEditingFirstFloor, savedGroundPlan, savedFirstFloorPlan]);
 
   const groundFloorPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return plan;
-    if (activeFloor === 0 && stagedPlan) return stagedPlan;
-    return (isCustomPreset ? customPlan : null) || floors.ground;
-  }, [isDoubleStorey, floors, plan, activeFloor, stagedPlan, isCustomPreset, customPlan]);
+    if (!isEditingFirstFloor && stagedPlan) return stagedPlan;
+    return savedGroundPlan;
+  }, [isDoubleStorey, floors, plan, isEditingFirstFloor, stagedPlan, savedGroundPlan]);
 
   const firstFloorDisplayPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return undefined;
-    if (activeFloor === 1 && stagedPlan) return stagedPlan;
-    return (isCustomPreset ? customFirstFloorPlan : null) || floors.first;
-  }, [isDoubleStorey, floors, activeFloor, stagedPlan, isCustomPreset, customFirstFloorPlan]);
+    if (isEditingFirstFloor && stagedPlan) return stagedPlan;
+    return savedFirstFloorPlan || undefined;
+  }, [isDoubleStorey, floors, isEditingFirstFloor, stagedPlan, savedFirstFloorPlan]);
 
   const currentPlan = useMemo(() => {
     const p = stagedPlan || displayPlan;
@@ -447,16 +459,16 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   const commitStagedPlan = () => {
     if (!stagedPlan) return null;
 
-    const newGround = (isDoubleStorey && activeFloor === 1)
-      ? ((isCustomPreset ? customPlan : null) || familyPackageLayout?.ground || floors?.ground || plan)
+    const newGround = isEditingFirstFloor
+      ? savedGroundPlan
       : stagedPlan;
-    const newFirst = (isDoubleStorey && activeFloor === 1)
+    const newFirst = isEditingFirstFloor
       ? stagedPlan
-      : ((isCustomPreset ? customFirstFloorPlan : null) || familyPackageLayout?.first || floors?.first || null);
+      : savedFirstFloorPlan;
 
     if (!isCustomPreset) {
       setPresetOverride(presetId, newGround, newFirst);
-    } else if (isDoubleStorey && activeFloor === 1) {
+    } else if (isEditingFirstFloor) {
       setCustomFirstFloorPlan(newFirst);
     } else {
       setCustomPlan(newGround);
@@ -787,19 +799,19 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   <CustomEditorCanvas
                     homeType={homeType}
                     onChange={(editorPlan) => {
-                      if (isDoubleStorey && activeFloor === 1) {
+                      if (isEditingFirstFloor) {
                         setCustomFirstFloorPlan(editorPlan);
                       } else if (isCustomPreset) {
                         setCustomPlan(editorPlan);
                       }
                     }}
                     onSave={async (editorPlan) => {
-                      const newGround = (isDoubleStorey && activeFloor === 1)
-                        ? ((isCustomPreset ? customPlan : null) || familyPackageLayout?.ground || floors?.ground || plan)
+                      const newGround = isEditingFirstFloor
+                        ? savedGroundPlan
                         : editorPlan;
-                      const newFirst = (isDoubleStorey && activeFloor === 1)
+                      const newFirst = isEditingFirstFloor
                         ? editorPlan
-                        : ((isCustomPreset ? customFirstFloorPlan : null) || familyPackageLayout?.first || floors?.first || null);
+                        : savedFirstFloorPlan;
 
                       try {
                         if (isFamilyDoubleStoreyPackage) {
@@ -818,7 +830,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                         return;
                       }
 
-                      if (isCustomPreset && isDoubleStorey && activeFloor === 1) {
+                      if (isCustomPreset && isEditingFirstFloor) {
                         setCustomFirstFloorPlan(newFirst);
                       } else if (isCustomPreset) {
                         setCustomPlan(newGround);
@@ -826,7 +838,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
                       setAdvancedEditorMode(false);
                     }}
-                    initialPlan={isDoubleStorey && activeFloor === 1 ? ((isCustomPreset ? customFirstFloorPlan : null) || floors?.first || null) : null}
+                    initialPlan={isEditingFirstFloor ? savedFirstFloorPlan : savedGroundPlan}
                   />
                 </motion.div>
               ) : view === '2d' ? (

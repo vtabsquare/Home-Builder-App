@@ -31,7 +31,7 @@ export interface WindowInfo {
 
 export interface Room {
   id: string;
-  type: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'dining' | 'entry' | 'hallway' | 'balcony' | 'carport' | 'garden';
+  type: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'dining' | 'entry' | 'hallway' | 'staircase' | 'balcony' | 'carport' | 'garden';
   label: string;
   x: number; // ft
   y: number;
@@ -60,6 +60,7 @@ const COLORS: Record<string, string> = {
   dining:   'hsl(36 28% 82%)',
   entry:    'hsl(36 18% 76%)',
   hallway:  'hsl(38 20% 88%)',
+  staircase:'hsl(38 20% 88%)',
   balcony:  'hsl(120 18% 78%)',
   carport:  'hsl(0 0% 82%)',
   garden:   'hsl(120 30% 72%)',
@@ -291,17 +292,17 @@ function getDoorType(roomTypeA: Room['type'], roomTypeB: Room['type']): 'standar
 function injectAdjacencyDoors(rooms: Room[]): void {
   const connected = new Set<string>();
   const hasDining = rooms.some(r => r.type === 'dining');
-  const hasHallway = rooms.some(r => r.type === 'hallway');
+  const hasHallway = rooms.some(r => r.type === 'hallway' || r.type === 'staircase');
 
   const hasEntrance = (room: Room) => room.doors.some(d => {
     const c = rooms.find(r => r.id === d.connectsTo);
-    return c && (c.type === 'hallway' || c.type === 'living');
+    return c && (c.type === 'hallway' || c.type === 'staircase' || c.type === 'living');
   });
 
   // In no-hallway plans, check if bedroom already has any entrance (to living/kitchen/dining)
   const hasAnyEntrance = (room: Room) => room.doors.some(d => {
     const c = rooms.find(r => r.id === d.connectsTo);
-    return c && (c.type === 'hallway' || c.type === 'living' || c.type === 'kitchen' || c.type === 'dining');
+    return c && (c.type === 'hallway' || c.type === 'staircase' || c.type === 'living' || c.type === 'kitchen' || c.type === 'dining');
   });
 
   for (let i = 0; i < rooms.length; i++) {
@@ -322,7 +323,7 @@ function injectAdjacencyDoors(rooms: Room[]): void {
       if (a.type === 'bedroom' && b.type === 'bedroom') continue;
 
       if (hasDining && types.includes('kitchen')) {
-        if (types.includes('hallway') || types.includes('living')) continue;
+        if (types.includes('hallway') || types.includes('staircase') || types.includes('living')) continue;
       }
 
       if (types.includes('bathroom') && types.includes('bedroom')) {
@@ -335,7 +336,7 @@ function injectAdjacencyDoors(rooms: Room[]): void {
         }
       }
       
-      if (types.includes('bathroom') && types.includes('hallway')) {
+      if (types.includes('bathroom') && (types.includes('hallway') || types.includes('staircase'))) {
         const bath = a.type === 'bathroom' ? a : b;
         if (bath.id.includes('attached')) continue;
       }
@@ -353,10 +354,10 @@ function injectAdjacencyDoors(rooms: Room[]): void {
       if (a.type === 'bathroom' && a.doors.length >= 1) continue;
       if (b.type === 'bathroom' && b.doors.length >= 1) continue;
 
-      if (a.type === 'bedroom' && ['hallway', 'living'].includes(b.type)) {
+      if (a.type === 'bedroom' && ['hallway', 'staircase', 'living'].includes(b.type)) {
         if (hasEntrance(a)) continue;
       }
-      if (b.type === 'bedroom' && ['hallway', 'living'].includes(a.type)) {
+      if (b.type === 'bedroom' && ['hallway', 'staircase', 'living'].includes(a.type)) {
         if (hasEntrance(b)) continue;
       }
 
@@ -400,7 +401,7 @@ function injectAdjacencyDoors(rooms: Room[]): void {
 // ── Validation ─────────────────────────────────────────────────────────────
 
 function cleanupDoors(rooms: Room[]): void {
-  const hasHallway = rooms.some(r => r.type === 'hallway');
+  const hasHallway = rooms.some(r => r.type === 'hallway' || r.type === 'staircase');
 
   for (const room of rooms) {
     if (room.type === 'bathroom') {
@@ -422,9 +423,9 @@ function cleanupDoors(rooms: Room[]): void {
         } else {
           // Non-attached bath: connect to hallway, or any accessible room if no hallway
           if (hasHallway) {
-            isValid = (connectedRoom.type === 'hallway');
+            isValid = (connectedRoom.type === 'hallway' || connectedRoom.type === 'staircase');
           } else {
-            isValid = ['living', 'kitchen', 'dining', 'hallway', 'bedroom'].includes(connectedRoom.type);
+            isValid = ['living', 'kitchen', 'dining', 'hallway', 'staircase', 'bedroom'].includes(connectedRoom.type);
           }
         }
 
@@ -459,7 +460,7 @@ function cleanupDoors(rooms: Room[]): void {
 
         if (connectedRoom.type === 'bathroom' || connectedRoom.type === 'balcony') {
           validDoors.push(door);
-        } else if (connectedRoom.type === 'hallway' || connectedRoom.type === 'living') {
+        } else if (connectedRoom.type === 'hallway' || connectedRoom.type === 'staircase' || connectedRoom.type === 'living') {
           if (!entranceFound) {
             validDoors.push(door);
             entranceFound = true;
@@ -524,16 +525,17 @@ function findAbsorptionDirection(candidate: Room, removed: Room): AbsorbDirectio
 
 function absorbRemovedRoomSpace(rooms: Room[], removedRoom: Room, c: ConfigState): void {
   const typePriority: Partial<Record<Room['type'], Partial<Record<Room['type'], number>>>> = {
-    bedroom:   { bedroom: 5, hallway: 4, living: 3, dining: 2, kitchen: 2, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
-    bathroom:  { bathroom: 5, hallway: 4, bedroom: 3, living: 2, kitchen: 1, dining: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
-    kitchen:   { kitchen: 5, dining: 4, living: 3, hallway: 2, bedroom: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
-    living:    { living: 5, dining: 4, hallway: 3, kitchen: 3, bedroom: 2, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
-    dining:    { dining: 5, kitchen: 4, living: 3, hallway: 2, bedroom: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
-    balcony:   { balcony: 5, garden: 4, living: 3, hallway: 2, bedroom: 1, bathroom: 1, kitchen: 1, carport: 0, entry: 0, dining: 0 },
-    carport:   { carport: 5, garden: 4, hallway: 2, living: 1, bedroom: 0, bathroom: 0, kitchen: 0, dining: 0, balcony: 0, entry: 0 },
-    garden:    { garden: 5, balcony: 4, carport: 3, living: 2, hallway: 2, bedroom: 1, bathroom: 1, kitchen: 1, dining: 1, entry: 0 },
-    entry:     { entry: 5, hallway: 4, living: 3, bedroom: 2, bathroom: 1, kitchen: 1, dining: 1, balcony: 0, carport: 0, garden: 0 },
-    hallway:   { hallway: 5, living: 4, dining: 3, kitchen: 3, bedroom: 2, bathroom: 2, balcony: 1, carport: 1, garden: 1, entry: 3 },
+    bedroom:   { bedroom: 5, hallway: 4, staircase: 4, living: 3, dining: 2, kitchen: 2, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    bathroom:  { bathroom: 5, hallway: 4, staircase: 4, bedroom: 3, living: 2, kitchen: 1, dining: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    kitchen:   { kitchen: 5, dining: 4, living: 3, hallway: 2, staircase: 2, bedroom: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    living:    { living: 5, dining: 4, hallway: 3, staircase: 3, kitchen: 3, bedroom: 2, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    dining:    { dining: 5, kitchen: 4, living: 3, hallway: 2, staircase: 2, bedroom: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    balcony:   { balcony: 5, garden: 4, living: 3, hallway: 2, staircase: 2, bedroom: 1, bathroom: 1, kitchen: 1, carport: 0, entry: 0, dining: 0 },
+    carport:   { carport: 5, garden: 4, hallway: 2, staircase: 2, living: 1, bedroom: 0, bathroom: 0, kitchen: 0, dining: 0, balcony: 0, entry: 0 },
+    garden:    { garden: 5, balcony: 4, carport: 3, living: 2, hallway: 2, staircase: 2, bedroom: 1, bathroom: 1, kitchen: 1, dining: 1, entry: 0 },
+    entry:     { entry: 5, hallway: 4, staircase: 4, living: 3, bedroom: 2, bathroom: 1, kitchen: 1, dining: 1, balcony: 0, carport: 0, garden: 0 },
+    hallway:   { hallway: 5, staircase: 5, living: 4, dining: 3, kitchen: 3, bedroom: 2, bathroom: 2, balcony: 1, carport: 1, garden: 1, entry: 3 },
+    staircase: { staircase: 5, hallway: 5, living: 4, dining: 3, kitchen: 3, bedroom: 2, bathroom: 2, balcony: 1, carport: 1, garden: 1, entry: 3 },
   };
 
   let bestCandidate: Room | null = null;

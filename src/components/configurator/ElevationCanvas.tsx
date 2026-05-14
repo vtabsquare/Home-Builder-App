@@ -16,6 +16,8 @@ import {
   createDoorWoodTexture, createDoorWoodNormal,
 } from './materials';
 
+const isStaircaseRoom = (room: Plan['rooms'][number]) => room.type === 'staircase' || room.id.toLowerCase().includes('staircase') || room.label.toLowerCase().includes('staircase');
+
 interface Props {
   plan: Plan;
   roof: RoofType;
@@ -38,7 +40,7 @@ const findMainDoorWorld = (plan: Plan): { x: number; z: number; nx: number; nz: 
   const D = plan.height || 0;
   const candidates: any[] = [];
   for (const room of plan.rooms || []) {
-    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony' || room.type === 'hallway') continue;
+    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony' || room.type === 'hallway' || room.type === 'staircase') continue;
     for (const door of room.doors || []) {
       const isMain = (door as any).label === 'MAIN DOOR' || (!(door as any).connectsTo && (door as any).doorType !== 'open');
       if (!isMain) continue;
@@ -309,11 +311,6 @@ const Staircase3D = ({ w, h, floorHeight, isNight }: { w: number, h: number, flo
         const stepTop = (i + 1) * stepH; // top of this step
         return (
           <group key={`r1-${i}`} position={[f1InnerX, stepTop + rH/2, h/2 - i * stepL - stepL/2]}>
-            {/* Glass panel */}
-            <mesh>
-              <boxGeometry args={[0.1, rH, stepL + 0.02]} />
-              <meshStandardMaterial color="#88bbee" transparent opacity={0.25} roughness={0.05} metalness={0.3} side={THREE.DoubleSide} />
-            </mesh>
             {/* Handrail on top */}
             <mesh position={[0, rH/2, 0]}>
               <boxGeometry args={[0.12, 0.12, stepL + 0.02]} />
@@ -335,10 +332,6 @@ const Staircase3D = ({ w, h, floorHeight, isNight }: { w: number, h: number, flo
 
       {/* Landing — glass railing along back edge */}
       <group position={[0, landingY + 0.35 + rH/2, -h/2 + 0.1]}>
-        <mesh>
-          <boxGeometry args={[w - 0.4, rH, 0.1]} />
-          <meshStandardMaterial color="#88bbee" transparent opacity={0.25} roughness={0.05} metalness={0.3} side={THREE.DoubleSide} />
-        </mesh>
         <mesh position={[0, rH/2, 0]}>
           <boxGeometry args={[w - 0.4, 0.12, 0.12]} />
           <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
@@ -360,11 +353,6 @@ const Staircase3D = ({ w, h, floorHeight, isNight }: { w: number, h: number, flo
         const stepTop = (flightStepCount + 1 + i + 1) * stepH;
         return (
           <group key={`r2-${i}`} position={[f2InnerX, stepTop + rH/2, -h/2 + landingD + i * stepL + stepL/2]}>
-            {/* Glass panel */}
-            <mesh>
-              <boxGeometry args={[0.1, rH, stepL + 0.02]} />
-              <meshStandardMaterial color="#88bbee" transparent opacity={0.25} roughness={0.05} metalness={0.3} side={THREE.DoubleSide} />
-            </mesh>
             {/* Handrail on top */}
             <mesh position={[0, rH/2, 0]}>
               <boxGeometry args={[0.12, 0.12, stepL + 0.02]} />
@@ -965,7 +953,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
                 const isBedroom = ['bedroom', 'master', 'guest'].includes(r.type);
                 const isKitchen = r.type === 'kitchen';
                 const isBath = r.type === 'bathroom';
-                const isCorridor = ['corridor', 'hallway', 'passage'].includes(r.type);
+                const isCorridor = ['corridor', 'hallway', 'passage', 'staircase'].includes(r.type);
 
                 let map = floorTextures.oak;
                 let normalMap: any = floorTextures.oakNormal;
@@ -1010,7 +998,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
               })()}
 
               {/* Ceiling Elements */}
-              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && !(r.id.toLowerCase().includes('staircase') || r.label.toLowerCase().includes('staircase')) && (
+              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && !isStaircaseRoom(r) && (
                 <>
                   <mesh position={[cx, wallH - 0.01, cz]}>
                     <boxGeometry args={[r.w - 0.1, 0.02, r.h - 0.1]} />
@@ -1046,7 +1034,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
               })}
 
               {/* Staircase Model */}
-              {(r.type === 'hallway' && (r.id.toLowerCase().includes('staircase') || r.label.toLowerCase().includes('staircase'))) && (
+              {isStaircaseRoom(r) && (
                 <group position={[cx, 0.02, cz]}>
                   <Staircase3D w={r.w} h={r.h} floorHeight={wallH} isNight={isNight} />
                 </group>
@@ -1084,12 +1072,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
 
       {/* Exterior Architecture (cornice/trim slabs with staircase cutout) */}
       {!hideRoof && (() => {
-        const groundStaircaseForTrim = (plan.rooms || []).find(r => 
-          r.label.toLowerCase().includes('staircase') || 
-          r.id.toLowerCase().includes('staircase') || 
-          r.type === 'staircase' ||
-          (r.type === 'hallway' && r.label.toLowerCase().includes('stair'))
-        );
+        const groundStaircaseForTrim = (plan.rooms || []).find(r => isStaircaseRoom(r));
         
         // Trim slab shape (roofW + 0.8 x roofD + 0.8)
         const trimShape = new THREE.Shape();
@@ -1177,12 +1160,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
 
       {/* Roof System */}
       {(() => {
-        const groundStaircase = (plan.rooms || []).find(r => 
-          r.label.toLowerCase().includes('staircase') || 
-          r.id.toLowerCase().includes('staircase') || 
-          r.type === 'staircase' ||
-          (r.type === 'hallway' && r.label.toLowerCase().includes('stair'))
-        );
+        const groundStaircase = (plan.rooms || []).find(r => isStaircaseRoom(r));
         const hole = groundStaircase ? {
           x: round2(groundStaircase.x + groundStaircase.w / 2 - W / 2 - roofCX),
           z: round2(groundStaircase.y + groundStaircase.h / 2 - D / 2 - roofCZ),
@@ -2630,7 +2608,7 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
   };
 
   (firstFloorPlan?.rooms || []).forEach(room => {
-    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony' || room.type === 'hallway') return;
+    if (room.type === 'garden' || room.type === 'carport' || room.type === 'balcony') return;
     const rX = room.x, rY = room.y, rW = room.w, rH = room.h;
     const getAbsDoors = (wall: string) => (room.doors || []).filter((d:any) => d.wall === wall).map((d:any) => {
       let doorCategory: 'main' | 'room' | 'bathroom' = 'room';
@@ -2658,51 +2636,26 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
 
   return (
     <group position={[0, floorY, 0]}>
-      {/* Floor slab with staircase cutout */}
-      {(() => {
-        const staircaseRoom = (firstFloorPlan?.rooms || []).find(r => r.id.toLowerCase().includes('staircase') || r.label.toLowerCase().includes('staircase'));
-        const slabW = ffW + 0.5;
-        const slabD = ffH + 0.5;
-        const slabCX = round2((ffW - W) / 2);
-        const slabCZ = round2((ffH - D) / 2);
-
-        const slabShape = new THREE.Shape();
-        slabShape.moveTo(-slabW / 2, -slabD / 2);
-        slabShape.lineTo(slabW / 2, -slabD / 2);
-        slabShape.lineTo(slabW / 2, slabD / 2);
-        slabShape.lineTo(-slabW / 2, slabD / 2);
-        slabShape.closePath();
-
-        if (staircaseRoom) {
-          // Calculate room center relative to slab center
-          // Slab group is at 0,0. Mesh is at slabCX, slabCZ.
-          // Room group is at upperOffsetX, upperOffsetZ.
-          const rx = upperOffsetX + staircaseRoom.x + staircaseRoom.w/2 - slabCX;
-          const rz = upperOffsetZ + staircaseRoom.y + staircaseRoom.h/2 - slabCZ;
-          
-          const floorHole = new THREE.Path();
-          floorHole.moveTo(rx - staircaseRoom.w/2, rz - staircaseRoom.h/2);
-          floorHole.lineTo(rx + staircaseRoom.w/2, rz - staircaseRoom.h/2);
-          floorHole.lineTo(rx + staircaseRoom.w/2, rz + staircaseRoom.h/2);
-          floorHole.lineTo(rx - staircaseRoom.w/2, rz + staircaseRoom.h/2);
-          floorHole.closePath();
-          slabShape.holes.push(floorHole);
-        }
-
-        return (
-          <mesh receiveShadow position={[slabCX, 0.02, slabCZ]} rotation={[-Math.PI/2, 0, 0]}>
-            <extrudeGeometry args={[slabShape, { depth: 0.8, bevelEnabled: false }]} />
-            <meshStandardMaterial color="#9a8a78" roughness={0.8} />
-          </mesh>
-        );
-      })()}
+      {/* Floor slab only beneath added upper-floor rooms */}
+      {(firstFloorPlan?.rooms || [])
+        .filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && !isStaircaseRoom(r))
+        .map(r => {
+          const cx = round2(upperOffsetX + r.x + r.w / 2);
+          const cz = round2(upperOffsetZ + r.y + r.h / 2);
+          return (
+            <mesh key={`upper-slab-${r.id}`} receiveShadow position={[cx, 0.4, cz]}>
+              <boxGeometry args={[r.w, 0.8, r.h]} />
+              <meshStandardMaterial color="#9a8a78" roughness={0.8} />
+            </mesh>
+          );
+        })}
 
       <group position={[upperOffsetX, 0.8, upperOffsetZ]}>
         {/* Room floors & ceilings */}
         {(firstFloorPlan?.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony').map(r => {
           const cx = round2(r.x + r.w / 2);
           const cz = round2(r.y + r.h / 2);
-          const isStaircase = r.id.toLowerCase().includes('staircase') || r.label.toLowerCase().includes('staircase');
+          const isStaircase = isStaircaseRoom(r);
           
           if (isStaircase) return null; // Create opening for staircase
 
