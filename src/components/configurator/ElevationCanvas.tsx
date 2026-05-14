@@ -550,13 +550,11 @@ export const ElevationCanvas = ({
           {addons.includes('landscaping') && <GrassField planW={safeW} planD={safeD} />}
           
           {/* Ground Floor Model */}
-          {(activeFloor === 0 || activeFloor === 2) && (
-            <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={activeFloor !== 2} plotW={plotW} plotD={plotD} isDoubleStorey={isDoubleStorey} />
-          )}
+          <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={currentFloor !== 2} plotW={plotW} plotD={plotD} isDoubleStorey={isDoubleStorey} />
           
           {/* Second Floor (Double Storey) */}
-          {isDoubleStorey && firstFloorPlan && (activeFloor === 1 || activeFloor === 2) && (
-            <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} hideRoof={activeFloor !== 2} />
+          {isDoubleStorey && firstFloorPlan && currentFloor !== 0 && (
+            <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} hideRoof={currentFloor !== 2} />
           )}
           
           
