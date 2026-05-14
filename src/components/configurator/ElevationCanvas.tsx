@@ -26,6 +26,7 @@ interface Props {
   firstFloorPlan?: Plan;
   hideHelpers?: boolean;
   isNight?: boolean;
+  activeFloor?: number;
 }
 
 const PLOT_PADDING_FT = 2;
@@ -91,9 +92,17 @@ const MATERIAL_COLORS: Record<Material, { wall: string; trim: string; roof: stri
   luxury: { wall: '#f7f7f5', trim: '#c9a84c', roof: '#0d0d0d', window: '#7ab0c8', door: '#8b6914', accent: '#6a4a1a', facade: '#2a2520', rod: '#c9a84c' },
 };
 
-const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, plan: Plan }) => {
-  const W = plan.width || 0;
-  const D = plan.height || 0;
+const CameraController = ({ activeRoom, plan, firstFloorPlan, activeFloor, isDoubleStorey }: { 
+  activeRoom?: string | null, 
+  plan: Plan,
+  firstFloorPlan?: Plan,
+  activeFloor: number,
+  isDoubleStorey: boolean
+}) => {
+  const currentPlan = (isDoubleStorey && activeFloor === 1 && firstFloorPlan) ? firstFloorPlan : plan;
+  const W = currentPlan.width || 0;
+  const D = currentPlan.height || 0;
+  const levelY = (isDoubleStorey && activeFloor === 1) ? 14 : 0;
   const prevRoom = useRef<string | null | undefined>(null);
   const animProgress = useRef(1);
   const targetPos = useRef(new THREE.Vector3(45, 25, 45));
@@ -105,14 +114,26 @@ const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, pl
       animProgress.current = 0; 
 
       if (!activeRoom || activeRoom === 'overview' || activeRoom === 'garden') {
-        targetPos.current.set(45, 25, 45);
-        targetLookAt.current.set(0, 0, 0);
+        targetPos.current.set(45, 25 + levelY, 45);
+        targetLookAt.current.set(0, levelY, 0);
       } else {
-        const rs = (plan.rooms || []).filter(r => r.id === activeRoom || r.type === activeRoom);
+        const rs = (currentPlan.rooms || []).filter(r => r.id === activeRoom || r.type === activeRoom);
         if (rs.length > 0) {
           const avgX = rs.reduce((sum, r) => sum + r.x + r.w / 2, 0) / rs.length;
           const avgY = rs.reduce((sum, r) => sum + r.y + r.h / 2, 0) / rs.length;
-          const center = new THREE.Vector3(avgX - W / 2, 0, avgY - D / 2);
+          
+          // Offset based on which plan we are using
+          let offsetX = 0;
+          let offsetZ = 0;
+          if (isDoubleStorey && activeFloor === 1 && firstFloorPlan) {
+             offsetX = -plan.width / 2 + (plan.width - firstFloorPlan.width) / 2;
+             offsetZ = -plan.height / 2 + (plan.height - firstFloorPlan.height) / 2;
+          } else {
+             offsetX = -W / 2;
+             offsetZ = -D / 2;
+          }
+
+          const center = new THREE.Vector3(avgX + offsetX, levelY, avgY + offsetZ);
 
           const minX = Math.min(...rs.map(r => r.x));
           const maxX = Math.max(...rs.map(r => r.x + r.w));
@@ -120,13 +141,13 @@ const CameraController = ({ activeRoom, plan }: { activeRoom?: string | null, pl
           const maxY = Math.max(...rs.map(r => r.y + r.h));
           const extent = Math.max(maxX - minX, maxY - minY);
 
-          const height = Math.max(40, extent * 2);
+          const height = Math.max(40, extent * 2) + levelY;
           targetPos.current.set(center.x, height, center.z);
           targetLookAt.current.copy(center);
         }
       }
     }
-  }, [activeRoom, plan, W, D]);
+  }, [activeRoom, currentPlan, W, D, levelY, isDoubleStorey, activeFloor, firstFloorPlan, plan]);
 
   useFrame((state, delta) => {
     if (animProgress.current >= 1) return;
@@ -209,6 +230,163 @@ const PottedPlant = ({ position, scale = 1 }: { position: [number, number, numbe
   );
 };
 
+const Staircase3D = ({ w, h, floorHeight, isNight }: { w: number, h: number, floorHeight: number, isNight: boolean }) => {
+  const marbleTextures = useMemo(() => ({
+    map: createMarbleTexture(1, 1),
+    roughness: createMarbleRoughness(1, 1),
+  }), []);
+
+  const stepCount = 18;
+  const flightStepCount = 8;
+  const stepH = floorHeight / stepCount;
+  
+  const flightW = w * 0.45;
+  const landingD = Math.max(3, h * 0.25);
+  const flightL = h - landingD;
+  const stepL = flightL / flightStepCount;
+  const landingY = flightStepCount * stepH;
+
+  // Railing constants
+  const rH = 3.2; // railing height above each step
+  const postR = 0.06; // steel post radius
+  const railR = 0.05; // handrail radius
+
+  // Flight 1: left side, going from front (z=h/2) towards back (z=h/2-flightL)
+  // Inner edge X = -w/2 + flightW
+  const f1InnerX = -w/2 + flightW;
+  // Flight 2: right side, going from back towards front
+  // Inner edge X = w/2 - flightW
+  const f2InnerX = w/2 - flightW;
+
+  return (
+    <group>
+      {/* === STEPS === */}
+      {/* Flight 1 */}
+      {Array.from({ length: flightStepCount }).map((_, i) => (
+        <group key={`f1-${i}`} position={[-w/2 + flightW/2, i * stepH + stepH/2, h/2 - i * stepL - stepL/2]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[flightW, 0.35, stepL]} />
+            <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
+          </mesh>
+          <mesh position={[0, -stepH/2, 0]}>
+            <boxGeometry args={[flightW - 0.2, stepH, 0.1]} />
+            <meshStandardMaterial color="#d0d0d0" roughness={0.4} />
+          </mesh>
+          {isNight && <pointLight position={[0, -0.2, 0]} intensity={0.4} distance={3} color="#fff5e0" />}
+        </group>
+      ))}
+
+      {/* Landing */}
+      <group key="landing" position={[0, landingY + 0.175, -h/2 + landingD/2]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[w, 0.35, landingD]} />
+          <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
+        </mesh>
+        {isNight && <pointLight position={[0, -0.2, 0]} intensity={0.8} distance={6} color="#fff5e0" />}
+      </group>
+
+      {/* Flight 2 */}
+      {Array.from({ length: flightStepCount }).map((_, i) => {
+        const stepY = (flightStepCount + 1 + i) * stepH;
+        return (
+          <group key={`f2-${i}`} position={[w/2 - flightW/2, stepY + stepH/2, -h/2 + landingD + i * stepL + stepL/2]}>
+            <mesh castShadow receiveShadow>
+              <boxGeometry args={[flightW, 0.35, stepL]} />
+              <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
+            </mesh>
+            <mesh position={[0, -stepH/2, 0]}>
+              <boxGeometry args={[flightW - 0.2, stepH, 0.1]} />
+              <meshStandardMaterial color="#d0d0d0" roughness={0.4} />
+            </mesh>
+            {isNight && <pointLight position={[0, -0.2, 0]} intensity={0.4} distance={3} color="#fff5e0" />}
+          </group>
+        );
+      })}
+
+      {/* === GLASS RAILINGS === */}
+      {/* Flight 1 — per-step upright glass panels on inner edge */}
+      {Array.from({ length: flightStepCount }).map((_, i) => {
+        const stepTop = (i + 1) * stepH; // top of this step
+        return (
+          <group key={`r1-${i}`} position={[f1InnerX, stepTop + rH/2, h/2 - i * stepL - stepL/2]}>
+            {/* Glass panel */}
+            <mesh>
+              <boxGeometry args={[0.1, rH, stepL + 0.02]} />
+              <meshStandardMaterial color="#88bbee" transparent opacity={0.25} roughness={0.05} metalness={0.3} side={THREE.DoubleSide} />
+            </mesh>
+            {/* Handrail on top */}
+            <mesh position={[0, rH/2, 0]}>
+              <boxGeometry args={[0.12, 0.12, stepL + 0.02]} />
+              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {/* Flight 1 — steel posts at start and end */}
+      <mesh position={[f1InnerX, rH/2, h/2]}>
+        <cylinderGeometry args={[postR, postR, rH + stepH, 8]} />
+        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+      </mesh>
+      <mesh position={[f1InnerX, landingY + rH/2, h/2 - flightL]}>
+        <cylinderGeometry args={[postR, postR, rH, 8]} />
+        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+      </mesh>
+
+      {/* Landing — glass railing along back edge */}
+      <group position={[0, landingY + 0.35 + rH/2, -h/2 + 0.1]}>
+        <mesh>
+          <boxGeometry args={[w - 0.4, rH, 0.1]} />
+          <meshStandardMaterial color="#88bbee" transparent opacity={0.25} roughness={0.05} metalness={0.3} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh position={[0, rH/2, 0]}>
+          <boxGeometry args={[w - 0.4, 0.12, 0.12]} />
+          <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+        </mesh>
+      </group>
+
+      {/* Landing — steel posts at corners */}
+      <mesh position={[-w/2 + 0.2, landingY + 0.35 + rH/2, -h/2 + 0.1]}>
+        <cylinderGeometry args={[postR, postR, rH, 8]} />
+        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+      </mesh>
+      <mesh position={[w/2 - 0.2, landingY + 0.35 + rH/2, -h/2 + 0.1]}>
+        <cylinderGeometry args={[postR, postR, rH, 8]} />
+        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+      </mesh>
+
+      {/* Flight 2 — per-step upright glass panels on inner edge */}
+      {Array.from({ length: flightStepCount }).map((_, i) => {
+        const stepTop = (flightStepCount + 1 + i + 1) * stepH;
+        return (
+          <group key={`r2-${i}`} position={[f2InnerX, stepTop + rH/2, -h/2 + landingD + i * stepL + stepL/2]}>
+            {/* Glass panel */}
+            <mesh>
+              <boxGeometry args={[0.1, rH, stepL + 0.02]} />
+              <meshStandardMaterial color="#88bbee" transparent opacity={0.25} roughness={0.05} metalness={0.3} side={THREE.DoubleSide} />
+            </mesh>
+            {/* Handrail on top */}
+            <mesh position={[0, rH/2, 0]}>
+              <boxGeometry args={[0.12, 0.12, stepL + 0.02]} />
+              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {/* Flight 2 — steel posts at start and end */}
+      <mesh position={[f2InnerX, landingY + 0.35 + rH/2, -h/2 + landingD]}>
+        <cylinderGeometry args={[postR, postR, rH, 8]} />
+        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+      </mesh>
+      <mesh position={[f2InnerX, floorHeight + rH/2, h/2]}>
+        <cylinderGeometry args={[postR, postR, rH, 8]} />
+        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+      </mesh>
+    </group>
+  );
+};
+
 const BlackStonePathway = ({ doorPos, plotW, plotD }: { doorPos: { x: number, z: number, nx: number, nz: number }, plotW: number, plotD: number }) => {
   const marbleTextures = useMemo(() => ({
     map: createMarbleTexture(1, 1),
@@ -287,8 +465,12 @@ const BlackStonePathway = ({ doorPos, plotW, plotD }: { doorPos: { x: number, z:
   return <group>{elements}</group>;
 };
 
-export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom, isDoubleStorey = false, firstFloorPlan, hideHelpers = false, isNight = false }: Props) => {
-  const hideRoof = activeRoom && activeRoom !== 'overview' && activeRoom !== 'garden';
+export const ElevationCanvas = ({ 
+  plan, roof, material, addons = [], activeRoom, isDoubleStorey = false, 
+  activeFloor, firstFloorPlan, hideHelpers = false, isNight = false 
+}: Props) => {
+  const currentFloor = activeFloor ?? 2;
+  const hideRoof = currentFloor !== 2;
   const safeW = plan.width || 0;
   const safeD = plan.height || 0;
   const plotW = safeW + PLOT_PADDING_FT * 2;
@@ -367,11 +549,14 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           <EnhancedGround isNight={isNight} />
           {addons.includes('landscaping') && <GrassField planW={safeW} planD={safeD} />}
           
-          <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={!!hideRoof} plotW={plotW} plotD={plotD} isDoubleStorey={isDoubleStorey} />
+          {/* Ground Floor Model */}
+          {(activeFloor === 0 || activeFloor === 2) && (
+            <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={activeFloor !== 2} plotW={plotW} plotD={plotD} isDoubleStorey={isDoubleStorey} />
+          )}
           
           {/* Second Floor (Double Storey) */}
-          {isDoubleStorey && firstFloorPlan && (
-            <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} hideRoof={hideRoof} />
+          {isDoubleStorey && firstFloorPlan && (activeFloor === 1 || activeFloor === 2) && (
+            <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} hideRoof={activeFloor !== 2} />
           )}
           
           
@@ -389,7 +574,7 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           })()}
           {addons.includes('fence') && <FenceAround planW={plotW} planD={plotD} gates={gates} isNight={isNight} />}
           
-          <CameraController activeRoom={activeRoom} plan={plan} />
+          <CameraController activeRoom={activeRoom} plan={plan} firstFloorPlan={firstFloorPlan} activeFloor={currentFloor} isDoubleStorey={isDoubleStorey} />
           <ContactShadows position={[0, 0.02, 0]} opacity={isNight ? 0.28 : 0.32} scale={80} blur={2} far={40} />
           <OrbitControls
             makeDefault
@@ -827,7 +1012,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
               })()}
 
               {/* Ceiling Elements */}
-              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && (
+              {!hideRoof && r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && !(r.id.toLowerCase().includes('staircase') || r.label.toLowerCase().includes('staircase')) && (
                 <>
                   <mesh position={[cx, wallH - 0.01, cz]}>
                     <boxGeometry args={[r.w - 0.1, 0.02, r.h - 0.1]} />
@@ -861,6 +1046,13 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
                   </group>
                 );
               })}
+
+              {/* Staircase Model */}
+              {(r.type === 'hallway' && (r.id.toLowerCase().includes('staircase') || r.label.toLowerCase().includes('staircase'))) && (
+                <group position={[cx, 0.02, cz]}>
+                  <Staircase3D w={r.w} h={r.h} floorHeight={wallH} isNight={isNight} />
+                </group>
+              )}
             </group>
           );
         })}
@@ -892,19 +1084,69 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
         })}
       </group>
 
-      {/* Exterior Architecture */}
-      {!hideRoof && (
-        <>
-          <mesh position={[roofCX, wallH + 0.8, roofCZ]}>
-            <boxGeometry args={[roofW + 0.8, 0.35, roofD + 0.8]} />
-            <meshStandardMaterial color={colors.trim} roughness={0.45} metalness={0.08} />
-          </mesh>
-          <mesh position={[roofCX, wallH + 0.55, roofCZ]}>
-            <boxGeometry args={[roofW + 0.5, 0.15, roofD + 0.5]} />
-            <meshStandardMaterial color={colors.accent} roughness={0.5} />
-          </mesh>
-        </>
-      )}
+      {/* Exterior Architecture (cornice/trim slabs with staircase cutout) */}
+      {!hideRoof && (() => {
+        const groundStaircaseForTrim = (plan.rooms || []).find(r => 
+          r.label.toLowerCase().includes('staircase') || 
+          r.id.toLowerCase().includes('staircase') || 
+          r.type === 'staircase' ||
+          (r.type === 'hallway' && r.label.toLowerCase().includes('stair'))
+        );
+        
+        // Trim slab shape (roofW + 0.8 x roofD + 0.8)
+        const trimShape = new THREE.Shape();
+        const tw = roofW + 0.8, td = roofD + 0.8;
+        trimShape.moveTo(-tw/2, -td/2);
+        trimShape.lineTo(tw/2, -td/2);
+        trimShape.lineTo(tw/2, td/2);
+        trimShape.lineTo(-tw/2, td/2);
+        trimShape.closePath();
+        
+        // Accent slab shape (roofW + 0.5 x roofD + 0.5)
+        const accentShape = new THREE.Shape();
+        const aw = roofW + 0.5, ad = roofD + 0.5;
+        accentShape.moveTo(-aw/2, -ad/2);
+        accentShape.lineTo(aw/2, -ad/2);
+        accentShape.lineTo(aw/2, ad/2);
+        accentShape.lineTo(-aw/2, ad/2);
+        accentShape.closePath();
+        
+        if (groundStaircaseForTrim) {
+          const hx = round2(groundStaircaseForTrim.x + groundStaircaseForTrim.w / 2 - W / 2 - roofCX);
+          const hz = round2(groundStaircaseForTrim.y + groundStaircaseForTrim.h / 2 - D / 2 - roofCZ);
+          const hw = groundStaircaseForTrim.w + 0.2; // Slightly larger for clearance
+          const hh = groundStaircaseForTrim.h + 0.2;
+          
+          const trimHole = new THREE.Path();
+          trimHole.moveTo(hx - hw/2, hz - hh/2);
+          trimHole.lineTo(hx + hw/2, hz - hh/2);
+          trimHole.lineTo(hx + hw/2, hz + hh/2);
+          trimHole.lineTo(hx - hw/2, hz + hh/2);
+          trimHole.closePath();
+          trimShape.holes.push(trimHole);
+          
+          const accentHole = new THREE.Path();
+          accentHole.moveTo(hx - hw/2, hz - hh/2);
+          accentHole.lineTo(hx + hw/2, hz - hh/2);
+          accentHole.lineTo(hx + hw/2, hz + hh/2);
+          accentHole.lineTo(hx - hw/2, hz + hh/2);
+          accentHole.closePath();
+          accentShape.holes.push(accentHole);
+        }
+        
+        return (
+          <>
+            <mesh position={[roofCX, wallH + 0.05, roofCZ]} rotation={[-Math.PI / 2, 0, 0]}>
+              <extrudeGeometry args={[trimShape, { depth: 0.35, bevelEnabled: false }]} />
+              <meshStandardMaterial color={colors.trim} roughness={0.45} metalness={0.08} />
+            </mesh>
+            <mesh position={[roofCX, wallH + 0.02, roofCZ]} rotation={[-Math.PI / 2, 0, 0]}>
+              <extrudeGeometry args={[accentShape, { depth: 0.15, bevelEnabled: false }]} />
+              <meshStandardMaterial color={colors.accent} roughness={0.5} />
+            </mesh>
+          </>
+        );
+      })()}
 
       {/* Entrance Features */}
       {mainDoorPos && (
@@ -936,11 +1178,26 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
       )}
 
       {/* Roof System */}
-      {roofType === 'gable' ? (
-        <GableRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} cpAtLeft={cpAtLeft} cpAtRight={cpAtRight} cpAtTop={cpAtTop} cpAtBottom={cpAtBottom} />
-      ) : (
-        <FlatRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} cpAtLeft={cpAtLeft} cpAtRight={cpAtRight} cpAtTop={cpAtTop} cpAtBottom={cpAtBottom} />
-      )}
+      {(() => {
+        const groundStaircase = (plan.rooms || []).find(r => 
+          r.label.toLowerCase().includes('staircase') || 
+          r.id.toLowerCase().includes('staircase') || 
+          r.type === 'staircase' ||
+          (r.type === 'hallway' && r.label.toLowerCase().includes('stair'))
+        );
+        const hole = groundStaircase ? {
+          x: round2(groundStaircase.x + groundStaircase.w / 2 - W / 2 - roofCX),
+          z: round2(groundStaircase.y + groundStaircase.h / 2 - D / 2 - roofCZ),
+          w: groundStaircase.w + 0.2, // Slightly larger for clearance
+          h: groundStaircase.h + 0.2
+        } : null;
+
+        return roofType === 'gable' ? (
+          <GableRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} cpAtLeft={cpAtLeft} cpAtRight={cpAtRight} cpAtTop={cpAtTop} cpAtBottom={cpAtBottom} />
+        ) : (
+          <FlatRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} cpAtLeft={cpAtLeft} cpAtRight={cpAtRight} cpAtTop={cpAtTop} cpAtBottom={cpAtBottom} hole={hole} />
+        );
+      })()}
 
       {/* Rooftop Equipment */}
       {addons.includes('solar') && !hideRoof && !isDoubleStorey && <SolarPanels minX={minX - W/2} maxX={maxX - W/2} minZ={minZ - D/2} maxZ={maxZ - D/2} roofType={roofType} wallH={wallH} />}
@@ -1428,19 +1685,40 @@ const GableRoof = ({
 
 const FlatRoof = ({ 
   W, D, cx, cz, wallH, color, transparent, opacity,
-  cpAtLeft, cpAtRight, cpAtTop, cpAtBottom 
+  cpAtLeft, cpAtRight, cpAtTop, cpAtBottom,
+  hole
 }: any) => {
-  const overhang = 2.5;
-  const lw = cpAtLeft ? 0.2 : overhang / 2;
-  const rw = cpAtRight ? 0.2 : overhang / 2;
-  const tw = cpAtTop ? 0.2 : overhang / 2;
-  const bw = cpAtBottom ? 0.2 : overhang / 2;
+  const shape = useMemo(() => {
+    const s = new THREE.Shape();
+    const rw = W + (cpAtLeft ? 0 : 1.25) + (cpAtRight ? 0 : 1.25);
+    const rh = D + (cpAtTop ? 0 : 1.25) + (cpAtBottom ? 0 : 1.25);
+    
+    s.moveTo(-rw/2, -rh/2);
+    s.lineTo(rw/2, -rh/2);
+    s.lineTo(rw/2, rh/2);
+    s.lineTo(-rw/2, rh/2);
+    s.closePath();
+    
+    if (hole) {
+      const holesArr = Array.isArray(hole) ? hole : [hole];
+      holesArr.forEach(hRect => {
+        const hPath = new THREE.Path();
+        hPath.moveTo(hRect.x - hRect.w/2, hRect.z - hRect.h/2);
+        hPath.lineTo(hRect.x + hRect.w/2, hRect.z - hRect.h/2);
+        hPath.lineTo(hRect.x + hRect.w/2, hRect.z + hRect.h/2);
+        hPath.lineTo(hRect.x - hRect.w/2, hRect.z + hRect.h/2);
+        hPath.closePath();
+        s.holes.push(hPath);
+      });
+    }
+    return s;
+  }, [W, D, cpAtLeft, cpAtRight, cpAtTop, cpAtBottom, hole]);
 
   return (
-    <group position={[cx, wallH + 1.2, cz]}>
+    <group position={[cx, wallH + 0.05, cz]}>
       {/* Main slab */}
-      <mesh castShadow>
-        <boxGeometry args={[W + (cpAtLeft ? 0 : 1.25) + (cpAtRight ? 0 : 1.25), 0.8, D + (cpAtTop ? 0 : 1.25) + (cpAtBottom ? 0 : 1.25)]} />
+      <mesh castShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <extrudeGeometry args={[shape, { depth: 0.8, bevelEnabled: false }]} />
         <meshStandardMaterial color={color} roughness={0.65} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
       </mesh>
       {/* Parapet walls */}
@@ -2318,7 +2596,7 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
   const D = plan.height;
   const wallH = 13;
   const t = 0.4;
-  const floorY = wallH + 0.8; // Height of ground floor walls + foundation
+  const floorY = wallH; // Ground floor walls end at wallH
   const round2 = (n: number) => Math.round(n * 100) / 100;
 
   // Use firstFloorPlan dimensions (may be smaller than ground)
@@ -2326,15 +2604,17 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
   const ffH = firstFloorPlan.height;
   const upperOffsetX = round2(-W / 2 + (W - ffW) / 2);
   const upperOffsetZ = round2(-D / 2 + (D - ffH) / 2);
-  const upperRoofRooms = (firstFloorPlan?.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && r.type !== 'hallway');
-  const upperMinX = upperRoofRooms.length ? Math.min(...upperRoofRooms.map(r => r.x)) : 0;
-  const upperMaxX = upperRoofRooms.length ? Math.max(...upperRoofRooms.map(r => r.x + r.w)) : ffW;
-  const upperMinZ = upperRoofRooms.length ? Math.min(...upperRoofRooms.map(r => r.y)) : 0;
-  const upperMaxZ = upperRoofRooms.length ? Math.max(...upperRoofRooms.map(r => r.y + r.h)) : ffH;
+  // Include ALL rooms (including staircase/hallway) for roof bounds so holes can clip correctly
+  const allUpperRooms = (firstFloorPlan?.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony');
+  const upperMinX = allUpperRooms.length ? Math.min(...allUpperRooms.map(r => r.x)) : 0;
+  const upperMaxX = allUpperRooms.length ? Math.max(...allUpperRooms.map(r => r.x + r.w)) : ffW;
+  const upperMinZ = allUpperRooms.length ? Math.min(...allUpperRooms.map(r => r.y)) : 0;
+  const upperMaxZ = allUpperRooms.length ? Math.max(...allUpperRooms.map(r => r.y + r.h)) : ffH;
   const upperRoofW = round2(upperMaxX - upperMinX);
   const upperRoofD = round2(upperMaxZ - upperMinZ);
   const upperRoofCX = round2((upperMinX + upperMaxX) / 2);
   const upperRoofCZ = round2((upperMinZ + upperMaxZ) / 2);
+
 
   // Extract walls for first floor
   const extractedWalls: any[] = [];
@@ -2380,23 +2660,70 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
 
   return (
     <group position={[0, floorY, 0]}>
-      {/* Floor slab */}
-      <mesh receiveShadow position={[round2((ffW - W) / 2), 0.15, round2((ffH - D) / 2)]}>
-        <boxGeometry args={[ffW + 0.5, 0.3, ffH + 0.5]} />
-        <meshStandardMaterial color="#9a8a78" roughness={0.8} />
-      </mesh>
+      {/* Floor slab with staircase cutout */}
+      {(() => {
+        const staircaseRoom = (firstFloorPlan?.rooms || []).find(r => r.id.toLowerCase().includes('staircase') || r.label.toLowerCase().includes('staircase'));
+        const slabW = ffW + 0.5;
+        const slabD = ffH + 0.5;
+        const slabCX = round2((ffW - W) / 2);
+        const slabCZ = round2((ffH - D) / 2);
 
-      <group position={[upperOffsetX, 0.3, upperOffsetZ]}>
-        {/* Room floors */}
+        const slabShape = new THREE.Shape();
+        slabShape.moveTo(-slabW / 2, -slabD / 2);
+        slabShape.lineTo(slabW / 2, -slabD / 2);
+        slabShape.lineTo(slabW / 2, slabD / 2);
+        slabShape.lineTo(-slabW / 2, slabD / 2);
+        slabShape.closePath();
+
+        if (staircaseRoom) {
+          // Calculate room center relative to slab center
+          // Slab group is at 0,0. Mesh is at slabCX, slabCZ.
+          // Room group is at upperOffsetX, upperOffsetZ.
+          const rx = upperOffsetX + staircaseRoom.x + staircaseRoom.w/2 - slabCX;
+          const rz = upperOffsetZ + staircaseRoom.y + staircaseRoom.h/2 - slabCZ;
+          
+          const floorHole = new THREE.Path();
+          floorHole.moveTo(rx - staircaseRoom.w/2, rz - staircaseRoom.h/2);
+          floorHole.lineTo(rx + staircaseRoom.w/2, rz - staircaseRoom.h/2);
+          floorHole.lineTo(rx + staircaseRoom.w/2, rz + staircaseRoom.h/2);
+          floorHole.lineTo(rx - staircaseRoom.w/2, rz + staircaseRoom.h/2);
+          floorHole.closePath();
+          slabShape.holes.push(floorHole);
+        }
+
+        return (
+          <mesh receiveShadow position={[slabCX, 0.02, slabCZ]} rotation={[-Math.PI/2, 0, 0]}>
+            <extrudeGeometry args={[slabShape, { depth: 0.8, bevelEnabled: false }]} />
+            <meshStandardMaterial color="#9a8a78" roughness={0.8} />
+          </mesh>
+        );
+      })()}
+
+      <group position={[upperOffsetX, 0.8, upperOffsetZ]}>
+        {/* Room floors & ceilings */}
         {(firstFloorPlan?.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony').map(r => {
           const cx = round2(r.x + r.w / 2);
           const cz = round2(r.y + r.h / 2);
+          const isStaircase = r.id.toLowerCase().includes('staircase') || r.label.toLowerCase().includes('staircase');
+          
+          if (isStaircase) return null; // Create opening for staircase
+
           return (
             <group key={r.id}>
+              {/* Floor */}
               <mesh receiveShadow position={[cx, 0.01, cz]}>
                 <boxGeometry args={[r.w, 0.02, r.h]} />
                 <meshStandardMaterial color={r.color} roughness={0.8} />
               </mesh>
+              
+              {/* Ceiling */}
+              {!hideRoof && r.type !== 'hallway' && (
+                <mesh position={[cx, wallH - 0.01, cz]}>
+                  <boxGeometry args={[r.w - 0.1, 0.02, r.h - 0.1]} />
+                  <meshStandardMaterial color="#fafaf6" roughness={0.95} />
+                </mesh>
+              )}
+
               {/* Furniture */}
               {r.furniture.map((f: any, i: number) => (
                 <group key={`f-${i}`} position={[round2(r.x + f.x + f.w/2), 0.02, round2(r.y + f.y + f.h/2)]}
@@ -2427,11 +2754,34 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
           }
         })}
 
-        {roof === 'gable' ? (
-          <GableRoof W={upperRoofW} D={upperRoofD} cx={upperRoofCX} cz={upperRoofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
-        ) : (
-          <FlatRoof W={upperRoofW} D={upperRoofD} cx={upperRoofCX} cz={upperRoofCZ} wallH={wallH} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
-        )}
+        {(() => {
+          const clipRooms = (firstFloorPlan?.rooms || []).filter(r => {
+            const label = r.label.toLowerCase();
+            return (
+              r.type === 'garden' || 
+              r.type === 'carport' || 
+              r.type === 'balcony' ||
+              label.includes('terrace') ||
+              label.includes('open terrace') ||
+              r.type === 'terrace'
+            );
+          });
+
+          
+          const holes = clipRooms.map(r => ({
+            x: round2(r.x + r.w / 2 - upperRoofCX),
+            z: round2(r.y + r.h / 2 - upperRoofCZ),
+            w: r.w + 0.4, // Clearance margin
+            h: r.h + 0.4
+          }));
+
+
+          return roof === 'gable' ? (
+            <GableRoof W={upperRoofW} D={upperRoofD} cx={upperRoofCX} cz={upperRoofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
+          ) : (
+            <FlatRoof W={upperRoofW} D={upperRoofD} cx={upperRoofCX} cz={upperRoofCZ} wallH={wallH} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} hole={holes} />
+          );
+        })()}
 
         {addons.includes('solar') && !hideRoof && <SolarPanels minX={upperMinX} maxX={upperMaxX} minZ={upperMinZ} maxZ={upperMaxZ} roofType={roof} wallH={wallH} />}
         {addons.includes('water_tank') && !hideRoof && <WaterTank maxX={upperMaxX} maxZ={upperMaxZ} wallH={wallH} roofType={roof} />}

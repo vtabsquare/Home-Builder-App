@@ -754,7 +754,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border">
               <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mr-2">Level Selection:</span>
               <div className="inline-flex rounded-xl bg-soft-section p-1 border border-border shadow-inner">
-                {([0, 1] as const).map((f) => (
+                {([0, 1, 2] as const).map((f) => (
                   <button
                     key={f}
                     onClick={() => setActiveFloor(f)}
@@ -764,7 +764,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                         : 'text-muted-foreground/60 hover:text-foreground'
                     }`}
                   >
-                    {f === 0 ? 'Ground Floor' : 'First Floor'}
+                    {f === 0 ? 'Ground Floor' : f === 1 ? 'First Floor' : 'Full View'}
                   </button>
                 ))}
               </div>
@@ -887,7 +887,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 <motion.div key={`3d-${activeFloor}`} className="h-full w-full"
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
-                  <ElevationCanvas plan={isDoubleStorey ? groundFloorPlan : currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={firstFloorDisplayPlan} hideHelpers={true} />
+                  <ElevationCanvas plan={isDoubleStorey ? groundFloorPlan : currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={firstFloorDisplayPlan} hideHelpers={true} activeFloor={activeFloor} />
                 </motion.div>
               ) : (
                 <motion.div key="elevation" className="h-full w-full bg-white p-8 flex flex-col"

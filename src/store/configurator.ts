@@ -83,7 +83,7 @@ export interface ConfigState {
   planHistory: { id: string; label: string; type: string; targetId: string; original: any }[];
   // Double Storey
   isDoubleStorey: boolean;
-  activeFloor: 0 | 1;
+  activeFloor: 0 | 1 | 2;
   customFirstFloorPlan: any | null;
   savedPresets: any[];
   packageLayouts: Record<string, any>;
@@ -112,7 +112,7 @@ export interface ConfigActions {
   setAdvancedEditorMode: (v: boolean) => void;
   setCustomPlan: (p: any | null) => void;
   setDoubleStorey: (v: boolean) => void;
-  setActiveFloor: (f: 0 | 1) => void;
+  setActiveFloor: (f: 0 | 1 | 2) => void;
   setCustomFirstFloorPlan: (p: any | null) => void;
   setPresetOverride: (presetId: number, groundPlan: any, firstFloorPlan: any | null) => void;
   saveBuiltInPreset: (presetId: number, groundPlan: any, firstFloorPlan: any | null) => Promise<void>;
@@ -165,7 +165,7 @@ const initial: ConfigState = {
   customPlan: null,
   planHistory: [],
   isDoubleStorey: false,
-  activeFloor: 0 as 0 | 1,
+  activeFloor: 2 as 0 | 1 | 2,
   customFirstFloorPlan: null,
   savedPresets: [],
   packageLayouts: {},
@@ -185,7 +185,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       setCustomLandArea: (customLandArea) => set({ customLandArea }),
       setHomeType: (homeType) => {
         const d = HOME_TYPE_DEFAULTS[homeType];
-        set({ homeType, bedrooms: d.bedrooms, bathrooms: d.bathrooms, presetId: 0, loadedPresetId: null, customPlan: null, isDoubleStorey: false, activeFloor: 0, customFirstFloorPlan: null });
+        set({ homeType, bedrooms: d.bedrooms, bathrooms: d.bathrooms, presetId: 0, loadedPresetId: null, customPlan: null, isDoubleStorey: false, activeFloor: 2, customFirstFloorPlan: null });
       },
       setBedrooms: (bedrooms) => set((state) => {
         const limits = HOME_TYPE_LIMITS[state.homeType].bedrooms;
@@ -221,7 +221,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       setPresetId: (presetId) => set({ presetId, customPlan: null, loadedPresetId: null }),
       setAdvancedEditorMode: (advancedEditorMode) => set({ advancedEditorMode }),
       setCustomPlan: (customPlan) => set({ customPlan }),
-      setDoubleStorey: (isDoubleStorey) => set({ isDoubleStorey, activeFloor: 0, customPlan: null, customFirstFloorPlan: null }),
+      setDoubleStorey: (isDoubleStorey) => set({ isDoubleStorey, activeFloor: isDoubleStorey ? 2 : 0, customPlan: null, customFirstFloorPlan: null }),
       setActiveFloor: (activeFloor) => set({ activeFloor }),
       setCustomFirstFloorPlan: (customFirstFloorPlan) => set({ customFirstFloorPlan }),
       setPresetOverride: (presetId, groundPlan, firstFloorPlan) => set((s) => ({
