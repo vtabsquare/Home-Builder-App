@@ -3,7 +3,7 @@ import { Stage, Layer, Rect, Text, Line, Group, Transformer } from 'react-konva'
 import { Plan, Room, FurnitureItem, generateEmptyPlan, regenerateFurniture } from '@/lib/floorplan';
 import { useConfig, HomeType } from '@/store/configurator';
 import Konva from 'konva';
-import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed, Waypoints } from 'lucide-react';
+import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed, Waypoints, Car } from 'lucide-react';
 
 interface Props {
   homeType: HomeType;
@@ -21,6 +21,7 @@ export const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaul
   { type: 'bathroom', label: 'Bathroom', icon: Bath, defaultW: 7, defaultH: 7, color: 'hsl(200 30% 82%)' },
   { type: 'kitchen', label: 'Kitchen', icon: CookingPot, defaultW: 12, defaultH: 10, color: 'hsl(28 38% 72%)' },
   { type: 'dining', label: 'Dining', icon: UtensilsCrossed, defaultW: 10, defaultH: 10, color: 'hsl(36 28% 82%)' },
+  { type: 'carport', label: 'Carport', icon: Car, defaultW: 12, defaultH: 14, color: 'hsl(0 0% 82%)' },
   { type: 'garden', label: 'Garden', icon: Trees, defaultW: 10, defaultH: 10, color: 'hsl(120 30% 72%)' },
 ];
 
@@ -259,6 +260,48 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
     return { ...p, rooms };
   };
 
+  /** Toggle a wall on the source room AND the adjacent room's opposite wall */
+  const toggleWallWithAdjacent = (sourceRoom: Room, wall: string) => {
+    const isAdding = !(sourceRoom.openWalls || []).includes(wall as any);
+    const oppositeMap: Record<string, string> = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+
+    const updatedRooms = plan.rooms.map(r => {
+      if (r.id === sourceRoom.id) {
+        const openWalls = r.openWalls || [];
+        const newOpenWalls = openWalls.includes(wall as any)
+          ? openWalls.filter(w => w !== wall)
+          : [...openWalls, wall as any];
+        return { ...r, openWalls: newOpenWalls };
+      }
+
+      // Check if this room is adjacent on the toggled wall side
+      let targetWall: string | null = null;
+      if (wall === 'top' && Math.abs((r.y + r.h) - sourceRoom.y) < 1) {
+        if (Math.max(r.x, sourceRoom.x) < Math.min(r.x + r.w, sourceRoom.x + sourceRoom.w) - 0.1) targetWall = 'bottom';
+      } else if (wall === 'bottom' && Math.abs(r.y - (sourceRoom.y + sourceRoom.h)) < 1) {
+        if (Math.max(r.x, sourceRoom.x) < Math.min(r.x + r.w, sourceRoom.x + sourceRoom.w) - 0.1) targetWall = 'top';
+      } else if (wall === 'left' && Math.abs((r.x + r.w) - sourceRoom.x) < 1) {
+        if (Math.max(r.y, sourceRoom.y) < Math.min(r.y + r.h, sourceRoom.y + sourceRoom.h) - 0.1) targetWall = 'right';
+      } else if (wall === 'right' && Math.abs(r.x - (sourceRoom.x + sourceRoom.w)) < 1) {
+        if (Math.max(r.y, sourceRoom.y) < Math.min(r.y + r.h, sourceRoom.y + sourceRoom.h) - 0.1) targetWall = 'left';
+      }
+
+      if (targetWall) {
+        const openWalls = r.openWalls || [];
+        if (isAdding && !openWalls.includes(targetWall as any)) {
+          return { ...r, openWalls: [...openWalls, targetWall as any] };
+        } else if (!isAdding) {
+          return { ...r, openWalls: openWalls.filter(w => w !== targetWall) };
+        }
+      }
+      return r;
+    });
+
+    const updated = { ...plan, rooms: updatedRooms };
+    setPlan(updated);
+    onChange?.(updated);
+  };
+
   const savePlan = () => {
     // Preserve the user's exact door placement; only auto-fill exterior windows.
     const finalPlan = addWindowsToRooms(plan);
@@ -443,13 +486,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                             const pos = stage.getPointerPosition();
                             setWallPopup({ roomId: room.id, wall: 'top', x: pos.x, y: pos.y });
                           } else {
-                            const openWalls = room.openWalls || [];
-                            const newOpenWalls = openWalls.includes('top')
-                              ? openWalls.filter(w => w !== 'top')
-                              : [...openWalls, 'top' as any];
-                            const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
-                            setPlan(updated);
-                            onChange?.(updated);
+                            toggleWallWithAdjacent(room, 'top');
                           }
                         }}
                         onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
@@ -468,13 +505,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                             const pos = stage.getPointerPosition();
                             setWallPopup({ roomId: room.id, wall: 'bottom', x: pos.x, y: pos.y });
                           } else {
-                            const openWalls = room.openWalls || [];
-                            const newOpenWalls = openWalls.includes('bottom')
-                              ? openWalls.filter(w => w !== 'bottom')
-                              : [...openWalls, 'bottom' as any];
-                            const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
-                            setPlan(updated);
-                            onChange?.(updated);
+                            toggleWallWithAdjacent(room, 'bottom');
                           }
                         }}
                         onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
@@ -493,13 +524,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                             const pos = stage.getPointerPosition();
                             setWallPopup({ roomId: room.id, wall: 'left', x: pos.x, y: pos.y });
                           } else {
-                            const openWalls = room.openWalls || [];
-                            const newOpenWalls = openWalls.includes('left')
-                              ? openWalls.filter(w => w !== 'left')
-                              : [...openWalls, 'left' as any];
-                            const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
-                            setPlan(updated);
-                            onChange?.(updated);
+                            toggleWallWithAdjacent(room, 'left');
                           }
                         }}
                         onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
@@ -518,13 +543,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                             const pos = stage.getPointerPosition();
                             setWallPopup({ roomId: room.id, wall: 'right', x: pos.x, y: pos.y });
                           } else {
-                            const openWalls = room.openWalls || [];
-                            const newOpenWalls = openWalls.includes('right')
-                              ? openWalls.filter(w => w !== 'right')
-                              : [...openWalls, 'right' as any];
-                            const updated = { ...plan, rooms: plan.rooms.map(r => r.id === room.id ? { ...r, openWalls: newOpenWalls } : r) };
-                            setPlan(updated);
-                            onChange?.(updated);
+                            toggleWallWithAdjacent(room, 'right');
                           }
                         }}
                         onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = 'pointer'}
@@ -560,7 +579,38 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                       ))}
                     </Group>
                   )}
+                  {room.type === 'carport' && (
+                    <Group opacity={0.15}>
+                      {Array.from({ length: Math.ceil((rw + rh) / scale) }).map((_, i) => (
+                        <Line key={`cp-${i}`}
+                          points={[Math.min(i * scale, rw), Math.max(0, i * scale - rw), Math.max(0, i * scale - rh), Math.min(i * scale, rh)]}
+                          stroke="hsl(0, 0%, 40%)" strokeWidth={0.8} />
+                      ))}
+                    </Group>
+                  )}
 
+                  {/* Staircase step lines with orientation */}
+                  {(room.type === 'staircase' || (room.type === 'hallway' && (room.label || '').toLowerCase().includes('staircase'))) && (() => {
+                    const orient = room.orientation || 0;
+                    const isVert = orient === 0 || orient === 2;
+                    const stepCount = isVert ? Math.max(3, Math.floor(rh / (scale * 1.2))) : Math.max(3, Math.floor(rw / (scale * 1.2)));
+                    const stepSpacing = isVert ? rh / stepCount : rw / stepCount;
+                    const arrowSz = Math.min(rw, rh) * 0.18;
+                    return (
+                      <Group opacity={0.35}>
+                        {Array.from({ length: stepCount - 1 }).map((_, i) => {
+                          const pos = (i + 1) * stepSpacing;
+                          return isVert
+                            ? <Line key={`step-${i}`} points={[2, pos, rw - 2, pos]} stroke="#444" strokeWidth={1.5} />
+                            : <Line key={`step-${i}`} points={[pos, 2, pos, rh - 2]} stroke="#444" strokeWidth={1.5} />;
+                        })}
+                        {orient === 0 && <Line points={[rw/2, arrowSz*0.5, rw/2-arrowSz, arrowSz*1.8, rw/2+arrowSz, arrowSz*1.8]} fill="#333" closed stroke="#333" strokeWidth={1} />}
+                        {orient === 2 && <Line points={[rw/2, rh-arrowSz*0.5, rw/2-arrowSz, rh-arrowSz*1.8, rw/2+arrowSz, rh-arrowSz*1.8]} fill="#333" closed stroke="#333" strokeWidth={1} />}
+                        {orient === 1 && <Line points={[rw-arrowSz*0.5, rh/2, rw-arrowSz*1.8, rh/2-arrowSz, rw-arrowSz*1.8, rh/2+arrowSz]} fill="#333" closed stroke="#333" strokeWidth={1} />}
+                        {orient === 3 && <Line points={[arrowSz*0.5, rh/2, arrowSz*1.8, rh/2-arrowSz, arrowSz*1.8, rh/2+arrowSz]} fill="#333" closed stroke="#333" strokeWidth={1} />}
+                      </Group>
+                    );
+                  })()}
                   {/* Room label */}
                   <Text
                     text={room.label}
