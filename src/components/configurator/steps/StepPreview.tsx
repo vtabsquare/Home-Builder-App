@@ -309,6 +309,18 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     return (isCustomPreset ? customFirstFloorPlan : null) || floors.first;
   }, [isDoubleStorey, floors, activeFloor, plan, customFirstFloorPlan, customPlan, isCustomPreset]);
 
+  const groundFloorPlan = useMemo(() => {
+    if (!isDoubleStorey || !floors) return plan;
+    if (activeFloor === 0 && stagedPlan) return stagedPlan;
+    return (isCustomPreset ? customPlan : null) || floors.ground;
+  }, [isDoubleStorey, floors, plan, activeFloor, stagedPlan, isCustomPreset, customPlan]);
+
+  const firstFloorDisplayPlan = useMemo(() => {
+    if (!isDoubleStorey || !floors) return undefined;
+    if (activeFloor === 1 && stagedPlan) return stagedPlan;
+    return (isCustomPreset ? customFirstFloorPlan : null) || floors.first;
+  }, [isDoubleStorey, floors, activeFloor, stagedPlan, isCustomPreset, customFirstFloorPlan]);
+
   const currentPlan = useMemo(() => {
     const p = stagedPlan || displayPlan;
     // Ensure plan has required structure
@@ -872,10 +884,10 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   }} />
                 </motion.div>
               ) : view === '3d' ? (
-                <motion.div key="3d" className="h-full w-full"
+                <motion.div key={`3d-${activeFloor}`} className="h-full w-full"
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
-                  <ElevationCanvas plan={currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={isDoubleStorey && floors ? ((isCustomPreset ? customFirstFloorPlan : null) || floors.first) : undefined} hideHelpers={true} />
+                  <ElevationCanvas plan={isDoubleStorey ? groundFloorPlan : currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={firstFloorDisplayPlan} hideHelpers={true} />
                 </motion.div>
               ) : (
                 <motion.div key="elevation" className="h-full w-full bg-white p-8 flex flex-col"

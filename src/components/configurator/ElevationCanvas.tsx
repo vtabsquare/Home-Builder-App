@@ -367,11 +367,11 @@ export const ElevationCanvas = ({ plan, roof, material, addons = [], activeRoom,
           <EnhancedGround isNight={isNight} />
           {addons.includes('landscaping') && <GrassField planW={safeW} planD={safeD} />}
           
-          <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={!!hideRoof} plotW={plotW} plotD={plotD} />
+          <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={!!hideRoof} plotW={plotW} plotD={plotD} isDoubleStorey={isDoubleStorey} />
           
           {/* Second Floor (Double Storey) */}
           {isDoubleStorey && firstFloorPlan && (
-            <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} material={material} activeRoom={activeRoom} hideRoof={hideRoof} />
+            <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} hideRoof={hideRoof} />
           )}
           
           
@@ -574,9 +574,10 @@ const GardenArea = ({ room: r, W, D, isNight, mainDoorPos }: { room: any, W: num
 };
 
 /* ─── Main House Component ─── */
-const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hideRoof = false, plotW, plotD }: {
-  plan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons: AddOn[]; isNight?: boolean; hideRoof?: boolean; plotW: number; plotD: number;
+const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hideRoof = false, plotW, plotD, isDoubleStorey = false }: {
+  plan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons: AddOn[]; isNight?: boolean; hideRoof?: boolean; plotW: number; plotD: number; isDoubleStorey?: boolean;
 }) => {
+  const roofType = isDoubleStorey ? 'flat' : roof;
   const colors = MATERIAL_COLORS[material];
   const W = plan.width;
   const D = plan.height;
@@ -935,15 +936,15 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
       )}
 
       {/* Roof System */}
-      {roof === 'gable' ? (
+      {roofType === 'gable' ? (
         <GableRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} cpAtLeft={cpAtLeft} cpAtRight={cpAtRight} cpAtTop={cpAtTop} cpAtBottom={cpAtBottom} />
       ) : (
         <FlatRoof W={roofW} D={roofD} cx={roofCX} cz={roofCZ} wallH={wallH} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} cpAtLeft={cpAtLeft} cpAtRight={cpAtRight} cpAtTop={cpAtTop} cpAtBottom={cpAtBottom} />
       )}
 
       {/* Rooftop Equipment */}
-      {addons.includes('solar') && !hideRoof && <SolarPanels minX={minX - W/2} maxX={maxX - W/2} minZ={minZ - D/2} maxZ={maxZ - D/2} roofType={roof} wallH={wallH} />}
-      {addons.includes('water_tank') && !hideRoof && <WaterTank maxX={maxX - W/2} maxZ={maxZ - D/2} wallH={wallH} roofType={roof} />}
+      {addons.includes('solar') && !hideRoof && !isDoubleStorey && <SolarPanels minX={minX - W/2} maxX={maxX - W/2} minZ={minZ - D/2} maxZ={maxZ - D/2} roofType={roofType} wallH={wallH} />}
+      {addons.includes('water_tank') && !hideRoof && !isDoubleStorey && <WaterTank maxX={maxX - W/2} maxZ={maxZ - D/2} wallH={wallH} roofType={roofType} />}
 
       {/* Room Labels */}
       {(plan.rooms || []).map(r => {
@@ -2309,8 +2310,8 @@ const FenceAround = ({ planW, planD, gates, isNight }: { planW: number; planD: n
 };
 
 /* ─── Second Floor (Double Storey) ─── */
-const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom, hideRoof }: {
-  plan: Plan; firstFloorPlan: Plan; material: Material; activeRoom?: string | null; hideRoof?: boolean;
+const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons = [], hideRoof }: {
+  plan: Plan; firstFloorPlan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons?: AddOn[]; hideRoof?: boolean;
 }) => {
   const colors = MATERIAL_COLORS[material];
   const W = plan.width;
@@ -2323,6 +2324,17 @@ const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom, hideRoof }: {
   // Use firstFloorPlan dimensions (may be smaller than ground)
   const ffW = firstFloorPlan.width;
   const ffH = firstFloorPlan.height;
+  const upperOffsetX = round2(-W / 2 + (W - ffW) / 2);
+  const upperOffsetZ = round2(-D / 2 + (D - ffH) / 2);
+  const upperRoofRooms = (firstFloorPlan?.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && r.type !== 'hallway');
+  const upperMinX = upperRoofRooms.length ? Math.min(...upperRoofRooms.map(r => r.x)) : 0;
+  const upperMaxX = upperRoofRooms.length ? Math.max(...upperRoofRooms.map(r => r.x + r.w)) : ffW;
+  const upperMinZ = upperRoofRooms.length ? Math.min(...upperRoofRooms.map(r => r.y)) : 0;
+  const upperMaxZ = upperRoofRooms.length ? Math.max(...upperRoofRooms.map(r => r.y + r.h)) : ffH;
+  const upperRoofW = round2(upperMaxX - upperMinX);
+  const upperRoofD = round2(upperMaxZ - upperMinZ);
+  const upperRoofCX = round2((upperMinX + upperMaxX) / 2);
+  const upperRoofCZ = round2((upperMinZ + upperMaxZ) / 2);
 
   // Extract walls for first floor
   const extractedWalls: any[] = [];
@@ -2374,7 +2386,7 @@ const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom, hideRoof }: {
         <meshStandardMaterial color="#9a8a78" roughness={0.8} />
       </mesh>
 
-      <group position={[round2(-W / 2 + (W - ffW) / 2), 0.3, round2(-D / 2 + (D - ffH) / 2)]}>
+      <group position={[upperOffsetX, 0.3, upperOffsetZ]}>
         {/* Room floors */}
         {(firstFloorPlan?.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony').map(r => {
           const cx = round2(r.x + r.w / 2);
@@ -2414,6 +2426,15 @@ const SecondFloor = ({ plan, firstFloorPlan, material, activeRoom, hideRoof }: {
               frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} hideRoof={hideRoof} />;
           }
         })}
+
+        {roof === 'gable' ? (
+          <GableRoof W={upperRoofW} D={upperRoofD} cx={upperRoofCX} cz={upperRoofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
+        ) : (
+          <FlatRoof W={upperRoofW} D={upperRoofD} cx={upperRoofCX} cz={upperRoofCZ} wallH={wallH} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
+        )}
+
+        {addons.includes('solar') && !hideRoof && <SolarPanels minX={upperMinX} maxX={upperMaxX} minZ={upperMinZ} maxZ={upperMaxZ} roofType={roof} wallH={wallH} />}
+        {addons.includes('water_tank') && !hideRoof && <WaterTank maxX={upperMaxX} maxZ={upperMaxZ} wallH={wallH} roofType={roof} />}
 
         {/* Room labels */}
         {(firstFloorPlan?.rooms || []).map(r => (
