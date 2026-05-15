@@ -1401,9 +1401,61 @@ export function generateEmptyPlan(homeType: 'starter' | 'family' | 'premium'): P
   };
 }
 
+/**
+ * Synchronise openWalls of structural rooms (staircases, hallways) between
+ * two floors. When a user removes a wall on the ground floor staircase, the
+ * matching first-floor staircase should mirror the change.
+ *
+ * Matching is done by room type + positional overlap (>50% area overlap).
+ * Only `openWalls` are propagated — furniture, doors, etc. stay independent.
+ */
+export function syncStructuralWalls(sourcePlan: Plan, targetPlan: Plan): Plan {
+  if (!sourcePlan?.rooms || !targetPlan?.rooms) return targetPlan;
+
+  const structuralTypes = new Set<Room['type']>(['hallway', 'staircase']);
+
+  const sourceStructural = sourcePlan.rooms.filter(r => structuralTypes.has(r.type));
+  if (sourceStructural.length === 0) return targetPlan;
+
+  const updatedRooms = targetPlan.rooms.map(targetRoom => {
+    if (!structuralTypes.has(targetRoom.type)) return targetRoom;
+
+    // Find the best positional match on the source floor
+    let bestMatch: Room | null = null;
+    let bestOverlap = 0;
+
+    for (const src of sourceStructural) {
+      if (src.type !== targetRoom.type) continue;
+
+      // Calculate 2D overlap area
+      const ox = Math.max(0, Math.min(src.x + src.w, targetRoom.x + targetRoom.w) - Math.max(src.x, targetRoom.x));
+      const oy = Math.max(0, Math.min(src.y + src.h, targetRoom.y + targetRoom.h) - Math.max(src.y, targetRoom.y));
+      const overlap = ox * oy;
+      const minArea = Math.min(src.w * src.h, targetRoom.w * targetRoom.h);
+
+      // Require > 50% area overlap to count as a structural match
+      if (overlap > minArea * 0.5 && overlap > bestOverlap) {
+        bestOverlap = overlap;
+        bestMatch = src;
+      }
+    }
+
+    if (bestMatch && bestMatch.openWalls) {
+      return { ...targetRoom, openWalls: [...bestMatch.openWalls] };
+    } else if (bestMatch && !bestMatch.openWalls) {
+      // Source has no openWalls, so remove any openWalls from target too
+      const { openWalls: _removed, ...rest } = targetRoom;
+      return rest as Room;
+    }
+    return targetRoom;
+  });
+
+  return { ...targetPlan, rooms: updatedRooms };
+}
+
 // ── Double Storey Support ─────────────────────────────────────────
 
-function familyDoubleStorey(W: number, H: number): { ground: Plan; first: Plan } {
+function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standard', bedrooms: number = 3, bathrooms: number = 2): { ground: Plan; first: Plan } {
   // Ground rules for blueprint scale mapping to a standard 40x40 dimension
   // W=40, H=40. Let's arrange them based on relative coordinates from the image.
   
@@ -1456,13 +1508,22 @@ function familyDoubleStorey(W: number, H: number): { ground: Plan; first: Plan }
   });
 
   gRooms.push({
-    id: 'gf-kitchen', type: 'kitchen', label: 'KITCHEN',
-    x: x1 + bathW, y: 0, w: W - (x1 + bathW), h: y1, // Reduced kitchen length
+    id: 'gf-kitchen', type: 'kitchen', label: kitchenType === 'open' ? 'OPEN KITCHEN + DINING' : kitchenType === 'galley' ? 'KITCHEN (GALLEY)' : 'KITCHEN',
+    x: x1 + bathW, y: 0,
+    w: kitchenType === 'open' ? W - (x1 + bathW) : kitchenType === 'galley' ? Math.round((W - (x1 + bathW)) * 0.6) : W - (x1 + bathW),
+    h: kitchenType === 'open' ? y2 - 0 : y1,
     color: COLORS.kitchen,
-    furniture: kitchenFurniture(W - (x1 + bathW), y1, 'open', 0),
-    doors: [
-      { wall: 'bottom', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'gf-dining' }
-    ],
+    furniture: kitchenType === 'open'
+      ? [
+          ...kitchenFurniture(W - (x1 + bathW), y1, 'open', 0),
+          { type: 'dining_table' as const, x: (W - (x1 + bathW)) * 0.2, y: y1 + 2, w: 6, h: 4, rotation: 0 }
+        ]
+      : kitchenType === 'galley'
+        ? kitchenFurniture(Math.round((W - (x1 + bathW)) * 0.6), y1, 'galley', 0)
+        : kitchenFurniture(W - (x1 + bathW), y1, 'standard', 0),
+    doors: kitchenType === 'open'
+      ? [{ wall: 'bottom' as const, position: 0.5, width: 4, swing: 'out' as const, doorType: 'open' as const, connectsTo: 'gf-living' }]
+      : [{ wall: 'bottom' as const, position: 0.5, width: 3.5, swing: 'out' as const, doorType: 'open' as const, connectsTo: 'gf-dining' }],
     windows: [{ wall: 'top', position: 0.5, width: 4 }, { wall: 'right', position: 0.5, width: 4 }]
   });
 
@@ -1473,22 +1534,65 @@ function familyDoubleStorey(W: number, H: number): { ground: Plan; first: Plan }
     color: COLORS.hallway,
     furniture: [],
     doors: [
-      { wall: 'right', position: 0.5, width: 3.5, swing: 'in', doorType: 'open', connectsTo: 'gf-dining' }
+      { wall: 'right', position: 0.5, width: 3.5, swing: 'in', doorType: 'open', connectsTo: kitchenType === 'open' ? 'gf-kitchen' : 'gf-dining' }
     ],
     windows: [{ wall: 'left', position: 0.5, width: 4 }]
   });
-  
-  gRooms.push({
-    id: 'gf-dining', type: 'dining', label: 'DINING',
-    x: x1, y: y1, w: W - x1, h: y2 - y1,
-    color: COLORS.dining,
-    furniture: diningFurniture(W - x1, y2 - y1),
-    doors: [
-      { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'gf-living' },
-      { wall: 'left', position: 0.2, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'gf-bed-0' }
-    ],
-    windows: [{ wall: 'right', position: 0.5, width: 4 }]
-  });
+
+  // Dining room (only for standard and galley layouts — open plan merges into kitchen above)
+  if (kitchenType === 'galley') {
+    // Galley: dining sits beside the galley kitchen
+    const galleyKitchenW = Math.round((W - (x1 + bathW)) * 0.6);
+    gRooms.push({
+      id: 'gf-dining', type: 'dining', label: 'DINING',
+      x: x1 + bathW + galleyKitchenW, y: 0, w: W - (x1 + bathW + galleyKitchenW), h: y1,
+      color: COLORS.dining,
+      furniture: diningFurniture(W - (x1 + bathW + galleyKitchenW), y1),
+      doors: [
+        { wall: 'bottom', position: 0.5, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'gf-staircase' }
+      ],
+      windows: [{ wall: 'right', position: 0.5, width: 4 }]
+    });
+    // Hallway/corridor between staircase and living (middle row)
+    gRooms.push({
+      id: 'gf-corridor', type: 'hallway', label: '',
+      x: x1, y: y1, w: W - x1, h: y2 - y1,
+      color: COLORS.hallway,
+      openWalls: ['left'],
+      furniture: [],
+      doors: [
+        { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'gf-living' },
+        { wall: 'left', position: 0.2, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'gf-bed-0' }
+      ],
+      windows: [{ wall: 'right', position: 0.5, width: 4 }]
+    });
+  } else if (kitchenType !== 'open') {
+    // Standard: separate dining room in middle row
+    gRooms.push({
+      id: 'gf-dining', type: 'dining', label: 'DINING',
+      x: x1, y: y1, w: W - x1, h: y2 - y1,
+      color: COLORS.dining,
+      furniture: diningFurniture(W - x1, y2 - y1),
+      doors: [
+        { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'gf-living' },
+        { wall: 'left', position: 0.2, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'gf-bed-0' }
+      ],
+      windows: [{ wall: 'right', position: 0.5, width: 4 }]
+    });
+  } else {
+    // Open plan: middle row is a corridor connecting staircase to living
+    gRooms.push({
+      id: 'gf-corridor', type: 'hallway', label: '',
+      x: x1, y: y1, w: x1 + bathW > x1 ? bathW : W - x1, h: y2 - y1,
+      color: COLORS.hallway,
+      openWalls: ['left'],
+      furniture: [],
+      doors: [
+        { wall: 'left', position: 0.2, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'gf-bed-0' }
+      ],
+      windows: []
+    });
+  }
 
   // BOTTOM ROW (y: y2 to H)
   gRooms.push({
@@ -1531,10 +1635,11 @@ function familyDoubleStorey(W: number, H: number): { ground: Plan; first: Plan }
   injectAdjacencyDoors(gRooms);
   cleanupDoors(gRooms);
 
-  // Restore the door from common bath to dining which cleanupDoors incorrectly strips
+  // Restore the door from common bath to dining/corridor which cleanupDoors incorrectly strips
   const commonBath = gRooms.find(r => r.id === 'gf-bath-common');
-  if (commonBath && !commonBath.doors.some(d => d.connectsTo === 'gf-dining')) {
-    commonBath.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'out', doorType: 'standard', connectsTo: 'gf-dining' });
+  const corridorTarget = kitchenType === 'open' ? 'gf-corridor' : kitchenType === 'galley' ? 'gf-corridor' : 'gf-dining';
+  if (commonBath && !commonBath.doors.some(d => d.connectsTo === corridorTarget)) {
+    commonBath.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'out', doorType: 'standard', connectsTo: corridorTarget });
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -1687,11 +1792,36 @@ function familyDoubleStorey(W: number, H: number): { ground: Plan; first: Plan }
  * First: 2 bedrooms accessible via hallway, common bath, staircase, open terrace.
  * Both floors share the same footprint — every cell filled, zero gaps.
  */
-export function splitPlanToFloors(plan: Plan, homeType?: string): { ground: Plan; first: Plan } {
+export function splitPlanToFloors(
+  plan: Plan,
+  homeType?: string,
+  kitchen: string = 'standard',
+  bedrooms: number = 3,
+  bathrooms: number = 2,
+  addons: string[] = []
+): { ground: Plan; first: Plan } {
+  let result: { ground: Plan; first: Plan };
+
   if (homeType === 'family') {
-    return familyDoubleStorey(plan.width, plan.height);
+    result = familyDoubleStorey(plan.width, plan.height, kitchen, bedrooms, bathrooms);
+  } else {
+    result = _splitPlanGeneric(plan);
   }
 
+  // Apply layout-affecting addons (carport, landscaping) to the ground floor
+  const layoutAddons = addons.filter(a => a === 'carport' || a === 'landscaping');
+  if (layoutAddons.length > 0) {
+    const groundWithAddons = applyAddOnsToPlan(result.ground, { addons: layoutAddons as any[] });
+    // Sync first floor dimensions to match ground floor (keep structural alignment)
+    const first = { ...result.first, width: groundWithAddons.width, height: groundWithAddons.height };
+    result = { ground: groundWithAddons, first };
+  }
+
+  return result;
+}
+
+// Internal generic double-storey splitter (for non-family home types)
+function _splitPlanGeneric(plan: Plan): { ground: Plan; first: Plan } {
   const W = plan.width;
   const H = plan.height;
 

@@ -4,7 +4,7 @@ import { StepShell } from '../StepShell';
 import { FloorPlanCanvas } from '../FloorPlanCanvas';
 import { ElevationCanvas } from '../ElevationCanvas';
 import { CustomEditorCanvas, ROOM_BLOCKS } from '../CustomEditorCanvas';
-import { Plan, splitPlanToFloors, Room, generateEmptyPlan, regenerateFurniture } from '@/lib/floorplan';
+import { Plan, splitPlanToFloors, Room, generateEmptyPlan, regenerateFurniture, syncStructuralWalls } from '@/lib/floorplan';
 import { fetchElevationImagesByVariant, fetchElevationVariantFamily, normalizeParsedVariantAddons, resolveElevationVariant } from '@/lib/elevationVariants';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -299,8 +299,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     // Preset override takes priority (user's saved alignment for this addon/storey combo)
     if (builtInOverride) return builtInOverride;
     if (familyPackageLayout) return familyPackageLayout;
-    return splitPlanToFloors(plan, homeType);
-  }, [isDoubleStorey, plan, homeType, familyPackageLayout, builtInOverride]);
+    return splitPlanToFloors(plan, homeType, kitchen, bedrooms, bathrooms, addons as string[]);
+  }, [isDoubleStorey, plan, homeType, kitchen, bedrooms, bathrooms, addons, familyPackageLayout, builtInOverride]);
 
   const isEditingFirstFloor = isDoubleStorey && activeFloor === 1;
 

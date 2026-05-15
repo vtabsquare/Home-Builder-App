@@ -3,7 +3,7 @@ import { Stage, Layer, Rect, Text, Line, Group, Transformer } from 'react-konva'
 import { Plan, Room, FurnitureItem, generateEmptyPlan, regenerateFurniture } from '@/lib/floorplan';
 import { useConfig, HomeType } from '@/store/configurator';
 import Konva from 'konva';
-import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed, Waypoints, Car } from 'lucide-react';
+import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed, Waypoints, Car, Fence } from 'lucide-react';
 
 interface Props {
   homeType: HomeType;
@@ -21,6 +21,7 @@ export const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaul
   { type: 'bathroom', label: 'Bathroom', icon: Bath, defaultW: 7, defaultH: 7, color: 'hsl(200 30% 82%)' },
   { type: 'kitchen', label: 'Kitchen', icon: CookingPot, defaultW: 12, defaultH: 10, color: 'hsl(28 38% 72%)' },
   { type: 'dining', label: 'Dining', icon: UtensilsCrossed, defaultW: 10, defaultH: 10, color: 'hsl(36 28% 82%)' },
+  { type: 'balcony', label: 'Balcony', icon: Fence, defaultW: 12, defaultH: 4, color: 'hsl(120 18% 78%)' },
   { type: 'carport', label: 'Carport', icon: Car, defaultW: 12, defaultH: 14, color: 'hsl(0 0% 82%)' },
   { type: 'garden', label: 'Garden', icon: Trees, defaultW: 10, defaultH: 10, color: 'hsl(120 30% 72%)' },
 ];
@@ -363,7 +364,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
               isWallMode ? 'bg-clay text-white border-transparent' : 'bg-white border-border hover:bg-surface'
             }`}
           >
-            <Maximize size={12} /> {isWallMode ? 'Exit Wall Mode' : 'Add/Remove Wall'}
+            <Maximize size={12} /> {isWallMode ? 'Exit Wall Mode' : (selectedRoom?.type === 'balcony' ? 'Add/Remove Handrail' : 'Add/Remove Wall')}
           </button>
           <button
             onClick={() => deleteRoom(selectedRoomId!)}
@@ -470,14 +471,26 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                     shadowOffsetY={2}
                   />
 
-                  {/* Individual Walls */}
+                  {/* Individual Walls / Handrails */}
                   {(true) && (
                     <>
                       {/* Top Wall */}
+                      {room.type === 'balcony' && !room.openWalls?.includes('top') && (() => {
+                        const balusterCount = Math.max(2, Math.floor(rw / (scale * 1.5)));
+                        const spacing = rw / (balusterCount + 1);
+                        return (
+                          <Group>
+                            {Array.from({ length: balusterCount }).map((_, i) => (
+                              <Line key={`bt-${i}`} points={[(i + 1) * spacing, -1, (i + 1) * spacing, 3]} stroke={isSelected ? '#2563eb' : '#5a5a5a'} strokeWidth={1.5} />
+                            ))}
+                          </Group>
+                        );
+                      })()}
                       <Line 
                         points={[0, 0, rw, 0]} 
-                        stroke={room.openWalls?.includes('top') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
-                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+                        stroke={room.openWalls?.includes('top') ? 'transparent' : (isSelected ? '#2563eb' : (room.type === 'balcony' ? '#6b6b6b' : '#2c2c2c'))} 
+                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : (room.type === 'balcony' ? 2 : 3))} 
+                        dash={room.type === 'balcony' && !room.openWalls?.includes('top') ? [6, 4] : undefined}
                         hitStrokeWidth={25}
                         onClick={(e) => {
                           e.cancelBubble = true;
@@ -493,10 +506,22 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                         onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
                       />
                       {/* Bottom Wall */}
+                      {room.type === 'balcony' && !room.openWalls?.includes('bottom') && (() => {
+                        const balusterCount = Math.max(2, Math.floor(rw / (scale * 1.5)));
+                        const spacing = rw / (balusterCount + 1);
+                        return (
+                          <Group>
+                            {Array.from({ length: balusterCount }).map((_, i) => (
+                              <Line key={`bb-${i}`} points={[(i + 1) * spacing, rh - 3, (i + 1) * spacing, rh + 1]} stroke={isSelected ? '#2563eb' : '#5a5a5a'} strokeWidth={1.5} />
+                            ))}
+                          </Group>
+                        );
+                      })()}
                       <Line 
                         points={[0, rh, rw, rh]} 
-                        stroke={room.openWalls?.includes('bottom') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
-                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+                        stroke={room.openWalls?.includes('bottom') ? 'transparent' : (isSelected ? '#2563eb' : (room.type === 'balcony' ? '#6b6b6b' : '#2c2c2c'))} 
+                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : (room.type === 'balcony' ? 2 : 3))} 
+                        dash={room.type === 'balcony' && !room.openWalls?.includes('bottom') ? [6, 4] : undefined}
                         hitStrokeWidth={25}
                         onClick={(e) => {
                           e.cancelBubble = true;
@@ -512,10 +537,22 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                         onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
                       />
                       {/* Left Wall */}
+                      {room.type === 'balcony' && !room.openWalls?.includes('left') && (() => {
+                        const balusterCount = Math.max(2, Math.floor(rh / (scale * 1.5)));
+                        const spacing = rh / (balusterCount + 1);
+                        return (
+                          <Group>
+                            {Array.from({ length: balusterCount }).map((_, i) => (
+                              <Line key={`bl-${i}`} points={[-1, (i + 1) * spacing, 3, (i + 1) * spacing]} stroke={isSelected ? '#2563eb' : '#5a5a5a'} strokeWidth={1.5} />
+                            ))}
+                          </Group>
+                        );
+                      })()}
                       <Line 
                         points={[0, 0, 0, rh]} 
-                        stroke={room.openWalls?.includes('left') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
-                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+                        stroke={room.openWalls?.includes('left') ? 'transparent' : (isSelected ? '#2563eb' : (room.type === 'balcony' ? '#6b6b6b' : '#2c2c2c'))} 
+                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : (room.type === 'balcony' ? 2 : 3))} 
+                        dash={room.type === 'balcony' && !room.openWalls?.includes('left') ? [6, 4] : undefined}
                         hitStrokeWidth={25}
                         onClick={(e) => {
                           e.cancelBubble = true;
@@ -531,10 +568,22 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                         onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = 'default'}
                       />
                       {/* Right Wall */}
+                      {room.type === 'balcony' && !room.openWalls?.includes('right') && (() => {
+                        const balusterCount = Math.max(2, Math.floor(rh / (scale * 1.5)));
+                        const spacing = rh / (balusterCount + 1);
+                        return (
+                          <Group>
+                            {Array.from({ length: balusterCount }).map((_, i) => (
+                              <Line key={`br-${i}`} points={[rw - 3, (i + 1) * spacing, rw + 1, (i + 1) * spacing]} stroke={isSelected ? '#2563eb' : '#5a5a5a'} strokeWidth={1.5} />
+                            ))}
+                          </Group>
+                        );
+                      })()}
                       <Line 
                         points={[rw, 0, rw, rh]} 
-                        stroke={room.openWalls?.includes('right') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
-                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+                        stroke={room.openWalls?.includes('right') ? 'transparent' : (isSelected ? '#2563eb' : (room.type === 'balcony' ? '#6b6b6b' : '#2c2c2c'))} 
+                        strokeWidth={isSelected ? 4 : (isWallMode ? 6 : (room.type === 'balcony' ? 2 : 3))} 
+                        dash={room.type === 'balcony' && !room.openWalls?.includes('right') ? [6, 4] : undefined}
                         hitStrokeWidth={25}
                         onClick={(e) => {
                           e.cancelBubble = true;
@@ -576,6 +625,15 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                         <Line key={`hatch-${i}`}
                           points={[Math.min(i * scale, rw), Math.max(0, i * scale - rw), Math.max(0, i * scale - rh), Math.min(i * scale, rh)]}
                           stroke="hsl(120, 30%, 50%)" strokeWidth={0.5} />
+                      ))}
+                    </Group>
+                  )}
+                  {room.type === 'balcony' && (
+                    <Group opacity={0.3}>
+                      {Array.from({ length: Math.ceil((rw + rh) / (scale)) }).map((_, i) => (
+                        <Line key={`balhatch-${i}`}
+                          points={[Math.min(i * scale, rw), Math.max(0, i * scale - rw), Math.max(0, i * scale - rh), Math.min(i * scale, rh)]}
+                          stroke="hsl(0, 0%, 50%)" strokeWidth={0.5} />
                       ))}
                     </Group>
                   )}
@@ -773,7 +831,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
             }}
             className="flex h-8 items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase text-emerald-700 hover:bg-emerald-50 transition-colors"
           >
-            <Plus size={12} /> Add Wall
+            <Plus size={12} /> {(() => { const r = plan.rooms.find(r => r.id === wallPopup.roomId); return r?.type === 'balcony' ? 'Add Handrail' : 'Add Wall'; })()}
           </button>
           <div className="h-px w-full bg-border" />
           <button
@@ -825,7 +883,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
             }}
             className="flex h-8 items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase text-red-600 hover:bg-red-50 transition-colors"
           >
-            <Trash2 size={12} /> Remove Wall
+            <Trash2 size={12} /> {(() => { const r = plan.rooms.find(r => r.id === wallPopup.roomId); return r?.type === 'balcony' ? 'Remove Handrail' : 'Remove Wall'; })()}
           </button>
         </div>
       )}

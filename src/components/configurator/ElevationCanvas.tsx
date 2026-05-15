@@ -744,6 +744,97 @@ const GardenArea = ({ room: r, W, D, isNight, mainDoorPos }: { room: any, W: num
   );
 };
 
+/* ─── Balcony ─── */
+const Balcony3D = ({ room, W, D, offsetX = 0, offsetZ = 0, isNight, floorY = 0 }: { room: any, W: number, D: number, offsetX?: number, offsetZ?: number, isNight: boolean, floorY?: number }) => {
+  const cx = round2(offsetX + room.x + room.w / 2 - W / 2);
+  const cz = round2(offsetZ + room.y + room.h / 2 - D / 2);
+
+  const tileTextures = useMemo(() => ({
+    map: createTileTexture(4, 4),
+    normal: createTileNormal(4, 4),
+    rough: createTileRoughness(4, 4),
+  }), []);
+
+  const openWalls = room.openWalls || [];
+  const rH = 3.2; // railing height
+  const postR = 0.05; // steel post radius
+  const rw = room.w;
+  const rh = room.h;
+
+  return (
+    <group position={[cx, floorY, cz]}>
+      {/* Floor Slab */}
+      <mesh receiveShadow position={[0, 0.01, 0]}>
+        <boxGeometry args={[rw, 0.25, rh]} />
+        <meshStandardMaterial
+          color="#d0d0c0"
+          map={tileTextures.map}
+          normalMap={tileTextures.normal}
+          normalScale={new THREE.Vector2(0.3, 0.3)}
+          roughnessMap={tileTextures.rough}
+          roughness={0.6}
+          metalness={0.1}
+          envMapIntensity={0.8}
+        />
+      </mesh>
+      
+      {/* Furniture */}
+      {room.furniture?.map((f: any, fi: number) => {
+        const fx = f.x + (f.w || 1) / 2 - rw / 2;
+        const fz = f.y + (f.h || 1) / 2 - rh / 2;
+        return (
+          <group key={`f-${fi}`} position={[fx, 0.13, fz]} rotation={[0, f.rotation ? f.rotation * Math.PI / 180 : 0, 0]}>
+            <Furniture3D item={f} isNight={isNight} />
+          </group>
+        );
+      })}
+
+      {/* Railings */}
+      {['top', 'bottom', 'left', 'right'].map((wallDir) => {
+        if (openWalls.includes(wallDir)) return null;
+        
+        const isHorizontal = wallDir === 'top' || wallDir === 'bottom';
+        const len = isHorizontal ? rw : rh;
+        const xPos = wallDir === 'left' ? -rw/2 : wallDir === 'right' ? rw/2 : 0;
+        const zPos = wallDir === 'top' ? -rh/2 : wallDir === 'bottom' ? rh/2 : 0;
+        const rotY = isHorizontal ? 0 : Math.PI / 2;
+
+        return (
+          <group key={wallDir} position={[xPos, 0.13, zPos]} rotation={[0, rotY, 0]}>
+            {/* Base Upstand */}
+            <mesh position={[0, 0.25, 0]} castShadow>
+              <boxGeometry args={[len, 0.5, 0.2]} />
+              <meshStandardMaterial color="#e0e0e0" roughness={0.8} />
+            </mesh>
+            
+            {/* Glass Panel */}
+            <mesh position={[0, 0.5 + (rH - 0.5)/2, 0]}>
+              <boxGeometry args={[len - 0.2, rH - 0.5 - 0.12, 0.05]} />
+              <meshPhysicalMaterial color="#a0c0d0" transmission={0.95} opacity={1} transparent roughness={0.1} metalness={0.1} clearcoat={1} side={THREE.DoubleSide} />
+            </mesh>
+
+            {/* Handrail on top */}
+            <mesh position={[0, rH - 0.06, 0]}>
+              <boxGeometry args={[len, 0.12, 0.15]} />
+              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+            </mesh>
+
+            {/* Steel Posts */}
+            <mesh position={[-len/2 + 0.1, rH/2, 0]}>
+              <cylinderGeometry args={[postR, postR, rH, 8]} />
+              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+            </mesh>
+            <mesh position={[len/2 - 0.1, rH/2, 0]}>
+              <cylinderGeometry args={[postR, postR, rH, 8]} />
+              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+};
+
 /* ─── Main House Component ─── */
 const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hideRoof = false, plotW, plotD, isDoubleStorey = false }: {
   plan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons: AddOn[]; isNight?: boolean; hideRoof?: boolean; plotW: number; plotD: number; isDoubleStorey?: boolean;
@@ -1042,6 +1133,11 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
             </group>
           );
         })}
+
+        {/* Balconies */}
+        {(plan.rooms || []).filter(r => r.type === 'balcony').map((r) => (
+          <Balcony3D key={`balcony-${r.id}`} room={r} W={W} D={D} isNight={!!isNight} floorY={0} />
+        ))}
 
         {/* Interior Walls */}
         {extractedWalls.map((wall, i) => {
@@ -2649,6 +2745,11 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
             </mesh>
           );
         })}
+
+      {/* Balcony floors/railings for upper level */}
+      {(firstFloorPlan?.rooms || []).filter(r => r.type === 'balcony').map(r => (
+        <Balcony3D key={`balcony-ff-${r.id}`} room={r} W={firstFloorPlan.width} D={firstFloorPlan.height} offsetX={(plan.width - firstFloorPlan.width)/2} offsetZ={(plan.height - firstFloorPlan.height)/2} isNight={false} floorY={0} />
+      ))}
 
       <group position={[upperOffsetX, 0.8, upperOffsetZ]}>
         {/* Room floors & ceilings */}

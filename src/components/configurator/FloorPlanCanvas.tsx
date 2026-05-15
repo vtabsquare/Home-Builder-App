@@ -230,7 +230,10 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
             title="Toggle Wall Removal Mode - Click a wall to add/remove it"
           >
             <Maximize size={14} className={isWallMode ? 'text-white' : 'text-clay'} />
-            {isWallMode ? 'Exit Wall Mode' : 'Add/Remove Wall'}
+            {isWallMode ? 'Exit Wall Mode' : (() => {
+              const selRoom = (localPlan.rooms || []).find(r => r.id === selectedRoomId);
+              return selRoom?.type === 'balcony' ? 'Add/Remove Handrail' : 'Add/Remove Wall';
+            })()}
           </button>
           <div className="h-6 w-px bg-border" />
           <button
@@ -300,18 +303,57 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
               }}
               onWallToggle={(wall: string) => {
                 if (!advanced) return;
+                const sourceRoom = room;
+                const isAdding = !(sourceRoom.openWalls || []).includes(wall as any);
+
                 const updatedRooms = (localPlan.rooms || []).map(r => {
-                  if (r.id === room.id) {
+                  // Toggle the clicked room's wall
+                  if (r.id === sourceRoom.id) {
                     const openWalls = r.openWalls || [];
                     const newOpenWalls = openWalls.includes(wall as any)
                       ? openWalls.filter(w => w !== wall)
                       : [...openWalls, wall as any];
                     return { ...r, openWalls: newOpenWalls };
                   }
+
+                  // Also toggle the corresponding wall on the adjacent room
+                  let targetWall: string | null = null;
+                  if (wall === 'top' && Math.abs((r.y + r.h) - sourceRoom.y) < 1) {
+                    if (Math.max(r.x, sourceRoom.x) < Math.min(r.x + r.w, sourceRoom.x + sourceRoom.w) - 0.1) {
+                      targetWall = 'bottom';
+                    }
+                  } else if (wall === 'bottom' && Math.abs(r.y - (sourceRoom.y + sourceRoom.h)) < 1) {
+                    if (Math.max(r.x, sourceRoom.x) < Math.min(r.x + r.w, sourceRoom.x + sourceRoom.w) - 0.1) {
+                      targetWall = 'top';
+                    }
+                  } else if (wall === 'left' && Math.abs((r.x + r.w) - sourceRoom.x) < 1) {
+                    if (Math.max(r.y, sourceRoom.y) < Math.min(r.y + r.h, sourceRoom.y + sourceRoom.h) - 0.1) {
+                      targetWall = 'right';
+                    }
+                  } else if (wall === 'right' && Math.abs(r.x - (sourceRoom.x + sourceRoom.w)) < 1) {
+                    if (Math.max(r.y, sourceRoom.y) < Math.min(r.y + r.h, sourceRoom.y + sourceRoom.h) - 0.1) {
+                      targetWall = 'left';
+                    }
+                  }
+
+                  if (targetWall) {
+                    const openWalls = r.openWalls || [];
+                    if (isAdding) {
+                      // Adding open wall: add to adjacent room too
+                      if (!openWalls.includes(targetWall as any)) {
+                        return { ...r, openWalls: [...openWalls, targetWall as any] };
+                      }
+                    } else {
+                      // Removing open wall: remove from adjacent room too
+                      return { ...r, openWalls: openWalls.filter(w => w !== targetWall) };
+                    }
+                  }
+
                   return r;
                 });
                 commitLocalPlan({ ...localPlan, rooms: updatedRooms });
               }}
+              onRotate={() => handleRotateRoom(room.id)}
               innerRef={(node: any) => {
                 if (node) roomRefs.current[room.id] = node;
               }}
@@ -695,7 +737,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
             }}
             className="flex h-8 items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase text-emerald-700 hover:bg-emerald-50 transition-colors"
           >
-            <Plus size={12} /> Add Wall
+            <Plus size={12} /> {(() => { const r = (localPlanRef.current.rooms || []).find(r => r.id === wallPopup.roomId); return r?.type === 'balcony' ? 'Add Handrail' : 'Add Wall'; })()}
           </button>
           <div className="h-px w-full bg-border" />
           <button
@@ -744,7 +786,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
             }}
             className="flex h-8 items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase text-red-600 hover:bg-red-50 transition-colors"
           >
-            <Trash2 size={12} /> Remove Wall
+            <Trash2 size={12} /> {(() => { const r = (localPlanRef.current.rooms || []).find(r => r.id === wallPopup.roomId); return r?.type === 'balcony' ? 'Remove Handrail' : 'Remove Wall'; })()}
           </button>
         </div>
       )}
@@ -753,11 +795,12 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
 };
 
 /* ─── Room Shape ─── */
-const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPointerDown, onTransformEnd, onWallToggle, innerRef, isWallMode, isSelected, setWallPopup }: any) => {
+const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPointerDown, onTransformEnd, onWallToggle, onRotate, innerRef, isWallMode, isSelected, setWallPopup }: any) => {
   const rx = offsetX + room.x * scale;
   const ry = offsetY + room.y * scale;
   const rw = room.w * scale;
   const rh = room.h * scale;
+  const isStaircase = room.type === 'staircase' || (room.type === 'hallway' && (room.label || '').toLowerCase().includes('staircase'));
 
   const isRooftop = room.id.startsWith('addon-solar') || room.id.startsWith('addon-tank');
   const isFence = room.id === 'addon-fence';
@@ -781,14 +824,26 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
         stroke={(isRooftop || isFence) ? (isFence ? '#4a6741' : 'rgba(0,0,0,0.4)') : undefined}
         strokeWidth={(isRooftop || isFence) ? (isFence ? 4 : 1) : 0}
       />
-      {/* Explicitly draw individual walls to support open floor plans */}
+      {/* Explicitly draw individual walls / handrails to support open floor plans */}
       {!isRooftop && !isFence && !isTree && (
         <>
           {/* Top Wall */}
+          {room.type === 'balcony' && !room.openWalls?.includes('top') && (() => {
+            const balusterCount = Math.max(2, Math.floor(rw / (scale * 1.5)));
+            const spacing = rw / (balusterCount + 1);
+            return (
+              <Group>
+                {Array.from({ length: balusterCount }).map((_, i) => (
+                  <Line key={`bt-${i}`} points={[(i + 1) * spacing, -1, (i + 1) * spacing, 3]} stroke={isSelected ? '#2563eb' : '#5a5a5a'} strokeWidth={1.5} />
+                ))}
+              </Group>
+            );
+          })()}
           <Line 
             points={[0, 0, rw, 0]} 
-            stroke={room.openWalls?.includes('top') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
-            strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+            stroke={room.openWalls?.includes('top') ? 'transparent' : (isSelected ? '#2563eb' : (room.type === 'balcony' ? '#6b6b6b' : '#2c2c2c'))} 
+            strokeWidth={isSelected ? 4 : (isWallMode ? 6 : (room.type === 'balcony' ? 2 : 3))} 
+            dash={room.type === 'balcony' && !room.openWalls?.includes('top') ? [6, 4] : undefined}
             hitStrokeWidth={25}
             onClick={(e: any) => {
               e.cancelBubble = true;
@@ -808,10 +863,22 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
             }}
           />
           {/* Bottom Wall */}
+          {room.type === 'balcony' && !room.openWalls?.includes('bottom') && (() => {
+            const balusterCount = Math.max(2, Math.floor(rw / (scale * 1.5)));
+            const spacing = rw / (balusterCount + 1);
+            return (
+              <Group>
+                {Array.from({ length: balusterCount }).map((_, i) => (
+                  <Line key={`bb-${i}`} points={[(i + 1) * spacing, rh - 3, (i + 1) * spacing, rh + 1]} stroke={isSelected ? '#2563eb' : '#5a5a5a'} strokeWidth={1.5} />
+                ))}
+              </Group>
+            );
+          })()}
           <Line 
             points={[0, rh, rw, rh]} 
-            stroke={room.openWalls?.includes('bottom') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
-            strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+            stroke={room.openWalls?.includes('bottom') ? 'transparent' : (isSelected ? '#2563eb' : (room.type === 'balcony' ? '#6b6b6b' : '#2c2c2c'))} 
+            strokeWidth={isSelected ? 4 : (isWallMode ? 6 : (room.type === 'balcony' ? 2 : 3))} 
+            dash={room.type === 'balcony' && !room.openWalls?.includes('bottom') ? [6, 4] : undefined}
             hitStrokeWidth={25}
             onClick={(e: any) => {
               e.cancelBubble = true;
@@ -831,10 +898,22 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
             }}
           />
           {/* Left Wall */}
+          {room.type === 'balcony' && !room.openWalls?.includes('left') && (() => {
+            const balusterCount = Math.max(2, Math.floor(rh / (scale * 1.5)));
+            const spacing = rh / (balusterCount + 1);
+            return (
+              <Group>
+                {Array.from({ length: balusterCount }).map((_, i) => (
+                  <Line key={`bl-${i}`} points={[-1, (i + 1) * spacing, 3, (i + 1) * spacing]} stroke={isSelected ? '#2563eb' : '#5a5a5a'} strokeWidth={1.5} />
+                ))}
+              </Group>
+            );
+          })()}
           <Line 
             points={[0, 0, 0, rh]} 
-            stroke={room.openWalls?.includes('left') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
-            strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+            stroke={room.openWalls?.includes('left') ? 'transparent' : (isSelected ? '#2563eb' : (room.type === 'balcony' ? '#6b6b6b' : '#2c2c2c'))} 
+            strokeWidth={isSelected ? 4 : (isWallMode ? 6 : (room.type === 'balcony' ? 2 : 3))} 
+            dash={room.type === 'balcony' && !room.openWalls?.includes('left') ? [6, 4] : undefined}
             hitStrokeWidth={25}
             onClick={(e: any) => {
               e.cancelBubble = true;
@@ -854,10 +933,22 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
             }}
           />
           {/* Right Wall */}
+          {room.type === 'balcony' && !room.openWalls?.includes('right') && (() => {
+            const balusterCount = Math.max(2, Math.floor(rh / (scale * 1.5)));
+            const spacing = rh / (balusterCount + 1);
+            return (
+              <Group>
+                {Array.from({ length: balusterCount }).map((_, i) => (
+                  <Line key={`br-${i}`} points={[rw - 3, (i + 1) * spacing, rw + 1, (i + 1) * spacing]} stroke={isSelected ? '#2563eb' : '#5a5a5a'} strokeWidth={1.5} />
+                ))}
+              </Group>
+            );
+          })()}
           <Line 
             points={[rw, 0, rw, rh]} 
-            stroke={room.openWalls?.includes('right') ? 'transparent' : (isSelected ? '#2563eb' : "#2c2c2c")} 
-            strokeWidth={isSelected ? 4 : (isWallMode ? 6 : 3)} 
+            stroke={room.openWalls?.includes('right') ? 'transparent' : (isSelected ? '#2563eb' : (room.type === 'balcony' ? '#6b6b6b' : '#2c2c2c'))} 
+            strokeWidth={isSelected ? 4 : (isWallMode ? 6 : (room.type === 'balcony' ? 2 : 3))} 
+            dash={room.type === 'balcony' && !room.openWalls?.includes('right') ? [6, 4] : undefined}
             hitStrokeWidth={25}
             onClick={(e: any) => {
               e.cancelBubble = true;
@@ -913,6 +1004,61 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
               points={[Math.min(i * scale, rw), Math.max(0, i * scale - rw), Math.max(0, i * scale - rh), Math.min(i * scale, rh)]}
               stroke="hsl(120, 35%, 45%)" strokeWidth={0.8} />
           ))}
+        </Group>
+      )}
+      {/* Staircase step lines with orientation */}
+      {(room.type === 'staircase' || (room.type === 'hallway' && (room.label || '').toLowerCase().includes('staircase'))) && (() => {
+        const orient = room.orientation || 0;
+        const isVertical = orient === 0 || orient === 2; // steps go up/down
+        const stepCount = isVertical ? Math.max(3, Math.floor(rh / (scale * 1.2))) : Math.max(3, Math.floor(rw / (scale * 1.2)));
+        const stepSpacing = isVertical ? rh / stepCount : rw / stepCount;
+        const arrowSize = Math.min(rw, rh) * 0.18;
+
+        return (
+          <Group opacity={0.35}>
+            {/* Step lines */}
+            {Array.from({ length: stepCount - 1 }).map((_, i) => {
+              const pos = (i + 1) * stepSpacing;
+              return isVertical ? (
+                <Line key={`step-${i}`} points={[2, pos, rw - 2, pos]} stroke="#444" strokeWidth={1.5} />
+              ) : (
+                <Line key={`step-${i}`} points={[pos, 2, pos, rh - 2]} stroke="#444" strokeWidth={1.5} />
+              );
+            })}
+            {/* Direction arrow */}
+            {orient === 0 && ( // Up
+              <Line points={[rw / 2, arrowSize * 0.5, rw / 2 - arrowSize, arrowSize * 1.8, rw / 2 + arrowSize, arrowSize * 1.8]}
+                fill="#333" closed stroke="#333" strokeWidth={1} />
+            )}
+            {orient === 2 && ( // Down
+              <Line points={[rw / 2, rh - arrowSize * 0.5, rw / 2 - arrowSize, rh - arrowSize * 1.8, rw / 2 + arrowSize, rh - arrowSize * 1.8]}
+                fill="#333" closed stroke="#333" strokeWidth={1} />
+            )}
+            {orient === 1 && ( // Right
+              <Line points={[rw - arrowSize * 0.5, rh / 2, rw - arrowSize * 1.8, rh / 2 - arrowSize, rw - arrowSize * 1.8, rh / 2 + arrowSize]}
+                fill="#333" closed stroke="#333" strokeWidth={1} />
+            )}
+            {orient === 3 && ( // Left
+              <Line points={[arrowSize * 0.5, rh / 2, arrowSize * 1.8, rh / 2 - arrowSize, arrowSize * 1.8, rh / 2 + arrowSize]}
+                fill="#333" closed stroke="#333" strokeWidth={1} />
+            )}
+          </Group>
+        );
+      })()}
+      {/* Rotate button for staircase rooms */}
+      {isStaircase && (
+        <Group
+          x={rw - 20}
+          y={4}
+          onClick={(e: any) => {
+            e.cancelBubble = true;
+            onRotate?.();
+          }}
+          onMouseEnter={(e: any) => e.target.getStage()!.container().style.cursor = 'pointer'}
+          onMouseLeave={(e: any) => e.target.getStage()!.container().style.cursor = 'default'}
+        >
+          <Rect width={16} height={16} fill="#2563eb" cornerRadius={8} shadowBlur={4} shadowOpacity={0.3} shadowOffsetY={1} />
+          <Text x={2} y={1} text="⟲" fontSize={12} fill="white" fontStyle="bold" />
         </Group>
       )}
     </Group>
