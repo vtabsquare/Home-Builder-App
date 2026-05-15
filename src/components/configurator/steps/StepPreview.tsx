@@ -1,5 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getElevationLookupKeys, getElevationPresetKey, getFamilyDoubleStoreyPackageKey, useConfig, RoofType, Material } from '@/store/configurator';
+import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getElevationLookupKeys, getElevationPresetKey, getFamilyDoubleStoreyPackageKey, useConfig, RoofType, Material, KitchenType } from '@/store/configurator';
+import { useKitchenMeta } from '@/hooks/PricingContext';
+import { formatMoney } from '@/lib/cost';
 import { StepShell } from '../StepShell';
 import { FloorPlanCanvas } from '../FloorPlanCanvas';
 import { ElevationCanvas } from '../ElevationCanvas';
@@ -52,7 +54,8 @@ function getRoomTabs(plan: Plan): RoomTab[] {
 }
 
 export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
-  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset, presetOverrides, elevationImages, addElevationImage, removeElevationImage } = useConfig();
+  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, setKitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset, presetOverrides, elevationImages, addElevationImage, removeElevationImage } = useConfig();
+  const KITCHEN_META = useKitchenMeta();
   const isCustomPreset = presetId === -1;
   const [view, setView] = useState<'2d' | '3d' | 'elevation'>('2d');
   const [advanced, setAdvanced] = useState(false);
@@ -627,26 +630,69 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 className="overflow-hidden border-t border-border pt-6"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  {/* Left Column: Room Addition */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">Add Structural Elements</span>
+                  {/* Left Column: Room Addition + Kitchen Type */}
+                  <div className="space-y-8">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">Add Structural Elements</span>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        {ROOM_BLOCKS.map((block) => {
+                          const Icon = block.icon;
+                          return (
+                            <button
+                              key={block.label}
+                              onClick={() => handleAddRoom(block.type)}
+                              className="flex h-11 items-center gap-3 rounded-xl px-4 text-[10px] font-bold uppercase tracking-[0.2em] border border-border bg-white hover:bg-soft-section hover:shadow-soft transition-all active:scale-95 group"
+                              style={{ borderLeftColor: block.color, borderLeftWidth: 3 }}
+                            >
+                              <Icon size={16} strokeWidth={1.25} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+                              {block.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-3">
-                      {ROOM_BLOCKS.map((block) => {
-                        const Icon = block.icon;
-                        return (
-                          <button
-                            key={block.label}
-                            onClick={() => handleAddRoom(block.type)}
-                            className="flex h-11 items-center gap-3 rounded-xl px-4 text-[10px] font-bold uppercase tracking-[0.2em] border border-border bg-white hover:bg-soft-section hover:shadow-soft transition-all active:scale-95 group"
-                            style={{ borderLeftColor: block.color, borderLeftWidth: 3 }}
-                          >
-                            <Icon size={16} strokeWidth={1.25} className="text-muted-foreground group-hover:text-foreground transition-colors" />
-                            {block.label}
-                          </button>
-                        );
-                      })}
+
+                    {/* Kitchen Type Selector */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CookingPot size={14} strokeWidth={1.5} className="text-muted-foreground/40" />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">Kitchen Layout</span>
+                      </div>
+                      <div className="flex gap-3">
+                        {([
+                          { id: 'standard' as KitchenType, label: 'Standard', desc: 'Closed kitchen' },
+                          { id: 'open' as KitchenType, label: 'Open Plan', desc: 'Merged layout' },
+                          { id: 'galley' as KitchenType, label: 'Galley', desc: 'Two-wall compact' },
+                        ]).map((k) => {
+                          const active = kitchen === k.id;
+                          const kitchenMeta = KITCHEN_META[k.id];
+                          return (
+                            <button
+                              key={k.id}
+                              onClick={() => {
+                                setKitchen(k.id);
+                                setStagedPlan(null);
+                              }}
+                              className={`group relative flex-1 overflow-hidden rounded-xl p-4 text-left transition-all duration-500 border ${
+                                active
+                                  ? 'bg-surface shadow-elev border-clay/30 scale-[1.02]'
+                                  : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className={`font-display font-medium tracking-tight text-[11px] uppercase ${active ? 'text-foreground' : 'text-foreground/70'}`}>{k.label}</span>
+                                <div className="flex items-center gap-2">
+                                  {kitchenMeta && <span className="text-[9px] font-bold uppercase tracking-widest text-clay num">+{formatMoney(kitchenMeta.cost)}</span>}
+                                  {active && <div className="h-1.5 w-1.5 rounded-full bg-clay" />}
+                                </div>
+                              </div>
+                              <p className="text-[9px] text-muted-foreground leading-relaxed font-light">{k.desc}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
 
