@@ -232,85 +232,121 @@ const PottedPlant = ({ position, scale = 1 }: { position: [number, number, numbe
   );
 };
 
-const Staircase3D = ({ w, h, floorHeight, isNight }: { w: number, h: number, floorHeight: number, isNight: boolean }) => {
+const Staircase3D = ({ w: roomW, h: roomH, floorHeight, isNight, orientation = 0, isMirrored = false }: { w: number, h: number, floorHeight: number, isNight: boolean, orientation?: number, isMirrored?: boolean }) => {
   const marbleTextures = useMemo(() => ({
     map: createMarbleTexture(1, 1),
     roughness: createMarbleRoughness(1, 1),
   }), []);
 
-  const stepCount = 18;
-  const stepH = floorHeight / stepCount;
-  const stepL = h / stepCount;
+  // If orientation is 1 or 3 (90 or 270 deg), the model is rotated.
+  // To fit the same room bounds, we must swap the local width and depth.
+  const w = (orientation % 2 === 0) ? roomW : roomH;
+  const h = (orientation % 2 === 0) ? roomH : roomW;
+
+  const firstFlightCount = 9;
+  const secondFlightCount = 9;
+  const stepH = floorHeight / (firstFlightCount + secondFlightCount);
+  const landingSize = Math.min(w, h) * 0.45;
   
   // Railing constants
-  const rH = 3.2; // railing height above each step
-  const postR = 0.06; // steel post radius
+  const rH = 3.2; 
+  const postR = 0.06;
 
   return (
-    <group>
-      {/* === STEPS === */}
-      {Array.from({ length: stepCount }).map((_, i) => (
-        <group key={`step-${i}`} position={[0, i * stepH + stepH/2, h/2 - i * stepL - stepL/2]}>
-          <mesh castShadow receiveShadow>
-            <boxGeometry args={[w, 0.35, stepL]} />
-            <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
-          </mesh>
-          <mesh position={[0, -stepH/2, 0]}>
-            <boxGeometry args={[w - 0.2, stepH, 0.1]} />
-            <meshStandardMaterial color="#d0d0d0" roughness={0.4} />
-          </mesh>
-          {isNight && i % 3 === 0 && <pointLight position={[0, -0.2, 0]} intensity={0.4} distance={3} color="#fff5e0" />}
-        </group>
-      ))}
-
-      {/* === RAILINGS === */}
-      {/* Left side railing */}
-      {Array.from({ length: stepCount }).map((_, i) => {
-        const stepTop = (i + 1) * stepH;
+    <group rotation={[0, -orientation * Math.PI / 2, 0]} scale={[isMirrored ? -1 : 1, 1, 1]}>
+      {/* Flight 1 (Along Z axis, leading to landing) */}
+      {Array.from({ length: firstFlightCount }).map((_, i) => {
+        const stepW = landingSize;
+        const stepL = (h - landingSize) / firstFlightCount;
+        const posX = -w/2 + landingSize/2;
+        const posZ = h/2 - i * stepL - stepL/2;
+        const posY = i * stepH + stepH/2;
         return (
-          <group key={`r-left-${i}`} position={[-w/2 + 0.1, stepTop + rH/2, h/2 - i * stepL - stepL/2]}>
-            <mesh position={[0, rH/2, 0]}>
-              <boxGeometry args={[0.12, 0.12, stepL + 0.02]} />
-              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+          <group key={`f1-step-${i}`} position={[posX, posY, posZ]}>
+            <mesh castShadow receiveShadow>
+              <boxGeometry args={[stepW, 0.35, stepL]} />
+              <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
             </mesh>
-          </group>
-        );
-      })}
-      {/* Right side railing */}
-      {Array.from({ length: stepCount }).map((_, i) => {
-        const stepTop = (i + 1) * stepH;
-        return (
-          <group key={`r-right-${i}`} position={[w/2 - 0.1, stepTop + rH/2, h/2 - i * stepL - stepL/2]}>
-            <mesh position={[0, rH/2, 0]}>
-              <boxGeometry args={[0.12, 0.12, stepL + 0.02]} />
-              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+            <mesh position={[0, -stepH/2, 0]}>
+              <boxGeometry args={[stepW - 0.2, stepH, 0.1]} />
+              <meshStandardMaterial color="#d0d0d0" roughness={0.4} />
             </mesh>
+            {isNight && i % 3 === 0 && <pointLight position={[0, -0.2, 0]} intensity={0.4} distance={3} color="#fff5e0" />}
           </group>
         );
       })}
 
-      {/* Steel posts at start and end for left */}
+      {/* Landing */}
+      <group position={[-w/2 + landingSize/2, firstFlightCount * stepH + 0.1, -h/2 + landingSize/2]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[landingSize, 0.35, landingSize]} />
+          <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
+        </mesh>
+        <mesh position={[0, -stepH, 0]}>
+          <boxGeometry args={[landingSize - 0.2, stepH * 2, landingSize - 0.2]} />
+          <meshStandardMaterial color="#c0c0c0" roughness={0.5} />
+        </mesh>
+      </group>
+
+      {/* Flight 2 (Along X axis, leaving landing) */}
+      {Array.from({ length: secondFlightCount }).map((_, i) => {
+        const stepW = (w - landingSize) / secondFlightCount;
+        const stepL = landingSize;
+        const posX = -w/2 + landingSize + i * stepW + stepW/2;
+        const posZ = -h/2 + landingSize/2;
+        const posY = (firstFlightCount + i) * stepH + stepH/2;
+        return (
+          <group key={`f2-step-${i}`} position={[posX, posY, posZ]}>
+            <mesh castShadow receiveShadow>
+              <boxGeometry args={[stepW, 0.35, stepL]} />
+              <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
+            </mesh>
+            <mesh rotation={[0, Math.PI/2, 0]} position={[0, -stepH/2, 0]}>
+              <boxGeometry args={[stepL - 0.2, stepH, 0.1]} />
+              <meshStandardMaterial color="#d0d0d0" roughness={0.4} />
+            </mesh>
+            {isNight && i % 3 === 0 && <pointLight position={[0, -0.2, 0]} intensity={0.4} distance={3} color="#fff5e0" />}
+          </group>
+        );
+      })}
+
+      {/* Railings */}
+      {/* Flight 1 Outer */}
+      {Array.from({ length: firstFlightCount }).map((_, i) => {
+        const stepL = (h - landingSize) / firstFlightCount;
+        const posY = (i + 1) * stepH + rH;
+        return (
+          <mesh key={`f1-r-out-${i}`} position={[-w/2 + 0.1, posY, h/2 - i * stepL - stepL/2]}>
+            <boxGeometry args={[0.1, 0.1, stepL + 0.1]} />
+            <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.1} />
+          </mesh>
+        );
+      })}
+      {/* Flight 2 Outer */}
+      {Array.from({ length: secondFlightCount }).map((_, i) => {
+        const stepW = (w - landingSize) / secondFlightCount;
+        const posY = (firstFlightCount + i + 1) * stepH + rH;
+        return (
+          <mesh key={`f2-r-out-${i}`} position={[-w/2 + landingSize + i * stepW + stepW/2, posY, -h/2 + 0.1]}>
+            <boxGeometry args={[stepW + 0.1, 0.1, 0.1]} />
+            <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.1} />
+          </mesh>
+        );
+      })}
+
+      {/* Railing Posts */}
       <mesh position={[-w/2 + 0.1, rH/2, h/2]}>
         <cylinderGeometry args={[postR, postR, rH + stepH, 8]} />
         <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
       </mesh>
-      <mesh position={[-w/2 + 0.1, floorHeight + rH/2, -h/2]}>
-        <cylinderGeometry args={[postR, postR, rH, 8]} />
-        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
-      </mesh>
-      
-      {/* Steel posts at start and end for right */}
-      <mesh position={[w/2 - 0.1, rH/2, h/2]}>
-        <cylinderGeometry args={[postR, postR, rH + stepH, 8]} />
-        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
-      </mesh>
-      <mesh position={[w/2 - 0.1, floorHeight + rH/2, -h/2]}>
+      <mesh position={[w/2 - 0.1, floorHeight + rH/2, -h/2 + 0.1]}>
         <cylinderGeometry args={[postR, postR, rH, 8]} />
         <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
       </mesh>
     </group>
   );
 };
+
 
 const BlackStonePathway = ({ doorPos, plotW, plotD }: { doorPos: { x: number, z: number, nx: number, nz: number }, plotW: number, plotD: number }) => {
   const marbleTextures = useMemo(() => ({
@@ -1064,7 +1100,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
               {/* Staircase Model */}
               {isStaircaseRoom(r) && (
                 <group position={[cx, 0.02, cz]}>
-                  <Staircase3D w={r.w} h={r.h} floorHeight={wallH} isNight={isNight} />
+                  <Staircase3D w={r.w} h={r.h} floorHeight={wallH} isNight={isNight} orientation={r.orientation || 0} isMirrored={r.isMirrored} />
                 </group>
               )}
             </group>

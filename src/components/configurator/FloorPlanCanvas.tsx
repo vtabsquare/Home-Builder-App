@@ -111,17 +111,22 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
   };
 
   const handleRotateRoom = (id: string) => {
-    const updated: Plan = {
-      ...localPlan,
-      rooms: (localPlan.rooms || []).map((r) => {
-        if (r.id !== id) return r;
-        const newOrient = ((r.orientation || 0) + 1) % 4;
-        const newRoom = { ...r, orientation: newOrient };
-        newRoom.furniture = regenerateFurniture(newRoom, config.kitchen);
-        return newRoom;
-      }),
-    };
-    commitLocalPlan(updated);
+    const updatedRooms = (localPlan.rooms || []).map(r => {
+      if (r.id !== id) return r;
+      const newOrient = ((r.orientation || 0) + 1) % 4;
+      const newRoom = { ...r, orientation: newOrient };
+      newRoom.furniture = regenerateFurniture(newRoom, config.kitchen);
+      return newRoom;
+    });
+    commitLocalPlan({ ...localPlan, rooms: updatedRooms });
+  };
+
+  const handleMirrorRoom = (id: string) => {
+    const updatedRooms = (localPlan.rooms || []).map(r => {
+      if (r.id !== id) return r;
+      return { ...r, isMirrored: !r.isMirrored };
+    });
+    commitLocalPlan({ ...localPlan, rooms: updatedRooms });
   };
 
   const handleAddDoor = (roomId: string) => {
@@ -354,6 +359,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
                 commitLocalPlan({ ...localPlan, rooms: updatedRooms });
               }}
               onRotate={() => handleRotateRoom(room.id)}
+              onMirror={() => handleMirrorRoom(room.id)}
               innerRef={(node: any) => {
                 if (node) roomRefs.current[room.id] = node;
               }}
@@ -795,12 +801,13 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
 };
 
 /* ─── Room Shape ─── */
-const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPointerDown, onTransformEnd, onWallToggle, onRotate, innerRef, isWallMode, isSelected, setWallPopup }: any) => {
+const RoomShape = ({ room, scale, offsetX, offsetY, isSelected, onClick, onRotate, onMirror, draggable, onDragEnd, onContext, onFurnitureUpdate, showLabels = true, onPointerDown, onTransformEnd, innerRef, isWallMode, setWallPopup, onWallToggle }: any) => {
   const rx = offsetX + room.x * scale;
   const ry = offsetY + room.y * scale;
   const rw = room.w * scale;
   const rh = room.h * scale;
-  const isStaircase = room.type === 'staircase' || (room.type === 'hallway' && (room.label || '').toLowerCase().includes('staircase'));
+  const isStaircase = room.type === 'staircase' || (room.label || '').toLowerCase().includes('staircase');
+  const isMirrored = room.isMirrored || false;
 
   const isRooftop = room.id.startsWith('addon-solar') || room.id.startsWith('addon-tank');
   const isFence = room.id === 'addon-fence';
@@ -813,6 +820,8 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
       onDragEnd={onDragEnd}
       onPointerDown={onPointerDown}
       onTransformEnd={onTransformEnd}
+      onClick={onClick}
+      onContextMenu={onContext}
       ref={innerRef}
     >
       <Rect 
@@ -990,68 +999,119 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
       )}
       {(room.type === 'balcony' || room.type === 'carport') && (
         <Group opacity={0.3}>
-          {Array.from({ length: Math.ceil((rw + rh) / (scale)) }).map((_, i) => (
+          {Array.from({ length: Math.ceil((rw + rh) / (scale * 2)) }).map((_, i) => (
             <Line key={`hatch-${i}`}
-              points={[Math.min(i * scale, rw), Math.max(0, i * scale - rw), Math.max(0, i * scale - rh), Math.min(i * scale, rh)]}
+              points={[Math.min(i * scale * 2, rw), Math.max(0, i * scale * 2 - rw), Math.max(0, i * scale * 2 - rh), Math.min(i * scale * 2, rh)]}
               stroke="hsl(0, 0%, 50%)" strokeWidth={0.5} />
           ))}
         </Group>
       )}
       {room.type === 'garden' && (
         <Group opacity={0.25}>
-          {Array.from({ length: Math.ceil((rw + rh) / (scale)) }).map((_, i) => (
+          {Array.from({ length: Math.ceil((rw + rh) / (scale * 2)) }).map((_, i) => (
             <Line key={`ghatch-${i}`}
-              points={[Math.min(i * scale, rw), Math.max(0, i * scale - rw), Math.max(0, i * scale - rh), Math.min(i * scale, rh)]}
+              points={[Math.min(i * scale * 2, rw), Math.max(0, i * scale * 2 - rw), Math.max(0, i * scale * 2 - rh), Math.min(i * scale * 2, rh)]}
               stroke="hsl(120, 35%, 45%)" strokeWidth={0.8} />
           ))}
         </Group>
       )}
-      {/* Staircase step lines with orientation */}
+      {/* Staircase L-Shape Visualization */}
       {isStaircase && (() => {
         const orient = room.orientation || 0;
-        const isVertical = orient === 0 || orient === 2; // steps go up/down
-        const stepCount = 18;
-        const stepSpacing = isVertical ? rh / stepCount : rw / stepCount;
+        const landingSize = Math.min(rw, rh) * 0.45;
+        const firstFlightSteps = 9;
+        const secondFlightSteps = 9;
         
         return (
-          <Group opacity={0.6}>
-            {/* Step lines */}
-            {Array.from({ length: stepCount - 1 }).map((_, i) => {
-              const pos = (i + 1) * stepSpacing;
-              return isVertical ? (
-                <Line key={`step-${i}`} points={[0, pos, rw, pos]} stroke="#333" strokeWidth={1} />
-              ) : (
-                <Line key={`step-${i}`} points={[pos, 0, pos, rh]} stroke="#333" strokeWidth={1} />
-              );
-            })}
-            
-            {/* Center spine arrow indicating UP direction */}
+          <Group opacity={0.6} scaleX={isMirrored ? -1 : 1} x={isMirrored ? rw : 0}>
+            {/* Landing */}
             {(() => {
-              const startPad = isVertical ? rh * 0.1 : rw * 0.1;
-              const endPad = isVertical ? rh * 0.8 : rw * 0.8;
-              const arrowHeadSize = 8;
+              let lx = 0, ly = 0;
+              if (orient === 0) { lx = 0; ly = 0; } // Top-left
+              else if (orient === 1) { lx = rw - landingSize; ly = 0; } // Top-right
+              else if (orient === 2) { lx = rw - landingSize; ly = rh - landingSize; } // Bottom-right
+              else if (orient === 3) { lx = 0; ly = rh - landingSize; } // Bottom-left
               
-              let points = [];
+              return <Rect x={lx} y={ly} width={landingSize} height={landingSize} stroke="#333" strokeWidth={1} fill="rgba(0,0,0,0.05)" />;
+            })()}
+
+            {/* Flight 1 & 2 Steps */}
+            {(() => {
+              const items = [];
+              if (orient === 0) {
+                const f1H = rh - landingSize;
+                const f1StepH = f1H / firstFlightSteps;
+                for (let i = 1; i < firstFlightSteps; i++) {
+                  items.push(<Line key={`f1-${i}`} points={[0, rh - i * f1StepH, landingSize, rh - i * f1StepH]} stroke="#333" strokeWidth={1} />);
+                }
+                const f2W = rw - landingSize;
+                const f2StepW = f2W / secondFlightSteps;
+                for (let i = 1; i < secondFlightSteps; i++) {
+                  items.push(<Line key={`f2-${i}`} points={[landingSize + i * f2StepW, 0, landingSize + i * f2StepW, landingSize]} stroke="#333" strokeWidth={1} />);
+                }
+              } else if (orient === 1) {
+                const f1W = rw - landingSize;
+                const f1StepW = f1W / firstFlightSteps;
+                for (let i = 1; i < firstFlightSteps; i++) {
+                  items.push(<Line key={`f1-${i}`} points={[i * f1StepW, 0, i * f1StepW, landingSize]} stroke="#333" strokeWidth={1} />);
+                }
+                const f2H = rh - landingSize;
+                const f2StepH = f2H / secondFlightSteps;
+                for (let i = 1; i < secondFlightSteps; i++) {
+                  items.push(<Line key={`f2-${i}`} points={[rw - landingSize, landingSize + i * f2StepH, rw, landingSize + i * f2StepH]} stroke="#333" strokeWidth={1} />);
+                }
+              } else if (orient === 2) {
+                const f1H = rh - landingSize;
+                const f1StepH = f1H / firstFlightSteps;
+                for (let i = 1; i < firstFlightSteps; i++) {
+                  items.push(<Line key={`f1-${i}`} points={[rw - landingSize, i * f1StepH, rw, i * f1StepH]} stroke="#333" strokeWidth={1} />);
+                }
+                const f2W = rw - landingSize;
+                const f2StepW = f2W / secondFlightSteps;
+                for (let i = 1; i < secondFlightSteps; i++) {
+                  items.push(<Line key={`f2-${i}`} points={[rw - landingSize - i * f2StepW, rh - landingSize, rw - landingSize - i * f2StepW, rh]} stroke="#333" strokeWidth={1} />);
+                }
+              } else if (orient === 3) {
+                const f1W = rw - landingSize;
+                const f1StepW = f1W / firstFlightSteps;
+                for (let i = 1; i < firstFlightSteps; i++) {
+                  items.push(<Line key={`f1-${i}`} points={[rw - i * f1StepW, rh - landingSize, rw - i * f1StepW, rh]} stroke="#333" strokeWidth={1} />);
+                }
+                const f2H = rh - landingSize;
+                const f2StepH = f2H / secondFlightSteps;
+                for (let i = 1; i < secondFlightSteps; i++) {
+                  items.push(<Line key={`f2-${i}`} points={[0, rh - landingSize - i * f2StepH, landingSize, rh - landingSize - i * f2StepH]} stroke="#333" strokeWidth={1} />);
+                }
+              }
+              return items;
+            })()}
+            
+            {/* Directional Path Arrow */}
+            {(() => {
+              const arrowHeadSize = 6;
+              let pathPoints = [];
               let arrowPoints = [];
-              if (orient === 0) { // Up
-                points = [rw / 2, rh - startPad, rw / 2, rh - endPad];
-                arrowPoints = [rw / 2 - arrowHeadSize/2, rh - endPad + arrowHeadSize, rw / 2, rh - endPad, rw / 2 + arrowHeadSize/2, rh - endPad + arrowHeadSize];
-              } else if (orient === 2) { // Down
-                points = [rw / 2, startPad, rw / 2, endPad];
-                arrowPoints = [rw / 2 - arrowHeadSize/2, endPad - arrowHeadSize, rw / 2, endPad, rw / 2 + arrowHeadSize/2, endPad - arrowHeadSize];
-              } else if (orient === 1) { // Right
-                points = [startPad, rh / 2, endPad, rh / 2];
-                arrowPoints = [endPad - arrowHeadSize, rh / 2 - arrowHeadSize/2, endPad, rh / 2, endPad - arrowHeadSize, rh / 2 + arrowHeadSize/2];
-              } else if (orient === 3) { // Left
-                points = [rw - startPad, rh / 2, rw - endPad, rh / 2];
-                arrowPoints = [rw - endPad + arrowHeadSize, rh / 2 - arrowHeadSize/2, rw - endPad, rh / 2, rw - endPad + arrowHeadSize, rh / 2 + arrowHeadSize/2];
+              const mid = landingSize / 2;
+              
+              if (orient === 0) {
+                pathPoints = [mid, rh - 4, mid, mid, rw - 4, mid];
+                arrowPoints = [rw - 4 - arrowHeadSize, mid - arrowHeadSize/2, rw - 4, mid, rw - 4 - arrowHeadSize, mid + arrowHeadSize/2];
+              } else if (orient === 1) {
+                pathPoints = [4, mid, rw - mid, mid, rw - mid, rh - 4];
+                arrowPoints = [rw - mid - arrowHeadSize/2, rh - 4 - arrowHeadSize, rw - mid, rh - 4, rw - mid + arrowHeadSize/2, rh - 4 - arrowHeadSize];
+              } else if (orient === 2) {
+                pathPoints = [rw - mid, 4, rw - mid, rh - mid, 4, rh - mid];
+                arrowPoints = [4 + arrowHeadSize, rh - mid - arrowHeadSize/2, 4, rh - mid, 4 + arrowHeadSize, rh - mid + arrowHeadSize/2];
+              } else if (orient === 3) {
+                pathPoints = [rw - 4, rh - mid, mid, rh - mid, mid, 4];
+                arrowPoints = [mid - arrowHeadSize/2, 4 + arrowHeadSize, mid, 4, mid + arrowHeadSize/2, 4 + arrowHeadSize];
               }
               
               return (
-                <Group>
-                  <Circle x={points[0]} y={points[1]} radius={3} fill="#111" />
-                  <Line points={points} stroke="#111" strokeWidth={2} />
-                  <Line points={arrowPoints} stroke="#111" strokeWidth={2} />
+                <Group opacity={0.8}>
+                  <Circle x={pathPoints[0]} y={pathPoints[1]} radius={2.5} fill="#333" />
+                  <Line points={pathPoints} stroke="#333" strokeWidth={1.5} tension={0.2} />
+                  <Line points={arrowPoints} stroke="#333" strokeWidth={1.5} />
                 </Group>
               );
             })()}
@@ -1059,20 +1119,20 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
         );
       })()}
       
-      {/* Rotate button for staircase rooms (Visible in Advanced Mode) */}
+      {/* Floating Action Button (Specific for Staircase: Mirror) */}
       {isStaircase && draggable && (
         <Group
           x={rw / 2 - 12}
           y={rh / 2 - 12}
-          onClick={(e: any) => {
+          onPointerDown={(e: any) => {
             e.cancelBubble = true;
-            onRotate?.();
+            onMirror?.();
           }}
           onMouseEnter={(e: any) => e.target.getStage()!.container().style.cursor = 'pointer'}
           onMouseLeave={(e: any) => e.target.getStage()!.container().style.cursor = 'default'}
         >
-          <Circle x={12} y={12} radius={14} fill="rgba(255,255,255,0.9)" shadowBlur={4} shadowOpacity={0.2} shadowOffsetY={1} />
-          <Text x={6} y={6} text="⟲" fontSize={16} fill="#2563eb" fontStyle="bold" />
+          <Circle x={12} y={12} radius={14} fill="rgba(255,255,255,0.95)" shadowBlur={6} shadowOpacity={0.25} shadowOffsetY={2} />
+          <Text x={6} y={7} text="⇄" fontSize={16} fill="#2563eb" fontStyle="bold" />
         </Group>
       )}
     </Group>

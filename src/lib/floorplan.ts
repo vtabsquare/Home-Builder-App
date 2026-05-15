@@ -42,7 +42,9 @@ export interface Room {
   doors: DoorInfo[];
   windows: WindowInfo[];
   orientation?: number; // 0: Top, 1: Right, 2: Bottom, 3: Left
+  isMirrored?: boolean;
   openWalls?: ('top' | 'bottom' | 'left' | 'right')[];
+  kitchenType?: 'standard' | 'open' | 'galley';
 }
 
 export interface Plan {
@@ -77,7 +79,7 @@ export function regenerateFurniture(room: Room, kitchenType: string = 'open'): F
       const isMasterBath = room.id === 'bath-attached-bed-0';
       return bathroomFurniture(room.w, room.h, isMasterBath, orient);
     case 'kitchen':
-      return kitchenFurniture(room.w, room.h, kitchenType, orient);
+      return kitchenFurniture(room.w, room.h, room.kitchenType || kitchenType, orient);
     case 'living':
       return livingFurniture(room.w, room.h, orient);
     case 'dining':

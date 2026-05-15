@@ -13,13 +13,15 @@ interface Props {
 }
 
 // Room block templates
-export const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaultW: number; defaultH: number; color: string }[] = [
+export const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaultW: number; defaultH: number; color: string; kitchenType?: Room['kitchenType'] }[] = [
   { type: 'bedroom', label: 'Bedroom', icon: BedDouble, defaultW: 12, defaultH: 10, color: 'hsl(33 35% 82%)' },
   { type: 'living', label: 'Hall/Living', icon: Sofa, defaultW: 16, defaultH: 14, color: 'hsl(40 30% 87%)' },
   { type: 'hallway', label: 'Hallway', icon: Move, defaultW: 10, defaultH: 4, color: 'hsl(38 20% 88%)' },
   { type: 'staircase', label: 'Staircase', icon: Waypoints, defaultW: 10, defaultH: 8, color: 'hsl(38 20% 88%)' },
   { type: 'bathroom', label: 'Bathroom', icon: Bath, defaultW: 7, defaultH: 7, color: 'hsl(200 30% 82%)' },
-  { type: 'kitchen', label: 'Kitchen', icon: CookingPot, defaultW: 12, defaultH: 10, color: 'hsl(28 38% 72%)' },
+  { type: 'kitchen', label: 'Standard Kitchen', icon: CookingPot, defaultW: 12, defaultH: 10, color: 'hsl(28 38% 72%)', kitchenType: 'standard' },
+  { type: 'kitchen', label: 'Open Kitchen', icon: CookingPot, defaultW: 12, defaultH: 10, color: 'hsl(28 38% 72%)', kitchenType: 'open' },
+  { type: 'kitchen', label: 'Galley Kitchen', icon: CookingPot, defaultW: 12, defaultH: 10, color: 'hsl(28 38% 72%)', kitchenType: 'galley' },
   { type: 'dining', label: 'Dining', icon: UtensilsCrossed, defaultW: 10, defaultH: 10, color: 'hsl(36 28% 82%)' },
   { type: 'balcony', label: 'Balcony', icon: Fence, defaultW: 12, defaultH: 4, color: 'hsl(120 18% 78%)' },
   { type: 'carport', label: 'Carport', icon: Car, defaultW: 12, defaultH: 14, color: 'hsl(0 0% 82%)' },
@@ -109,10 +111,11 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
     setStagePos(newPos);
   }, []);
 
-  const addRoom = (blockType: Room['type']) => {
-    const block = ROOM_BLOCKS.find(b => b.type === blockType);
+  const addRoom = (blockIndex: number) => {
+    const block = ROOM_BLOCKS[blockIndex];
     if (!block) return;
 
+    const blockType = block.type;
     const id = `custom-${blockType}-${roomCounter}`;
     setRoomCounter(prev => prev + 1);
 
@@ -122,7 +125,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
       label = existingCount === 0 ? 'MASTER BEDROOM' : `BEDROOM ${existingCount + 1}`;
     } else if (blockType === 'staircase') {
       label = existingCount === 0 ? 'STAIRCASE' : `STAIRCASE ${existingCount + 1}`;
-    } else if (existingCount > 0) {
+    } else if (existingCount > 0 && !block.kitchenType) {
       label = `${block.label.toUpperCase()} ${existingCount + 1}`;
     }
 
@@ -139,6 +142,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
       w: Math.min(block.defaultW, plan.width),
       h: Math.min(block.defaultH, plan.height),
       color: block.color,
+      kitchenType: block.kitchenType,
       furniture: regenerateFurniture({
         id,
         type: blockType,
@@ -151,6 +155,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
         furniture: [],
         doors: [],
         windows: [],
+        kitchenType: block.kitchenType,
       }, config.kitchen),
       doors: [],
       windows: [],
@@ -178,6 +183,17 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
         const newRoom = { ...r, orientation: newOrient };
         newRoom.furniture = regenerateFurniture(newRoom, config.kitchen);
         return newRoom;
+      }),
+    };
+    setPlan(updated);
+    onChange?.(updated);
+  };
+  const mirrorRoom = (id: string) => {
+    const updated: Plan = {
+      ...plan,
+      rooms: plan.rooms.map(r => {
+        if (r.id !== id) return r;
+        return { ...r, isMirrored: !r.isMirrored };
       }),
     };
     setPlan(updated);
@@ -323,12 +339,12 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
         <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mr-2">
           Add Room:
         </div>
-        {ROOM_BLOCKS.map((block) => {
+        {ROOM_BLOCKS.map((block, idx) => {
           const Icon = block.icon;
           return (
             <button
-              key={block.type}
-              onClick={() => addRoom(block.type)}
+              key={`${block.type}-${idx}`}
+              onClick={() => addRoom(idx)}
               className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider border border-border hover:bg-surface hover:border-clay/40 transition-all active:scale-95 shadow-sm"
               style={{ borderLeftColor: block.color, borderLeftWidth: 3 }}
             >
@@ -394,8 +410,9 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
           }}
           draggable
         >
-          {/* Grid */}
+          {/* Background: Grid & Boundary */}
           <Layer listening={false}>
+            {/* Grid */}
             {Array.from({ length: plan.width + 1 }).map((_, i) => (
               <Line
                 key={`v-${i}`}
@@ -412,10 +429,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                 strokeWidth={i % 5 === 0 ? 1 : 0.5}
               />
             ))}
-          </Layer>
-
-          {/* Boundary rectangle */}
-          <Layer listening={false}>
+            {/* Boundary rectangle */}
             <Rect
               x={offsetX}
               y={offsetY}
@@ -647,25 +661,183 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                     </Group>
                   )}
 
-                  {/* Staircase step lines with orientation */}
+                  {/* Staircase L-Shape Visualization */}
                   {(room.type === 'staircase' || (room.type === 'hallway' && (room.label || '').toLowerCase().includes('staircase'))) && (() => {
                     const orient = room.orientation || 0;
-                    const isVert = orient === 0 || orient === 2;
-                    const stepCount = isVert ? Math.max(3, Math.floor(rh / (scale * 1.2))) : Math.max(3, Math.floor(rw / (scale * 1.2)));
-                    const stepSpacing = isVert ? rh / stepCount : rw / stepCount;
-                    const arrowSz = Math.min(rw, rh) * 0.18;
+                    const landingSize = Math.min(rw, rh) * 0.45;
+                    const firstFlightSteps = 9;
+                    const secondFlightSteps = 9;
+                    const isMirrored = room.isMirrored || false;
+                    
                     return (
                       <Group opacity={0.35}>
-                        {Array.from({ length: stepCount - 1 }).map((_, i) => {
-                          const pos = (i + 1) * stepSpacing;
-                          return isVert
-                            ? <Line key={`step-${i}`} points={[2, pos, rw - 2, pos]} stroke="#444" strokeWidth={1.5} />
-                            : <Line key={`step-${i}`} points={[pos, 2, pos, rh - 2]} stroke="#444" strokeWidth={1.5} />;
-                        })}
-                        {orient === 0 && <Line points={[rw/2, arrowSz*0.5, rw/2-arrowSz, arrowSz*1.8, rw/2+arrowSz, arrowSz*1.8]} fill="#333" closed stroke="#333" strokeWidth={1} />}
-                        {orient === 2 && <Line points={[rw/2, rh-arrowSz*0.5, rw/2-arrowSz, rh-arrowSz*1.8, rw/2+arrowSz, rh-arrowSz*1.8]} fill="#333" closed stroke="#333" strokeWidth={1} />}
-                        {orient === 1 && <Line points={[rw-arrowSz*0.5, rh/2, rw-arrowSz*1.8, rh/2-arrowSz, rw-arrowSz*1.8, rh/2+arrowSz]} fill="#333" closed stroke="#333" strokeWidth={1} />}
-                        {orient === 3 && <Line points={[arrowSz*0.5, rh/2, arrowSz*1.8, rh/2-arrowSz, arrowSz*1.8, rh/2+arrowSz]} fill="#333" closed stroke="#333" strokeWidth={1} />}
+                        {/* Landing */}
+                        {(() => {
+                          let lx = 0, ly = 0;
+                          if (!isMirrored) {
+                            if (orient === 0) { lx = 0; ly = 0; }
+                            else if (orient === 1) { lx = rw - landingSize; ly = 0; }
+                            else if (orient === 2) { lx = rw - landingSize; ly = rh - landingSize; }
+                            else if (orient === 3) { lx = 0; ly = rh - landingSize; }
+                          } else {
+                            if (orient === 0) { lx = rw - landingSize; ly = 0; }
+                            else if (orient === 1) { lx = rw - landingSize; ly = rh - landingSize; }
+                            else if (orient === 2) { lx = 0; ly = rh - landingSize; }
+                            else if (orient === 3) { lx = 0; ly = 0; }
+                          }
+                          return <Rect x={lx} y={ly} width={landingSize} height={landingSize} stroke="#444" strokeWidth={1} />;
+                        })()}
+
+                        {/* Flights */}
+                        {(() => {
+                          const items = [];
+                          if (orient === 0) {
+                            if (!isMirrored) {
+                              const f1H = rh - landingSize;
+                              const f1StepH = f1H / firstFlightSteps;
+                              for (let i = 1; i < firstFlightSteps; i++) {
+                                items.push(<Line key={`f1-${i}`} points={[0, rh - i * f1StepH, landingSize, rh - i * f1StepH]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                              const f2W = rw - landingSize;
+                              const f2StepW = f2W / secondFlightSteps;
+                              for (let i = 1; i < secondFlightSteps; i++) {
+                                items.push(<Line key={`f2-${i}`} points={[landingSize + i * f2StepW, 0, landingSize + i * f2StepW, landingSize]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                            } else {
+                              const f1H = rh - landingSize;
+                              const f1StepH = f1H / firstFlightSteps;
+                              for (let i = 1; i < firstFlightSteps; i++) {
+                                items.push(<Line key={`f1-${i}`} points={[rw - landingSize, rh - i * f1StepH, rw, rh - i * f1StepH]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                              const f2W = rw - landingSize;
+                              const f2StepW = f2W / secondFlightSteps;
+                              for (let i = 1; i < secondFlightSteps; i++) {
+                                items.push(<Line key={`f2-${i}`} points={[rw - landingSize - i * f2StepW, 0, rw - landingSize - i * f2StepW, landingSize]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                            }
+                          } else if (orient === 1) {
+                            if (!isMirrored) {
+                              const f1W = rw - landingSize;
+                              const f1StepW = f1W / firstFlightSteps;
+                              for (let i = 1; i < firstFlightSteps; i++) {
+                                items.push(<Line key={`f1-${i}`} points={[i * f1StepW, 0, i * f1StepW, landingSize]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                              const f2H = rh - landingSize;
+                              const f2StepH = f2H / secondFlightSteps;
+                              for (let i = 1; i < secondFlightSteps; i++) {
+                                items.push(<Line key={`f2-${i}`} points={[rw - landingSize, landingSize + i * f2StepH, rw, landingSize + i * f2StepH]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                            } else {
+                              const f1W = rw - landingSize;
+                              const f1StepW = f1W / firstFlightSteps;
+                              for (let i = 1; i < firstFlightSteps; i++) {
+                                items.push(<Line key={`f1-${i}`} points={[i * f1StepW, rh - landingSize, i * f1StepW, rh]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                              const f2H = rh - landingSize;
+                              const f2StepH = f2H / secondFlightSteps;
+                              for (let i = 1; i < secondFlightSteps; i++) {
+                                items.push(<Line key={`f2-${i}`} points={[rw - landingSize, rh - landingSize - i * f2StepH, rw, rh - landingSize - i * f2StepH]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                            }
+                          } else if (orient === 2) {
+                            if (!isMirrored) {
+                              const f1H = rh - landingSize;
+                              const f1StepH = f1H / firstFlightSteps;
+                              for (let i = 1; i < firstFlightSteps; i++) {
+                                items.push(<Line key={`f1-${i}`} points={[rw - landingSize, i * f1StepH, rw, i * f1StepH]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                              const f2W = rw - landingSize;
+                              const f2StepW = f2W / secondFlightSteps;
+                              for (let i = 1; i < secondFlightSteps; i++) {
+                                items.push(<Line key={`f2-${i}`} points={[rw - landingSize - i * f2StepW, rh - landingSize, rw - landingSize - i * f2StepW, rh]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                            } else {
+                              const f1H = rh - landingSize;
+                              const f1StepH = f1H / firstFlightSteps;
+                              for (let i = 1; i < firstFlightSteps; i++) {
+                                items.push(<Line key={`f1-${i}`} points={[0, i * f1StepH, landingSize, i * f1StepH]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                              const f2W = rw - landingSize;
+                              const f2StepW = f2W / secondFlightSteps;
+                              for (let i = 1; i < secondFlightSteps; i++) {
+                                items.push(<Line key={`f2-${i}`} points={[landingSize + i * f2StepW, rh - landingSize, landingSize + i * f2StepW, rh]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                            }
+                          } else if (orient === 3) {
+                            if (!isMirrored) {
+                              const f1W = rw - landingSize;
+                              const f1StepW = f1W / firstFlightSteps;
+                              for (let i = 1; i < firstFlightSteps; i++) {
+                                items.push(<Line key={`f1-${i}`} points={[rw - i * f1StepW, rh - landingSize, rw - i * f1StepW, rh]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                              const f2H = rh - landingSize;
+                              const f2StepH = f2H / secondFlightSteps;
+                              for (let i = 1; i < secondFlightSteps; i++) {
+                                items.push(<Line key={`f2-${i}`} points={[0, rh - landingSize - i * f2StepH, landingSize, rh - landingSize - i * f2StepH]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                            } else {
+                              const f1W = rw - landingSize;
+                              const f1StepW = f1W / firstFlightSteps;
+                              for (let i = 1; i < firstFlightSteps; i++) {
+                                items.push(<Line key={`f1-${i}`} points={[rw - i * f1StepW, 0, rw - i * f1StepW, landingSize]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                              const f2H = rh - landingSize;
+                              const f2StepH = f2H / secondFlightSteps;
+                              for (let i = 1; i < secondFlightSteps; i++) {
+                                items.push(<Line key={`f2-${i}`} points={[0, landingSize + i * f2StepH, landingSize, landingSize + i * f2StepH]} stroke="#444" strokeWidth={1.5} />);
+                              }
+                            }
+                          }
+                          return items;
+                        })()}
+                        
+                        {/* Directional Path Arrow */}
+                        {(() => {
+                          const arrowHeadSize = 5;
+                          let pathPoints = [];
+                          let arrowPoints = [];
+                          const mid = landingSize / 2;
+                          if (orient === 0) {
+                            if (!isMirrored) {
+                              pathPoints = [mid, rh - 2, mid, mid, rw - 2, mid];
+                              arrowPoints = [rw - 2 - arrowHeadSize, mid - arrowHeadSize/2, rw - 2, mid, rw - 2 - arrowHeadSize, mid + arrowHeadSize/2];
+                            } else {
+                              pathPoints = [rw - mid, rh - 2, rw - mid, mid, 2, mid];
+                              arrowPoints = [2 + arrowHeadSize, mid - arrowHeadSize/2, 2, mid, 2 + arrowHeadSize, mid + arrowHeadSize/2];
+                            }
+                          } else if (orient === 1) {
+                            if (!isMirrored) {
+                              pathPoints = [2, mid, rw - mid, mid, rw - mid, rh - 2];
+                              arrowPoints = [rw - mid - arrowHeadSize/2, rh - 2 - arrowHeadSize, rw - mid, rh - 2, rw - mid + arrowHeadSize/2, rh - 2 - arrowHeadSize];
+                            } else {
+                              pathPoints = [2, rh - mid, rw - mid, rh - mid, rw - mid, 2];
+                              arrowPoints = [rw - mid - arrowHeadSize/2, 2 + arrowHeadSize, rw - mid, 2, rw - mid + arrowHeadSize/2, 2 + arrowHeadSize];
+                            }
+                          } else if (orient === 2) {
+                            if (!isMirrored) {
+                              pathPoints = [rw - mid, 2, rw - mid, rh - mid, 2, rh - mid];
+                              arrowPoints = [2 + arrowHeadSize, rh - mid - arrowHeadSize/2, 2, rh - mid, 2 + arrowHeadSize, rh - mid + arrowHeadSize/2];
+                            } else {
+                              pathPoints = [mid, 2, mid, rh - mid, rw - 2, rh - mid];
+                              arrowPoints = [rw - 2 - arrowHeadSize, rh - mid - arrowHeadSize/2, rw - 2, rh - mid, rw - 2 - arrowHeadSize, rh - mid + arrowHeadSize/2];
+                            }
+                          } else if (orient === 3) {
+                            if (!isMirrored) {
+                              pathPoints = [rw - 2, rh - mid, mid, rh - mid, mid, 2];
+                              arrowPoints = [mid - arrowHeadSize/2, 2 + arrowHeadSize, mid, 2, mid + arrowHeadSize/2, 2 + arrowHeadSize];
+                            } else {
+                              pathPoints = [rw - 2, mid, mid, mid, mid, rh - 2];
+                              arrowPoints = [mid - arrowHeadSize/2, rh - 2 - arrowHeadSize, mid, rh - 2, mid + arrowHeadSize/2, rh - 2 - arrowHeadSize];
+                            }
+                          }
+                          return (
+                            <Group opacity={0.6}>
+                              <Circle x={pathPoints[0]} y={pathPoints[1]} radius={2} fill="#333" />
+                              <Line points={pathPoints} stroke="#333" strokeWidth={1} tension={0.2} />
+                              <Line points={arrowPoints} stroke="#333" strokeWidth={1} />
+                            </Group>
+                          );
+                        })()}
                       </Group>
                     );
                   })()}
@@ -696,6 +868,23 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan }: 
                     width={rw}
                     y={rh / 2 + 5}
                   />
+
+                  {/* Staircase Mirror Toggle Button */}
+                  {(room.type === 'staircase' || (room.label || '').toLowerCase().includes('staircase')) && isSelected && (
+                    <Group
+                      x={rw / 2 - 12}
+                      y={rh / 2 - 12}
+                      onClick={(e: any) => {
+                        e.cancelBubble = true;
+                        mirrorRoom(room.id);
+                      }}
+                      onMouseEnter={(e: any) => e.target.getStage()!.container().style.cursor = 'pointer'}
+                      onMouseLeave={(e: any) => e.target.getStage()!.container().style.cursor = 'default'}
+                    >
+                      <Circle x={12} y={12} radius={14} fill="rgba(255,255,255,0.95)" shadowBlur={6} shadowOpacity={0.2} />
+                      <Text x={6} y={6} text="⟲" fontSize={16} fill="#2563eb" fontStyle="bold" />
+                    </Group>
+                  )}
 
                   {/* Move indicator */}
                   {isSelected && (

@@ -637,7 +637,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                         const Icon = block.icon;
                         return (
                           <button
-                            key={block.type}
+                            key={block.label}
                             onClick={() => handleAddRoom(block.type)}
                             className="flex h-11 items-center gap-3 rounded-xl px-4 text-[10px] font-bold uppercase tracking-[0.2em] border border-border bg-white hover:bg-soft-section hover:shadow-soft transition-all active:scale-95 group"
                             style={{ borderLeftColor: block.color, borderLeftWidth: 3 }}
@@ -864,6 +864,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                             doors: updatedR.doors,
                             windows: updatedR.windows,
                             orientation: updatedR.orientation,
+                            isMirrored: updatedR.isMirrored,
                             openWalls: updatedR.openWalls,
                             furniture: updatedR.furniture.length > 0 ? updatedR.furniture : r.furniture
                           };
