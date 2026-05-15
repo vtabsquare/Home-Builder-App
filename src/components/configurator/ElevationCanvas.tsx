@@ -239,79 +239,48 @@ const Staircase3D = ({ w, h, floorHeight, isNight }: { w: number, h: number, flo
   }), []);
 
   const stepCount = 18;
-  const flightStepCount = 8;
   const stepH = floorHeight / stepCount;
+  const stepL = h / stepCount;
   
-  const flightW = w * 0.45;
-  const landingD = Math.max(3, h * 0.25);
-  const flightL = h - landingD;
-  const stepL = flightL / flightStepCount;
-  const landingY = flightStepCount * stepH;
-
   // Railing constants
   const rH = 3.2; // railing height above each step
   const postR = 0.06; // steel post radius
-  const railR = 0.05; // handrail radius
-
-  // Flight 1: left side, going from front (z=h/2) towards back (z=h/2-flightL)
-  // Inner edge X = -w/2 + flightW
-  const f1InnerX = -w/2 + flightW;
-  // Flight 2: right side, going from back towards front
-  // Inner edge X = w/2 - flightW
-  const f2InnerX = w/2 - flightW;
 
   return (
     <group>
       {/* === STEPS === */}
-      {/* Flight 1 */}
-      {Array.from({ length: flightStepCount }).map((_, i) => (
-        <group key={`f1-${i}`} position={[-w/2 + flightW/2, i * stepH + stepH/2, h/2 - i * stepL - stepL/2]}>
+      {Array.from({ length: stepCount }).map((_, i) => (
+        <group key={`step-${i}`} position={[0, i * stepH + stepH/2, h/2 - i * stepL - stepL/2]}>
           <mesh castShadow receiveShadow>
-            <boxGeometry args={[flightW, 0.35, stepL]} />
+            <boxGeometry args={[w, 0.35, stepL]} />
             <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
           </mesh>
           <mesh position={[0, -stepH/2, 0]}>
-            <boxGeometry args={[flightW - 0.2, stepH, 0.1]} />
+            <boxGeometry args={[w - 0.2, stepH, 0.1]} />
             <meshStandardMaterial color="#d0d0d0" roughness={0.4} />
           </mesh>
-          {isNight && <pointLight position={[0, -0.2, 0]} intensity={0.4} distance={3} color="#fff5e0" />}
+          {isNight && i % 3 === 0 && <pointLight position={[0, -0.2, 0]} intensity={0.4} distance={3} color="#fff5e0" />}
         </group>
       ))}
 
-      {/* Landing */}
-      <group key="landing" position={[0, landingY + 0.175, -h/2 + landingD/2]}>
-        <mesh castShadow receiveShadow>
-          <boxGeometry args={[w, 0.35, landingD]} />
-          <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
-        </mesh>
-        {isNight && <pointLight position={[0, -0.2, 0]} intensity={0.8} distance={6} color="#fff5e0" />}
-      </group>
-
-      {/* Flight 2 */}
-      {Array.from({ length: flightStepCount }).map((_, i) => {
-        const stepY = (flightStepCount + 1 + i) * stepH;
+      {/* === RAILINGS === */}
+      {/* Left side railing */}
+      {Array.from({ length: stepCount }).map((_, i) => {
+        const stepTop = (i + 1) * stepH;
         return (
-          <group key={`f2-${i}`} position={[w/2 - flightW/2, stepY + stepH/2, -h/2 + landingD + i * stepL + stepL/2]}>
-            <mesh castShadow receiveShadow>
-              <boxGeometry args={[flightW, 0.35, stepL]} />
-              <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
+          <group key={`r-left-${i}`} position={[-w/2 + 0.1, stepTop + rH/2, h/2 - i * stepL - stepL/2]}>
+            <mesh position={[0, rH/2, 0]}>
+              <boxGeometry args={[0.12, 0.12, stepL + 0.02]} />
+              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
             </mesh>
-            <mesh position={[0, -stepH/2, 0]}>
-              <boxGeometry args={[flightW - 0.2, stepH, 0.1]} />
-              <meshStandardMaterial color="#d0d0d0" roughness={0.4} />
-            </mesh>
-            {isNight && <pointLight position={[0, -0.2, 0]} intensity={0.4} distance={3} color="#fff5e0" />}
           </group>
         );
       })}
-
-      {/* === GLASS RAILINGS === */}
-      {/* Flight 1 — per-step upright glass panels on inner edge */}
-      {Array.from({ length: flightStepCount }).map((_, i) => {
-        const stepTop = (i + 1) * stepH; // top of this step
+      {/* Right side railing */}
+      {Array.from({ length: stepCount }).map((_, i) => {
+        const stepTop = (i + 1) * stepH;
         return (
-          <group key={`r1-${i}`} position={[f1InnerX, stepTop + rH/2, h/2 - i * stepL - stepL/2]}>
-            {/* Handrail on top */}
+          <group key={`r-right-${i}`} position={[w/2 - 0.1, stepTop + rH/2, h/2 - i * stepL - stepL/2]}>
             <mesh position={[0, rH/2, 0]}>
               <boxGeometry args={[0.12, 0.12, stepL + 0.02]} />
               <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
@@ -320,54 +289,22 @@ const Staircase3D = ({ w, h, floorHeight, isNight }: { w: number, h: number, flo
         );
       })}
 
-      {/* Flight 1 — steel posts at start and end */}
-      <mesh position={[f1InnerX, rH/2, h/2]}>
+      {/* Steel posts at start and end for left */}
+      <mesh position={[-w/2 + 0.1, rH/2, h/2]}>
         <cylinderGeometry args={[postR, postR, rH + stepH, 8]} />
         <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
       </mesh>
-      <mesh position={[f1InnerX, landingY + rH/2, h/2 - flightL]}>
+      <mesh position={[-w/2 + 0.1, floorHeight + rH/2, -h/2]}>
         <cylinderGeometry args={[postR, postR, rH, 8]} />
         <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
       </mesh>
-
-      {/* Landing — glass railing along back edge */}
-      <group position={[0, landingY + 0.35 + rH/2, -h/2 + 0.1]}>
-        <mesh position={[0, rH/2, 0]}>
-          <boxGeometry args={[w - 0.4, 0.12, 0.12]} />
-          <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
-        </mesh>
-      </group>
-
-      {/* Landing — steel posts at corners */}
-      <mesh position={[-w/2 + 0.2, landingY + 0.35 + rH/2, -h/2 + 0.1]}>
-        <cylinderGeometry args={[postR, postR, rH, 8]} />
+      
+      {/* Steel posts at start and end for right */}
+      <mesh position={[w/2 - 0.1, rH/2, h/2]}>
+        <cylinderGeometry args={[postR, postR, rH + stepH, 8]} />
         <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
       </mesh>
-      <mesh position={[w/2 - 0.2, landingY + 0.35 + rH/2, -h/2 + 0.1]}>
-        <cylinderGeometry args={[postR, postR, rH, 8]} />
-        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
-      </mesh>
-
-      {/* Flight 2 — per-step upright glass panels on inner edge */}
-      {Array.from({ length: flightStepCount }).map((_, i) => {
-        const stepTop = (flightStepCount + 1 + i + 1) * stepH;
-        return (
-          <group key={`r2-${i}`} position={[f2InnerX, stepTop + rH/2, -h/2 + landingD + i * stepL + stepL/2]}>
-            {/* Handrail on top */}
-            <mesh position={[0, rH/2, 0]}>
-              <boxGeometry args={[0.12, 0.12, stepL + 0.02]} />
-              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
-            </mesh>
-          </group>
-        );
-      })}
-
-      {/* Flight 2 — steel posts at start and end */}
-      <mesh position={[f2InnerX, landingY + 0.35 + rH/2, -h/2 + landingD]}>
-        <cylinderGeometry args={[postR, postR, rH, 8]} />
-        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
-      </mesh>
-      <mesh position={[f2InnerX, floorHeight + rH/2, h/2]}>
+      <mesh position={[w/2 - 0.1, floorHeight + rH/2, -h/2]}>
         <cylinderGeometry args={[postR, postR, rH, 8]} />
         <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
       </mesh>

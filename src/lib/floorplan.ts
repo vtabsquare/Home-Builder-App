@@ -1089,10 +1089,11 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
     const sY = buildH / curH;
 
     rooms = baseRooms
-      // garden/carport/balcony zones from the original plan are dropped — the new
-      // reserved yard strips replace them. Doors/windows use 0..1 wall positions
-      // so they stay aligned after scaling.
-      .filter((r) => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony')
+      .filter((r) => {
+        // Drop existing exterior zones — they will be replaced by new reserved strips
+        if (r.type === 'garden' || r.type === 'carport' || r.type === 'balcony') return false;
+        return true;
+      })
       .map((r) => {
         const nx = Math.round(buildX + (r.x - minX) * sX);
         const ny = Math.round(buildY + (r.y - minY) * sY);
@@ -1109,7 +1110,12 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
         return newRoom;
       });
   } else {
-    rooms = [...baseRooms];
+    // If no reshape needed, still ensure we filter out unwanted hardcoded exterior types
+    rooms = baseRooms.filter((r) => {
+      if (r.type === 'carport' && !wantCarport) return false;
+      if (r.type === 'garden' && !wantTrees) return false;
+      return true;
+    });
   }
 
   // ── 3. Place reserved-strip add-ons inside the plan boundary ─────────
@@ -1455,12 +1461,11 @@ export function syncStructuralWalls(sourcePlan: Plan, targetPlan: Plan): Plan {
 
 // ── Double Storey Support ─────────────────────────────────────────
 
-function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standard', bedrooms: number = 3, bathrooms: number = 2): { ground: Plan; first: Plan } {
+function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standard', bedrooms: number = 3, bathrooms: number = 2, addons: string[] = []): { ground: Plan; first: Plan } {
   // Ground rules for blueprint scale mapping to a standard 40x40 dimension
   // W=40, H=40. Let's arrange them based on relative coordinates from the image.
   
-  // X: 0 to W
-  // Y: 0 to H
+  const wantCarport = addons.includes('carport');
   
   const gRooms: Room[] = [];
   
@@ -1595,42 +1600,73 @@ function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standar
   }
 
   // BOTTOM ROW (y: y2 to H)
-  gRooms.push({
-    id: 'gf-porch', type: 'carport', label: 'PORCH\n(CAR PARKING)',
-    x: 0, y: y2, w: x1, h: H - y2,
-    color: COLORS.carport,
-    furniture: [],
-    doors: [],
-    windows: []
-  });
+  const wantLandscaping = addons.includes('landscaping');
 
-  gRooms.push({
-    id: 'gf-sitout', type: 'balcony', label: 'SIT OUT',
-    x: x1, y: y2, w: x2 - x1, h: H - y2,
-    color: COLORS.balcony,
-    furniture: [
-       { type: 'plant', x: 1, y: 1, w: 2, h: 2 },
-       { type: 'plant', x: (x2 - x1) - 3, y: 1, w: 2, h: 2 }
-    ],
-    doors: [
-      { wall: 'left', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'gf-porch' }
-    ],
-    openWalls: ['bottom'], // Sit out is open to outside
-    windows: []
-  });
+  if (wantCarport) {
+    gRooms.push({
+      id: 'gf-porch', type: 'carport', label: 'PORCH\n(CAR PARKING)',
+      x: 0, y: y2, w: x1, h: H - y2,
+      color: COLORS.carport,
+      furniture: [],
+      doors: [],
+      windows: []
+    });
 
-  gRooms.push({
-    id: 'gf-living', type: 'living', label: 'LIVING',
-    x: x2, y: y2, w: W - x2, h: H - y2,
-    color: COLORS.living, // Ensures correct color
-    furniture: livingFurniture(W - x2, H - y2, 2),
-    doors: [
-      { wall: 'left', position: 0.5, width: 4, swing: 'in', doorType: 'standard', connectsTo: 'gf-sitout', label: 'MAIN DOOR' },
-      { wall: 'bottom', position: 0.8, width: 3.5, swing: 'in', doorType: 'standard', label: 'OUTSIDE ENTRY' } // Extra door for external access as requested
-    ],
-    openWalls: [],
-    windows: [{ wall: 'bottom', position: 0.3, width: 4 }, { wall: 'right', position: 0.5, width: 4 }]
-  });
+    gRooms.push({
+      id: 'gf-sitout', type: wantLandscaping ? 'garden' : 'balcony', 
+      label: wantLandscaping ? 'ENTRY GARDEN' : 'SIT OUT',
+      x: x1, y: y2, w: x2 - x1, h: H - y2,
+      color: wantLandscaping ? COLORS.garden : COLORS.balcony,
+      furniture: wantLandscaping 
+        ? gardenFurniture(x2 - x1, H - y2)
+        : [
+           { type: 'plant', x: 1, y: 1, w: 2, h: 2 },
+           { type: 'plant', x: (x2 - x1) - 3, y: 1, w: 2, h: 2 }
+        ],
+      doors: [
+        { wall: 'left', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'gf-porch' }
+      ],
+      openWalls: ['bottom'], 
+      windows: []
+    });
+
+    gRooms.push({
+      id: 'gf-living', type: 'living', label: 'LIVING',
+      x: x2, y: y2, w: W - x2, h: H - y2,
+      color: COLORS.living,
+      furniture: livingFurniture(W - x2, H - y2, 2),
+      doors: [
+        { wall: 'left', position: 0.5, width: 4, swing: 'in', doorType: 'standard', connectsTo: 'gf-sitout', label: 'MAIN DOOR' },
+        { wall: 'bottom', position: 0.8, width: 3.5, swing: 'in', doorType: 'standard', label: 'OUTSIDE ENTRY' }
+      ],
+      windows: [{ wall: 'bottom', position: 0.3, width: 4 }, { wall: 'right', position: 0.5, width: 4 }]
+    });
+  } else {
+    // No carport: Expand living and provide a nice front sitout / garden
+    const sitoutW = 8;
+    gRooms.push({
+      id: 'gf-sitout', type: wantLandscaping ? 'garden' : 'balcony', 
+      label: wantLandscaping ? 'FRONT GARDEN' : 'SIT OUT',
+      x: 0, y: y2, w: sitoutW, h: H - y2,
+      color: wantLandscaping ? COLORS.garden : COLORS.balcony,
+      furniture: wantLandscaping ? gardenFurniture(sitoutW, H - y2) : [{ type: 'plant', x: 1, y: 1, w: 2, h: 2 }],
+      doors: [],
+      openWalls: ['bottom', 'left'],
+      windows: []
+    });
+
+    gRooms.push({
+      id: 'gf-living', type: 'living', label: 'LIVING ROOM',
+      x: sitoutW, y: y2, w: W - sitoutW, h: H - y2,
+      color: COLORS.living,
+      furniture: livingFurniture(W - sitoutW, H - y2, 2),
+      doors: [
+        { wall: 'left', position: 0.5, width: 4, swing: 'in', doorType: 'standard', connectsTo: 'gf-sitout', label: 'MAIN DOOR' },
+        { wall: 'bottom', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard', label: 'FRONT ENTRY' }
+      ],
+      windows: [{ wall: 'bottom', position: 0.2, width: 4 }, { wall: 'bottom', position: 0.8, width: 4 }, { wall: 'right', position: 0.5, width: 4 }]
+    });
+  }
   
   injectAdjacencyDoors(gRooms);
   cleanupDoors(gRooms);
@@ -1646,12 +1682,14 @@ function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standar
   // FIRST FLOOR
   const fRooms: Room[] = [];
 
-  // Above porch: Open Terrace
+  // Above porch/garden: Open Terrace / Garden Terrace
   fRooms.push({
-    id: 'ff-open-terrace', type: 'balcony', label: 'OPEN TERRACE',
+    id: 'ff-open-terrace', 
+    type: 'balcony', 
+    label: wantLandscaping ? 'GARDEN TERRACE' : 'OPEN TERRACE',
     x: 0, y: y2, w: x1, h: H - y2,
-    color: COLORS.garden,
-    furniture: gardenFurniture(x1, H - y2),
+    color: wantLandscaping ? COLORS.garden : COLORS.balcony,
+    furniture: wantLandscaping ? gardenFurniture(x1, H - y2) : [],
     doors: [],
     windows: []
   });
@@ -1752,10 +1790,12 @@ function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standar
   });
 
   fRooms.push({
-    id: 'ff-rear-terrace', type: 'balcony', label: 'OPEN TERRACE',
+    id: 'ff-rear-terrace', 
+    type: 'balcony', 
+    label: 'OPEN TERRACE',
     x: x1 + bathW, y: 0, w: W - (x1 + bathW), h: bathH,
-    color: COLORS.garden,
-    furniture: gardenFurniture(W - (x1 + bathW), bathH),
+    color: wantLandscaping ? COLORS.garden : COLORS.balcony,
+    furniture: wantLandscaping ? gardenFurniture(W - (x1 + bathW), bathH) : [],
     doors: [
       { wall: 'bottom', position: 0.2, width: 3.5, swing: 'in', doorType: 'standard', connectsTo: 'ff-hallway' }
     ],
@@ -1767,10 +1807,12 @@ function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standar
   const terr2W = W - terr2X;
   if (terr2W > 0) {
     fRooms.push({
-      id: 'ff-rear-terrace-2', type: 'balcony', label: '',
+      id: 'ff-rear-terrace-2', 
+      type: 'balcony', 
+      label: '',
       x: terr2X, y: bathH, w: terr2W, h: y1 - bathH,
-      color: COLORS.garden,
-      furniture: gardenFurniture(terr2W, y1 - bathH),
+      color: wantLandscaping ? COLORS.garden : COLORS.balcony,
+      furniture: wantLandscaping ? gardenFurniture(terr2W, y1 - bathH) : [],
       doors: [],
       openWalls: ['top', 'right'],
       windows: []
@@ -1803,7 +1845,7 @@ export function splitPlanToFloors(
   let result: { ground: Plan; first: Plan };
 
   if (homeType === 'family') {
-    result = familyDoubleStorey(plan.width, plan.height, kitchen, bedrooms, bathrooms);
+    result = familyDoubleStorey(plan.width, plan.height, kitchen, bedrooms, bathrooms, addons);
   } else {
     result = _splitPlanGeneric(plan);
   }

@@ -1007,49 +1007,63 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
         </Group>
       )}
       {/* Staircase step lines with orientation */}
-      {(room.type === 'staircase' || (room.type === 'hallway' && (room.label || '').toLowerCase().includes('staircase'))) && (() => {
+      {isStaircase && (() => {
         const orient = room.orientation || 0;
         const isVertical = orient === 0 || orient === 2; // steps go up/down
-        const stepCount = isVertical ? Math.max(3, Math.floor(rh / (scale * 1.2))) : Math.max(3, Math.floor(rw / (scale * 1.2)));
+        const stepCount = 18;
         const stepSpacing = isVertical ? rh / stepCount : rw / stepCount;
-        const arrowSize = Math.min(rw, rh) * 0.18;
-
+        
         return (
-          <Group opacity={0.35}>
+          <Group opacity={0.6}>
             {/* Step lines */}
             {Array.from({ length: stepCount - 1 }).map((_, i) => {
               const pos = (i + 1) * stepSpacing;
               return isVertical ? (
-                <Line key={`step-${i}`} points={[2, pos, rw - 2, pos]} stroke="#444" strokeWidth={1.5} />
+                <Line key={`step-${i}`} points={[0, pos, rw, pos]} stroke="#333" strokeWidth={1} />
               ) : (
-                <Line key={`step-${i}`} points={[pos, 2, pos, rh - 2]} stroke="#444" strokeWidth={1.5} />
+                <Line key={`step-${i}`} points={[pos, 0, pos, rh]} stroke="#333" strokeWidth={1} />
               );
             })}
-            {/* Direction arrow */}
-            {orient === 0 && ( // Up
-              <Line points={[rw / 2, arrowSize * 0.5, rw / 2 - arrowSize, arrowSize * 1.8, rw / 2 + arrowSize, arrowSize * 1.8]}
-                fill="#333" closed stroke="#333" strokeWidth={1} />
-            )}
-            {orient === 2 && ( // Down
-              <Line points={[rw / 2, rh - arrowSize * 0.5, rw / 2 - arrowSize, rh - arrowSize * 1.8, rw / 2 + arrowSize, rh - arrowSize * 1.8]}
-                fill="#333" closed stroke="#333" strokeWidth={1} />
-            )}
-            {orient === 1 && ( // Right
-              <Line points={[rw - arrowSize * 0.5, rh / 2, rw - arrowSize * 1.8, rh / 2 - arrowSize, rw - arrowSize * 1.8, rh / 2 + arrowSize]}
-                fill="#333" closed stroke="#333" strokeWidth={1} />
-            )}
-            {orient === 3 && ( // Left
-              <Line points={[arrowSize * 0.5, rh / 2, arrowSize * 1.8, rh / 2 - arrowSize, arrowSize * 1.8, rh / 2 + arrowSize]}
-                fill="#333" closed stroke="#333" strokeWidth={1} />
-            )}
+            
+            {/* Center spine arrow indicating UP direction */}
+            {(() => {
+              const startPad = isVertical ? rh * 0.1 : rw * 0.1;
+              const endPad = isVertical ? rh * 0.8 : rw * 0.8;
+              const arrowHeadSize = 8;
+              
+              let points = [];
+              let arrowPoints = [];
+              if (orient === 0) { // Up
+                points = [rw / 2, rh - startPad, rw / 2, rh - endPad];
+                arrowPoints = [rw / 2 - arrowHeadSize/2, rh - endPad + arrowHeadSize, rw / 2, rh - endPad, rw / 2 + arrowHeadSize/2, rh - endPad + arrowHeadSize];
+              } else if (orient === 2) { // Down
+                points = [rw / 2, startPad, rw / 2, endPad];
+                arrowPoints = [rw / 2 - arrowHeadSize/2, endPad - arrowHeadSize, rw / 2, endPad, rw / 2 + arrowHeadSize/2, endPad - arrowHeadSize];
+              } else if (orient === 1) { // Right
+                points = [startPad, rh / 2, endPad, rh / 2];
+                arrowPoints = [endPad - arrowHeadSize, rh / 2 - arrowHeadSize/2, endPad, rh / 2, endPad - arrowHeadSize, rh / 2 + arrowHeadSize/2];
+              } else if (orient === 3) { // Left
+                points = [rw - startPad, rh / 2, rw - endPad, rh / 2];
+                arrowPoints = [rw - endPad + arrowHeadSize, rh / 2 - arrowHeadSize/2, rw - endPad, rh / 2, rw - endPad + arrowHeadSize, rh / 2 + arrowHeadSize/2];
+              }
+              
+              return (
+                <Group>
+                  <Circle x={points[0]} y={points[1]} radius={3} fill="#111" />
+                  <Line points={points} stroke="#111" strokeWidth={2} />
+                  <Line points={arrowPoints} stroke="#111" strokeWidth={2} />
+                </Group>
+              );
+            })()}
           </Group>
         );
       })()}
-      {/* Rotate button for staircase rooms */}
-      {isStaircase && (
+      
+      {/* Rotate button for staircase rooms (Visible in Advanced Mode) */}
+      {isStaircase && draggable && (
         <Group
-          x={rw - 20}
-          y={4}
+          x={rw / 2 - 12}
+          y={rh / 2 - 12}
           onClick={(e: any) => {
             e.cancelBubble = true;
             onRotate?.();
@@ -1057,8 +1071,8 @@ const RoomShape = ({ room, scale, offsetX, offsetY, draggable, onDragEnd, onPoin
           onMouseEnter={(e: any) => e.target.getStage()!.container().style.cursor = 'pointer'}
           onMouseLeave={(e: any) => e.target.getStage()!.container().style.cursor = 'default'}
         >
-          <Rect width={16} height={16} fill="#2563eb" cornerRadius={8} shadowBlur={4} shadowOpacity={0.3} shadowOffsetY={1} />
-          <Text x={2} y={1} text="⟲" fontSize={12} fill="white" fontStyle="bold" />
+          <Circle x={12} y={12} radius={14} fill="rgba(255,255,255,0.9)" shadowBlur={4} shadowOpacity={0.2} shadowOffsetY={1} />
+          <Text x={6} y={6} text="⟲" fontSize={16} fill="#2563eb" fontStyle="bold" />
         </Group>
       )}
     </Group>
