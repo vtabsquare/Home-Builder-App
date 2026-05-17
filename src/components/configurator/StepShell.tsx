@@ -69,34 +69,38 @@ export const StepShell = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="fixed bottom-12 left-0 right-0 z-[200] px-4 pointer-events-none"
+          className="fixed bottom-6 md:bottom-12 left-0 right-0 z-[200] px-4 pointer-events-none"
         >
-          <div className="mx-auto max-w-[1440px] w-full relative flex items-center justify-center min-h-[56px] pointer-events-none">
+          <div className="mx-auto max-w-[1440px] w-full relative flex items-center justify-center min-h-[56px] pointer-events-none gap-4">
             {/* Left-aligned Back button */}
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-auto">
+            <div className="md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2 pointer-events-auto">
               {!hidePrev && onPrev ? (
                 <button
                   onClick={onPrev}
-                  className="flex items-center gap-2 rounded-full border border-border bg-surface px-7 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground hover:bg-soft-section transition-all active:scale-[0.98] shadow-soft"
+                  className="flex items-center gap-2 rounded-full border border-border bg-surface px-4 md:px-7 py-3 md:py-3.5 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground hover:bg-soft-section transition-all active:scale-[0.98] shadow-soft whitespace-nowrap"
                 >
-                  <ArrowLeft size={14} /> Back
+                  <ArrowLeft size={14} /> <span className="hidden sm:inline">Back</span>
                 </button>
               ) : null}
             </div>
 
             {/* Centered Continue button */}
-            <div className="pointer-events-auto">
+            <div className="pointer-events-auto flex-1 md:flex-none flex justify-center">
               {onNext && (
                 <button
                   onClick={onNext}
                   disabled={nextDisabled}
-                  className="group relative flex items-center justify-center gap-4 rounded-full bg-primary text-primary-foreground h-14 min-w-[340px] px-12 text-[10px] font-bold uppercase tracking-[0.3em] shadow-lg transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-30 disabled:hover:brightness-100 disabled:active:scale-100"
+                  className="group relative flex items-center justify-center gap-4 rounded-full bg-primary text-primary-foreground h-12 md:h-14 w-full md:min-w-[340px] md:w-auto px-6 md:px-12 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] shadow-lg transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-30 disabled:hover:brightness-100 disabled:active:scale-100"
                 >
                   <span className="relative z-10">{nextLabel}</span>
                   <ArrowRight size={14} className="relative z-10 transition-transform group-hover:translate-x-1" />
                 </button>
               )}
             </div>
+
+            {/* Placeholder to balance the centered button on mobile if needed, 
+                but since we use flex gap and absolute positioning on desktop it's fine */}
+            {!hidePrev && onPrev && <div className="md:hidden w-0" />}
           </div>
         </motion.div>
       )}

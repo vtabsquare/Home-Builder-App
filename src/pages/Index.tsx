@@ -141,8 +141,8 @@ const IndexInner = () => {
         }} />
 
         <main className="flex-1 relative">
-          <div className="mx-auto max-w-[1440px] px-4 md:px-8 py-4 md:py-6">
-            <div className={`grid gap-6 lg:gap-8 ${[3].includes(step) ? 'max-w-6xl mx-auto w-full' : 'lg:grid-cols-[1fr_400px]'}`}>
+          <div className="mx-auto max-w-[1440px] px-4 sm:px-6 md:px-8 py-4 md:py-6 lg:py-8">
+            <div className={`grid gap-8 lg:gap-10 ${[3].includes(step) ? 'max-w-6xl mx-auto w-full' : 'lg:grid-cols-[1fr_400px]'}`}>
               {/* Step content */}
               <div className="min-h-[60vh]">
                 <AnimatePresence mode="wait">
@@ -152,7 +152,7 @@ const IndexInner = () => {
 
               {/* Sticky live preview / Cost Sidebar */}
               {![3].includes(step) && (
-                <aside className="lg:sticky lg:top-24 lg:self-start space-y-6">
+                <aside className="lg:sticky lg:top-28 lg:self-start space-y-6 md:space-y-8 pb-12 lg:pb-0">
                   <AnimatePresence>
                     {(step !== 0) && (
                       <motion.div 

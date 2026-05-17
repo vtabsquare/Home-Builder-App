@@ -22,7 +22,7 @@ export const StepHomeType = () => {
       onNext={next}
       onPrev={prev}
     >
-      <div className="grid gap-8 md:grid-cols-3">
+      <div className="grid gap-6 md:gap-8 sm:grid-cols-2 lg:grid-cols-3">
         {TYPES.map(({ id, tag, desc }, i) => {
           const d = HOME_TYPE_META[id];
           const active = homeType === id;

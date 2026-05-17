@@ -11,6 +11,9 @@ export default {
       screens: { "2xl": "1480px" },
     },
     extend: {
+      screens: {
+        'xs': '480px',
+      },
       fontFamily: {
         display: ['Urbanist', 'system-ui', 'sans-serif'],
         sans: ['Epilogue', 'system-ui', 'sans-serif'],

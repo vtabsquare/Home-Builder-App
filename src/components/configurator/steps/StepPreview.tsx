@@ -493,9 +493,9 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
         <div className="flex flex-col gap-6 bg-surface p-6 rounded-3xl border border-border shadow-soft">
           {/* Main Controls Row */}
           {!advancedEditorMode ? (
-            <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="flex items-center gap-6">
-              <div className="inline-flex rounded-xl bg-soft-section p-1 border border-border shadow-inner">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+            <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+              <div className="inline-flex rounded-xl bg-soft-section p-1 border border-border shadow-inner overflow-x-auto scrollbar-hide">
                 {(['2d', '3d', 'elevation'] as const).map((v) => (
                   <button
                     key={v}
@@ -516,7 +516,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
               </div>
 
               {(view === '2d' || view === 'elevation') && !advancedEditorMode && (
-                <div className="inline-flex rounded-xl bg-soft-section/50 p-1 border border-border/50">
+                <div className="inline-flex rounded-xl bg-soft-section/50 p-1 border border-border/50 overflow-x-auto scrollbar-hide">
                   {[0].map((id) => (
                     <button
                       key={id}
@@ -547,7 +547,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
               )}
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3 md:gap-4">
               {view === '2d' && !advancedEditorMode && (
                 <>
                   {canDoubleStorey && (
@@ -572,7 +572,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   </button>
                   <button
                     onClick={() => setAdvanced((v) => !v)}
-                    className={`h-11 rounded-xl border px-6 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
+                    className={`h-10 md:h-11 rounded-xl border px-4 md:px-6 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
                       advanced ? 'border-primary bg-primary text-white shadow-lg' : 'border-border bg-white text-muted-foreground hover:bg-soft-section hover:text-foreground'
                     }`}
                   >
@@ -581,7 +581,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 </>
               )}
               {view === '3d' && !advancedEditorMode && (
-                <div className="flex items-center gap-6">
+                <div className="flex flex-wrap items-center gap-4 md:gap-6">
                   <Group label="Roof">
                     {ROOFS.map((r) => (
                       <Pill key={r.id} active={roof === r.id} onClick={() => setRoof(r.id)}>{r.label}</Pill>
@@ -590,7 +590,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   <Group label="Material">
                     {MATERIALS.map((m) => (
                       <Pill key={m.id} active={material === m.id} onClick={() => setMaterial(m.id)}>
-                        <span className="inline-block h-2.5 w-2.5 rounded-full mr-2 align-middle shadow-inner" style={{ background: m.swatch }} />
+                        <span className="inline-block h-2.5 w-2.5 rounded-full mr-1.5 md:mr-2 align-middle shadow-inner" style={{ background: m.swatch }} />
                         {m.label}
                       </Pill>
                     ))}
@@ -811,18 +811,18 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
           {isDoubleStorey && !advancedEditorMode && (
             <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border">
               <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mr-2">Level Selection:</span>
-              <div className="inline-flex rounded-xl bg-soft-section p-1 border border-border shadow-inner">
+              <div className="inline-flex rounded-xl bg-soft-section p-1 border border-border shadow-inner overflow-x-auto scrollbar-hide">
                 {([0, 1, 2] as const).map((f) => (
                   <button
                     key={f}
                     onClick={() => setActiveFloor(f)}
-                    className={`rounded-lg px-8 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
+                    className={`rounded-lg px-4 md:px-8 py-2 md:py-2.5 text-[8px] md:text-[9px] font-bold uppercase tracking-[0.2em] transition-all duration-500 whitespace-nowrap ${
                       activeFloor === f
                         ? 'bg-white text-foreground shadow-lg scale-[1.02]'
                         : 'text-muted-foreground/60 hover:text-foreground'
                     }`}
                   >
-                    {f === 0 ? 'Ground Floor' : f === 1 ? 'First Floor' : 'Full View'}
+                    {f === 0 ? 'Ground' : f === 1 ? 'First' : 'Full View'}
                   </button>
                 ))}
               </div>
@@ -831,7 +831,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
         </div>
 
         {/* Canvas area */}
-        <div className="flex h-[440px] md:h-[560px] overflow-hidden rounded-3xl border border-border shadow-elev relative bg-white">
+        <div className="flex h-[360px] xs:h-[440px] md:h-[560px] overflow-hidden rounded-3xl border border-border shadow-elev relative bg-white">
           <div
             className="relative flex-1 overflow-hidden"
             onTouchStart={handleTouchStart}
@@ -1098,7 +1098,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
               className="absolute bottom-28 left-1/2 -translate-x-1/2 rounded-full border border-border bg-white/90 backdrop-blur-md px-10 py-4 shadow-elev"
             >
-              <span className="font-display text-2xl font-normal tracking-tight text-foreground">
+              <span className="font-display text-lg md:text-2xl font-normal tracking-tight text-foreground whitespace-nowrap">
                 {currentTabLabel}
               </span>
             </motion.div>
@@ -1106,7 +1106,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
           {/* Room navigation tabs (only for non-editor views) */}
           {!advancedEditorMode && (
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-[640px]">
+            <div className="absolute bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 w-[95%] md:w-[90%] max-w-[640px]">
               <div className="relative flex items-center gap-3">
                 <button onClick={() => scrollTabs('left')}
                   className="shrink-0 flex h-12 w-12 items-center justify-center rounded-full bg-white/90 backdrop-blur-md border border-border shadow-lg hover:bg-white transition-all hover:scale-105 active:scale-95">
@@ -1114,7 +1114,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 </button>
 
                 <div ref={tabScrollRef}
-                  className="flex-1 overflow-x-auto scrollbar-hide flex items-center gap-2 rounded-[2.5rem] bg-white/90 backdrop-blur-md border border-border shadow-elev px-3 py-2">
+                  className="flex-1 overflow-x-auto scrollbar-hide flex items-center gap-1.5 md:gap-2 rounded-[2.5rem] bg-white/90 backdrop-blur-md border border-border shadow-elev px-2 md:px-3 py-1.5 md:py-2">
                   {roomTabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -1122,14 +1122,14 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`shrink-0 flex items-center gap-3 rounded-full px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
+                        className={`shrink-0 flex items-center gap-2 md:gap-3 rounded-full px-4 md:px-6 py-2.5 md:py-3 text-[8px] md:text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
                           isActive
                             ? 'text-white shadow-lg scale-105'
                             : 'text-muted-foreground/60 hover:text-foreground hover:bg-soft-section'
                         }`}
                         style={isActive ? { background: tab.color } : {}}
                       >
-                        <Icon size={16} strokeWidth={isActive ? 2 : 1.25} />
+                        <Icon size={14} className="md:w-4 md:h-4" strokeWidth={isActive ? 2 : 1.25} />
                         {tab.label}
                       </button>
                     );

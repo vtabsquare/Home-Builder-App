@@ -37,7 +37,7 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
-            className="text-5xl lg:text-7xl font-display text-balance leading-[1.1] mb-8"
+            className="text-4xl xs:text-5xl lg:text-7xl font-display text-balance leading-[1.1] mb-8"
           >
             Design Your <br /> Future Home
           </motion.h1>
@@ -59,7 +59,7 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
           >
             <button
               onClick={onStart}
-              className="group relative inline-flex h-14 items-center justify-center gap-3 overflow-hidden rounded-full bg-primary px-8 text-sm font-medium text-primary-foreground transition-all hover:scale-[1.02] active:scale-95 shadow-elev"
+              className="group relative inline-flex h-12 md:h-14 items-center justify-center gap-3 overflow-hidden rounded-full bg-primary px-6 md:px-8 text-xs md:text-sm font-medium text-primary-foreground transition-all hover:scale-[1.02] active:scale-95 shadow-elev"
             >
               <div className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-12deg)_translateX(-100%)] group-hover:duration-1000 group-hover:[transform:skew(-12deg)_translateX(100%)]">
                 <div className="relative h-full w-8 bg-white/20" />
@@ -70,7 +70,7 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
             
             <button
               onClick={onExplore}
-              className="group inline-flex h-14 items-center justify-center gap-3 rounded-full border border-border bg-transparent px-8 text-sm font-medium text-foreground transition-all hover:bg-surface active:scale-95"
+              className="group inline-flex h-12 md:h-14 items-center justify-center gap-3 rounded-full border border-border bg-transparent px-6 md:px-8 text-xs md:text-sm font-medium text-foreground transition-all hover:bg-surface active:scale-95"
             >
               <Play className="transition-transform group-hover:scale-110" size={16} fill="currentColor" />
               <span className="font-bold tracking-wide uppercase">Explore Preview</span>

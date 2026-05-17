@@ -37,7 +37,7 @@ export const StepFeatures = () => {
       onPrev={prev}
     >
       <div className="space-y-10">
-        <div className="grid gap-8 md:grid-cols-2">
+        <div className="grid gap-6 md:gap-8 sm:grid-cols-2">
           <Stepper
             label="Bedrooms"
             value={bedrooms}
@@ -65,7 +65,7 @@ export const StepFeatures = () => {
             <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Spatial Layout</h3>
             <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Options</span>
           </div>
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-4 md:gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {KITCHENS.map((k) => {
               const active = kitchen === k.id;
               const kitchenMeta = KITCHEN_META[k.id];

@@ -31,7 +31,7 @@ export const CostPanel = ({ cost, compact }: Props) => {
         </div>
       </div>
 
-      <div className="relative z-10 mt-6 grid grid-cols-3 gap-3 text-center">
+      <div className="relative z-10 mt-6 grid grid-cols-2 xs:grid-cols-3 gap-2 md:gap-3 text-center">
         <Stat label="Down 10%" value={formatMoney(cost.downPayment)} />
         <Stat label="Loan" value={formatMoney(cost.loanAmount)} />
         <Stat label="Monthly" value={formatMoney(cost.emi)} highlight />

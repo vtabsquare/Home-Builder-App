@@ -47,7 +47,7 @@ export const StepLand = () => {
       nextDisabled={!canProceed}
       hidePrev
     >
-      <div className="grid gap-8 md:grid-cols-2">
+      <div className="grid gap-6 md:gap-8 sm:grid-cols-2">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
           <SelectableCard selected={land === 'own'} onClick={() => handleLandChoice('own')}>
             <div className="flex items-start justify-between gap-4 mb-6">
@@ -91,7 +91,7 @@ export const StepLand = () => {
                 Land Footprints
               </h2>
 
-              <div className="grid gap-8 md:grid-cols-3">
+              <div className="grid gap-6 md:gap-8 sm:grid-cols-2 lg:grid-cols-3">
                 {PACKAGE_IDS.map(({ id, tag }, i) => {
                   const pkg = LAND_PACKAGES[id];
                   const price = pkg.baseArea * LAND_SQFT_RATE;
