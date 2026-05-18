@@ -243,7 +243,8 @@ const Staircase3D = ({
   roomX = 0,
   roomY = 0,
   planWidth = 0,
-  planHeight = 0
+  planHeight = 0,
+  landingSize: landingSizeProp
 }: { 
   w: number
   h: number
@@ -255,6 +256,7 @@ const Staircase3D = ({
   roomY?: number
   planWidth?: number
   planHeight?: number
+  landingSize?: number
 }) => {
   const marbleTextures = useMemo(() => ({
     map: createMarbleTexture(1, 1),
@@ -270,7 +272,7 @@ const Staircase3D = ({
   const firstFlightCount = 9;
   const secondFlightCount = 9;
   const stepH = floorHeight / (firstFlightCount + secondFlightCount);
-  const landingSize = Math.min(w, h) * 0.45;
+  const landingSize = landingSizeProp ?? Math.min(w, h) * 0.45;
   
   // Railing constants
   const rH = 3.2; 
@@ -336,37 +338,69 @@ const Staircase3D = ({
         })}
 
         {/* Railings */}
-        {/* Flight 1 Outer */}
+        {/* Flight 1 Inner Handrail (Walnut Wood) */}
         {Array.from({ length: firstFlightCount }).map((_, i) => {
           const stepL = (h - landingSize) / firstFlightCount;
           const posY = (i + 1) * stepH + rH;
           return (
-            <mesh key={`f1-r-out-${i}`} position={[-w/2 + 0.1, posY, h/2 - i * stepL - stepL/2]}>
-              <boxGeometry args={[0.1, 0.1, stepL + 0.1]} />
-              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.1} />
+            <mesh key={`f1-r-out-${i}`} position={[-w/2 + landingSize - 0.15, posY, h/2 - i * stepL - stepL/2]}>
+              <boxGeometry args={[0.08, 0.08, stepL + 0.1]} />
+              <meshStandardMaterial color="#5c4033" roughness={0.3} />
             </mesh>
           );
         })}
-        {/* Flight 2 Outer */}
-        {Array.from({ length: secondFlightCount }).map((_, i) => {
-          const stepW = (w - landingSize) / secondFlightCount;
-          const posY = (firstFlightCount + i + 1) * stepH + rH;
+        {/* Flight 1 Inner Spindles (Black Steel) */}
+        {Array.from({ length: firstFlightCount }).map((_, i) => {
+          const stepL = (h - landingSize) / firstFlightCount;
+          const spindleH = rH;
+          const posY = i * stepH + 0.125 + spindleH/2;
           return (
-            <mesh key={`f2-r-out-${i}`} position={[-w/2 + landingSize + i * stepW + stepW/2, posY, -h/2 + 0.1]}>
-              <boxGeometry args={[stepW + 0.1, 0.1, 0.1]} />
-              <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.1} />
+            <mesh key={`f1-spindle-${i}`} position={[-w/2 + landingSize - 0.15, posY, h/2 - i * stepL - stepL/2]}>
+              <cylinderGeometry args={[0.015, 0.015, spindleH, 8]} />
+              <meshStandardMaterial color="#222222" metalness={0.8} roughness={0.2} />
             </mesh>
           );
         })}
 
-        {/* Railing Posts */}
-        <mesh position={[-w/2 + 0.1, rH/2, h/2]}>
+        {/* Flight 2 Inner Handrail (Walnut Wood) */}
+        {Array.from({ length: secondFlightCount }).map((_, i) => {
+          const stepW = (w - landingSize) / secondFlightCount;
+          const posY = (firstFlightCount + i + 1) * stepH + rH;
+          return (
+            <mesh key={`f2-r-out-${i}`} position={[-w/2 + landingSize + i * stepW + stepW/2, posY, -h/2 + landingSize - 0.15]}>
+              <boxGeometry args={[stepW + 0.1, 0.08, 0.08]} />
+              <meshStandardMaterial color="#5c4033" roughness={0.3} />
+            </mesh>
+          );
+        })}
+        {/* Flight 2 Inner Spindles (Black Steel) */}
+        {Array.from({ length: secondFlightCount }).map((_, i) => {
+          const stepW = (w - landingSize) / secondFlightCount;
+          const spindleH = rH;
+          const posY = (firstFlightCount + i) * stepH + 0.125 + spindleH/2;
+          return (
+            <mesh key={`f2-spindle-${i}`} position={[-w/2 + landingSize + i * stepW + stepW/2, posY, -h/2 + landingSize - 0.15]}>
+              <cylinderGeometry args={[0.015, 0.015, spindleH, 8]} />
+              <meshStandardMaterial color="#222222" metalness={0.8} roughness={0.2} />
+            </mesh>
+          );
+        })}
+
+        {/* Premium Handrail Posts */}
+        {/* Post 1: Bottom of Flight 1 */}
+        <mesh position={[-w/2 + landingSize - 0.15, rH/2, h/2]}>
           <cylinderGeometry args={[postR, postR, rH + stepH, 8]} />
-          <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+          <meshStandardMaterial color="#5c4033" roughness={0.3} />
         </mesh>
-        <mesh position={[w/2 - 0.1, floorHeight + rH/2, -h/2 + 0.1]}>
+        {/* Post 2: Landing Corner Intersection */}
+        <mesh position={[-w/2 + landingSize - 0.15, firstFlightCount * stepH + rH/2, -h/2 + landingSize - 0.15]}>
           <cylinderGeometry args={[postR, postR, rH, 8]} />
-          <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.15} />
+          <meshStandardMaterial color="#5c4033" roughness={0.3} />
+        </mesh>
+        {/* Post 3: Top of Flight 2 */}
+        <mesh position={[w/2 - 0.1, floorHeight + rH/2, -h/2 + landingSize - 0.15]}>
+          <cylinderGeometry args={[postR, postR, rH, 8]} />
+          <meshStandardMaterial color="#5c4033" roughness={0.3} />
         </mesh>
       </group>
     </group>
@@ -1149,8 +1183,13 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
 
               {isStaircaseRoom(r) && (() => {
                 const sg = resolveStairGeometry(r);
+                // When mirrored, the 2D canvas flips the stair drawing with scaleX:-1,
+                // visually moving it from left to right. Mirror the X offset to match in 3D.
+                const effectiveOffsetX = r.isMirrored 
+                  ? (r.w - sg.stairOffsetX - sg.stairWidth)
+                  : sg.stairOffsetX;
                 // Position stair 3D model at offset position inside room, not room center
-                const stairCX = round2(r.x + sg.stairOffsetX + sg.stairWidth / 2 - W / 2);
+                const stairCX = round2(r.x + effectiveOffsetX + sg.stairWidth / 2 - W / 2);
                 const stairCZ = round2(r.y + sg.stairOffsetY + sg.stairLength / 2 - D / 2);
                 return (
                   <group position={[stairCX, 0.02, stairCZ]}>
@@ -1165,6 +1204,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
                       roomY={r.y}
                       planWidth={W}
                       planHeight={D}
+                      landingSize={sg.landingSize}
                     />
                   </group>
                 );
@@ -1231,8 +1271,11 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
         
         if (groundStaircaseForTrim) {
           const sg = resolveStairGeometry(groundStaircaseForTrim);
-          // Opening position derived from stair offset inside room, NOT room center
-          const hx = round2(groundStaircaseForTrim.x + sg.stairOffsetX + sg.openingWidth / 2 - W / 2 - roofCX);
+          // Mirror-aware offset: flip X offset when staircase is mirrored
+          const trimEffectiveOffsetX = groundStaircaseForTrim.isMirrored
+            ? (groundStaircaseForTrim.w - sg.stairOffsetX - sg.openingWidth)
+            : sg.stairOffsetX;
+          const hx = round2(groundStaircaseForTrim.x + trimEffectiveOffsetX + sg.openingWidth / 2 - W / 2 - roofCX);
           const hz = round2(groundStaircaseForTrim.y + sg.stairOffsetY + sg.openingLength / 2 - D / 2 - roofCZ);
           const hw = sg.openingWidth + 0.2;
           const hh = sg.openingLength + 0.2;
@@ -1302,9 +1345,13 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
         const groundStaircase = (plan.rooms || []).find(r => isStaircaseRoom(r));
         const hole = groundStaircase ? (() => {
           const sg = resolveStairGeometry(groundStaircase);
+          // Mirror-aware offset: flip X offset when staircase is mirrored
+          const roofEffectiveOffsetX = groundStaircase.isMirrored
+            ? (groundStaircase.w - sg.stairOffsetX - sg.openingWidth)
+            : sg.stairOffsetX;
           return {
             // Opening position derived from stair offset, not room center
-            x: round2(groundStaircase.x + sg.stairOffsetX + sg.openingWidth / 2 - W / 2 - roofCX),
+            x: round2(groundStaircase.x + roofEffectiveOffsetX + sg.openingWidth / 2 - W / 2 - roofCX),
             z: round2(groundStaircase.y + sg.stairOffsetY + sg.openingLength / 2 - D / 2 - roofCZ),
             w: sg.openingWidth + 0.2,
             h: sg.openingLength + 0.2
@@ -2868,8 +2915,12 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
             const sg = resolveStairGeometry(r);
             const openW = sg.openingWidth;
             const openL = sg.openingLength;
+            // Mirror-aware offset: flip X offset when staircase is mirrored
+            const slabEffectiveOffsetX = r.isMirrored
+              ? (r.w - sg.stairOffsetX - openW)
+              : sg.stairOffsetX;
             // Opening position derived from stair offset inside room
-            const openCX = round2(upperOffsetX + r.x + sg.stairOffsetX + openW / 2);
+            const openCX = round2(upperOffsetX + r.x + slabEffectiveOffsetX + openW / 2);
             const openCZ = round2(upperOffsetZ + r.y + sg.stairOffsetY + openL / 2);
             // Compute 4 slab segments around the offset opening
             const EPS = 0.02; // tiny gap to prevent visual sealing
@@ -2877,7 +2928,7 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
             const slabY = 0.4;
             const slabH = 0.8;
             // Left slab: from room left edge to opening left edge
-            const leftW = sg.stairOffsetX - EPS;
+            const leftW = slabEffectiveOffsetX - EPS;
             if (leftW > 0.15) {
               slabs.push(
                 <mesh key={`slab-l-${r.id}`} receiveShadow position={[round2(upperOffsetX + r.x + leftW / 2), slabY, cz]}>
@@ -2887,7 +2938,7 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
               );
             }
             // Right slab: from opening right edge to room right edge
-            const rightEdge = sg.stairOffsetX + openW;
+            const rightEdge = slabEffectiveOffsetX + openW;
             const rightW = r.w - rightEdge - EPS;
             if (rightW > 0.15) {
               slabs.push(

@@ -457,7 +457,13 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
 
           {/* Rooms */}
           <Layer>
-            {plan.rooms.map((room) => {
+            {[...plan.rooms].sort((a, b) => {
+              const aIsStair = a.type === 'staircase' || (a.label || '').toLowerCase().includes('staircase');
+              const bIsStair = b.type === 'staircase' || (b.label || '').toLowerCase().includes('staircase');
+              if (aIsStair && !bIsStair) return 1;
+              if (!aIsStair && bIsStair) return -1;
+              return 0;
+            }).map((room) => {
               const rx = offsetX + room.x * scale;
               const ry = offsetY + room.y * scale;
               const rw = room.w * scale;
@@ -735,8 +741,18 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
                           })()}
 
                           {/* DN label */}
-                          <Text x={stairOffsetX + openW / 2 - 8} y={stairOffsetY + openL / 2 - 5}
-                            text="DN" fontSize={10} fontStyle="bold" fill="#555" letterSpacing={1} />
+                          <Text 
+                            x={stairOffsetX + openW / 2} 
+                            y={stairOffsetY + openL / 2 - 5}
+                            align="center"
+                            offsetX={8}
+                            scaleX={isMirrored ? -1 : 1}
+                            text="DN" 
+                            fontSize={10} 
+                            fontStyle="bold" 
+                            fill="#555" 
+                            letterSpacing={1} 
+                          />
                           
                           {/* Downward arrow */}
                           {(() => {
@@ -815,8 +831,18 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
                         })()}
 
                         {/* UP label */}
-                        <Text x={stairOffsetX + sW / 2 - 6} y={stairOffsetY + sL + 3}
-                          text="UP" fontSize={8} fontStyle="bold" fill="#666" letterSpacing={1} />
+                        <Text 
+                          x={stairOffsetX + sW / 2} 
+                          y={stairOffsetY - 12}
+                          align="center"
+                          offsetX={6}
+                          scaleX={isMirrored ? -1 : 1}
+                          text="UP" 
+                          fontSize={8} 
+                          fontStyle="bold" 
+                          fill="#666" 
+                          letterSpacing={1} 
+                        />
                       </Group>
                     );
                   })()}

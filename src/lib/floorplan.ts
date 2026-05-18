@@ -50,25 +50,32 @@ function clamp(v: number, min: number, max: number): number {
 
 /** Compute stair geometry from room dimensions. Auto-generates for legacy rooms. */
 export function computeStairGeometry(roomW: number, roomH: number): StairGeometry {
-  const stairWidth = clamp(roomW * 0.5, 4.8, 6.2);
-  const stairLength = clamp(roomH * 0.86, 11.5, 15);
-  const landingSize = Math.min(stairWidth, 4.8);
   const stepCount = 18; // 9 per flight
+  const stepsPerFlight = stepCount / 2;
   const floorHeight = 14; // standard residential floor height in ft
   const stepRise = floorHeight / stepCount;
-  const treadDepth = (stairLength - landingSize) / (stepCount / 2);
-  const openingWidth = stairWidth + 1.7;
-  const openingLength = stairLength * 0.9;
-  const stairOffsetX = 0.6;
-  const stairOffsetY = roomH * 0.06;
+
+  // Balanced L-shape: both flights get equal tread depth.
+  // Landing side = stair flight width, flightRun = stepsPerFlight * treadDepth.
+  // Total footprint side = landingSize + flightRun (same for width & length → square).
+  const treadDepth = clamp(0.85, 0.75, 1.0); // ~10 inches, standard residential
+  const flightRun = stepsPerFlight * treadDepth; // 7.65ft
+  const maxSide = Math.min(roomW - 1, roomH - 1); // leave margin inside room
+  const landingSize = clamp(maxSide - flightRun, 3, 4.5);
+  const side = landingSize + flightRun; // balanced square footprint
+  const stairWidth = Math.min(side, roomW - 0.8);
+  const stairLength = Math.min(side, roomH - 0.8);
+
+  const openingWidth = landingSize + 0.15; // fits only the ascending flight & landing
+  const openingLength = stairLength;
+  // Touch walls completely (no offset gap)
+  const stairOffsetX = 0;
+  const stairOffsetY = Math.max(0, roomH - stairLength);
   return { stairWidth, stairLength, landingSize, openingWidth, openingLength, stepCount, stepRise, treadDepth, stairOffsetX, stairOffsetY, stairType: 'L_SHAPE' };
 }
 
-/** Safely resolve stairGeometry, filling in missing fields from legacy saved plans. */
 export function resolveStairGeometry(room: { w: number; h: number; stairGeometry?: Partial<StairGeometry> }): StairGeometry {
-  const computed = computeStairGeometry(room.w, room.h);
-  if (!room.stairGeometry) return computed;
-  return { ...computed, ...room.stairGeometry } as StairGeometry;
+  return computeStairGeometry(room.w, room.h);
 }
 
 export interface Room {
