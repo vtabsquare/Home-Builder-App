@@ -380,11 +380,12 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     toast({ title: 'Layout Pasted', description: `Pasted layout from "${floorPlanClipboard.label}". Click "Update Plan" to save.` });
   };
 
-  const handleAddRoom = (blockType: Room['type']) => {
-    const block = ROOM_BLOCKS.find((b) => b.type === blockType);
+  const handleAddRoom = (blockIndex: number) => {
+    const block = ROOM_BLOCKS[blockIndex];
     if (!block) return;
 
     const basePlan = currentPlan;
+    const blockType = block.type;
     const id = `custom-${blockType}-${roomCounter}`;
     setRoomCounter((prev) => prev + 1);
 
@@ -408,12 +409,13 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
       w: Math.min(block.defaultW, basePlan.width),
       h: Math.min(block.defaultH, basePlan.height),
       color: block.color,
+      kitchenType: block.kitchenType,
       furniture: regenerateFurniture(
         {
-          id, type: blockType, label, x: 0, y: 0, w: block.defaultW, h: block.defaultH,
-          color: block.color, furniture: [], doors: [], windows: [],
+          id, type: blockType, label, x: 0, y: 0, w: Math.min(block.defaultW, basePlan.width), h: Math.min(block.defaultH, basePlan.height),
+          color: block.color, furniture: [], doors: [], windows: [], kitchenType: block.kitchenType,
         },
-        'open'
+        kitchen
       ),
       doors: [],
       windows: [],
@@ -557,7 +559,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   {canDoubleStorey && (
                     <button
                       onClick={() => setDoubleStorey(!isDoubleStorey)}
-                      className={`flex items-center gap-2 h-11 rounded-xl border px-5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all active:scale-95 ${
+                      className={`flex items-center gap-2 h-11 rounded-xl border border-clay/40 bg-soft-section text-clay px-5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all active:scale-95 ${
                         isDoubleStorey
                           ? 'border-clay/40 bg-soft-section text-clay'
                           : 'border-border bg-white text-muted-foreground hover:bg-soft-section hover:text-foreground'
@@ -641,16 +643,16 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                         <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">Add Structural Elements</span>
                       </div>
                       <div className="flex flex-wrap gap-3">
-                        {ROOM_BLOCKS.map((block) => {
+                        {ROOM_BLOCKS.map((block, index) => {
                           const Icon = block.icon;
                           return (
                             <button
                               key={block.label}
-                              onClick={() => handleAddRoom(block.type)}
+                              onClick={() => handleAddRoom(index)}
                               className="flex h-11 items-center gap-3 rounded-xl px-4 text-[10px] font-bold uppercase tracking-[0.2em] border border-border bg-white hover:bg-soft-section hover:shadow-soft transition-all active:scale-95 group"
                               style={{ borderLeftColor: block.color, borderLeftWidth: 3 }}
                             >
-                              <Icon size={16} strokeWidth={1.25} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+                              <Icon size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" />
                               {block.label}
                             </button>
                           );
@@ -889,13 +891,14 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       setAdvancedEditorMode(false);
                     }}
                     initialPlan={isEditingFirstFloor ? savedFirstFloorPlan : savedGroundPlan}
+                    floorLevel={isDoubleStorey ? activeFloor : undefined}
                   />
                 </motion.div>
               ) : view === '2d' ? (
                 <motion.div key={`2d-${activeFloor}`} className="h-full w-full"
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
-                  <FloorPlanCanvas plan={stagedPlan || getHighlightedPlan()} advanced={advanced} hideZoomHelper={true} onChange={(updatedHighlightedPlan) => {
+                  <FloorPlanCanvas plan={stagedPlan || getHighlightedPlan()} advanced={advanced} hideZoomHelper={true} floorLevel={isDoubleStorey ? activeFloor : undefined} onChange={(updatedHighlightedPlan) => {
                     const newPlan = {
                       ...(stagedPlan || displayPlan),
                       width: updatedHighlightedPlan.width,

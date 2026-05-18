@@ -29,9 +29,51 @@ export interface WindowInfo {
   width: number;
 }
 
+export interface StairGeometry {
+  stairWidth: number;   // Width of the actual stair flights (ft)
+  stairLength: number;  // Total length of the stair footprint (ft)
+  landingSize: number;  // Landing square side length (ft)
+  openingWidth: number; // Width of the slab opening for upper floor (ft)
+  openingLength: number; // Length of the slab opening for upper floor (ft)
+  stepCount: number;    // Total number of steps (both flights)
+  stepRise: number;     // Height of each step (ft)
+  treadDepth: number;   // Depth of each tread (ft)
+  stairOffsetX: number; // X offset of stair footprint inside room (ft)
+  stairOffsetY: number; // Y offset of stair footprint inside room (ft)
+  stairType: 'L_SHAPE'; // Currently only L-shape supported
+}
+
+/** Clamp a value between min and max. */
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+/** Compute stair geometry from room dimensions. Auto-generates for legacy rooms. */
+export function computeStairGeometry(roomW: number, roomH: number): StairGeometry {
+  const stairWidth = clamp(roomW * 0.5, 4.8, 6.2);
+  const stairLength = clamp(roomH * 0.86, 11.5, 15);
+  const landingSize = Math.min(stairWidth, 4.8);
+  const stepCount = 18; // 9 per flight
+  const floorHeight = 14; // standard residential floor height in ft
+  const stepRise = floorHeight / stepCount;
+  const treadDepth = (stairLength - landingSize) / (stepCount / 2);
+  const openingWidth = stairWidth + 1.7;
+  const openingLength = stairLength * 0.9;
+  const stairOffsetX = 0.6;
+  const stairOffsetY = roomH * 0.06;
+  return { stairWidth, stairLength, landingSize, openingWidth, openingLength, stepCount, stepRise, treadDepth, stairOffsetX, stairOffsetY, stairType: 'L_SHAPE' };
+}
+
+/** Safely resolve stairGeometry, filling in missing fields from legacy saved plans. */
+export function resolveStairGeometry(room: { w: number; h: number; stairGeometry?: Partial<StairGeometry> }): StairGeometry {
+  const computed = computeStairGeometry(room.w, room.h);
+  if (!room.stairGeometry) return computed;
+  return { ...computed, ...room.stairGeometry } as StairGeometry;
+}
+
 export interface Room {
   id: string;
-  type: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'dining' | 'entry' | 'hallway' | 'staircase' | 'balcony' | 'carport' | 'garden';
+  type: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'lounge' | 'dressing' | 'dining' | 'entry' | 'hallway' | 'staircase' | 'balcony' | 'carport' | 'garden';
   label: string;
   x: number; // ft
   y: number;
@@ -45,6 +87,7 @@ export interface Room {
   isMirrored?: boolean;
   openWalls?: ('top' | 'bottom' | 'left' | 'right')[];
   kitchenType?: 'standard' | 'open' | 'galley';
+  stairGeometry?: StairGeometry;
 }
 
 export interface Plan {
@@ -59,6 +102,8 @@ const COLORS: Record<string, string> = {
   bathroom: 'hsl(200 30% 82%)',
   kitchen:  'hsl(28 38% 72%)',
   living:   'hsl(40 30% 87%)',
+  lounge:   'hsl(32 28% 85%)',
+  dressing: 'hsl(28 24% 84%)',
   dining:   'hsl(36 28% 82%)',
   entry:    'hsl(36 18% 76%)',
   hallway:  'hsl(38 20% 88%)',
@@ -75,6 +120,8 @@ export function regenerateFurniture(room: Room, kitchenType: string = 'open'): F
   switch (room.type) {
     case 'bedroom':
       return bedroomFurniture(room.w, room.h, room.id === 'bed-0', orient);
+    case 'dressing':
+      return dressingFurniture(room.w, room.h, orient);
     case 'bathroom':
       const isMasterBath = room.id === 'bath-attached-bed-0';
       return bathroomFurniture(room.w, room.h, isMasterBath, orient);
@@ -82,6 +129,8 @@ export function regenerateFurniture(room: Room, kitchenType: string = 'open'): F
       return kitchenFurniture(room.w, room.h, room.kitchenType || kitchenType, orient);
     case 'living':
       return livingFurniture(room.w, room.h, orient);
+    case 'lounge':
+      return loungeFurniture(room.w, room.h, orient);
     case 'dining':
       return diningFurniture(room.w, room.h);
     case 'balcony':
@@ -112,6 +161,35 @@ function gardenFurniture(w: number, h: number): FurnitureItem[] {
       });
     }
   }
+  return items;
+}
+
+function dressingFurniture(w: number, h: number, orient: number = 0): FurnitureItem[] {
+  const items: FurnitureItem[] = [];
+  const G = 0.4;
+  const wardrobeLong = Math.min(Math.max(4.5, w * 0.5), Math.max(4.5, w - 1));
+  const wardrobeDepth = 2;
+  const vanityW = Math.min(Math.max(3, w * 0.34), Math.max(3, w - 1.2));
+  const vanityH = 1.6;
+
+  if (orient === 0) {
+    items.push({ type: 'wardrobe', x: G, y: G, w: wardrobeLong, h: wardrobeDepth, rotation: 0 });
+    items.push({ type: 'wardrobe', x: G, y: h - G - wardrobeDepth, w: wardrobeLong, h: wardrobeDepth, rotation: 0 });
+    items.push({ type: 'desk', x: w - G - vanityW, y: (h - vanityH) / 2, w: vanityW, h: vanityH, rotation: 0 });
+  } else if (orient === 1) {
+    items.push({ type: 'wardrobe', x: w - G - wardrobeDepth, y: G, w: wardrobeDepth, h: wardrobeLong, rotation: 0 });
+    items.push({ type: 'wardrobe', x: G, y: G, w: wardrobeDepth, h: wardrobeLong, rotation: 0 });
+    items.push({ type: 'desk', x: (w - vanityH) / 2, y: h - G - vanityW, w: vanityH, h: vanityW, rotation: 0 });
+  } else if (orient === 2) {
+    items.push({ type: 'wardrobe', x: w - G - wardrobeLong, y: h - G - wardrobeDepth, w: wardrobeLong, h: wardrobeDepth, rotation: 0 });
+    items.push({ type: 'wardrobe', x: w - G - wardrobeLong, y: G, w: wardrobeLong, h: wardrobeDepth, rotation: 0 });
+    items.push({ type: 'desk', x: G, y: (h - vanityH) / 2, w: vanityW, h: vanityH, rotation: 0 });
+  } else {
+    items.push({ type: 'wardrobe', x: G, y: h - G - wardrobeLong, w: wardrobeDepth, h: wardrobeLong, rotation: 0 });
+    items.push({ type: 'wardrobe', x: w - G - wardrobeDepth, y: h - G - wardrobeLong, w: wardrobeDepth, h: wardrobeLong, rotation: 0 });
+    items.push({ type: 'desk', x: (w - vanityH) / 2, y: G, w: vanityH, h: vanityW, rotation: 0 });
+  }
+
   return items;
 }
 
@@ -235,6 +313,24 @@ function livingFurniture(w: number, h: number, orient: number = 0): FurnitureIte
   return items;
 }
 
+function loungeFurniture(w: number, h: number, orient: number = 0): FurnitureItem[] {
+  const items = livingFurniture(w, h, orient);
+  const tableW = Math.min(4, w * 0.32);
+  const tableH = Math.min(2.2, h * 0.18);
+
+  if (orient === 0) {
+    items.push({ type: 'coffee_table', x: (w - tableW) / 2, y: Math.max(2.2, h * 0.42), w: tableW, h: tableH, rotation: 0 });
+  } else if (orient === 1) {
+    items.push({ type: 'coffee_table', x: Math.max(2.2, w * 0.42), y: (h - tableW) / 2, w: tableH, h: tableW, rotation: 0 });
+  } else if (orient === 2) {
+    items.push({ type: 'coffee_table', x: (w - tableW) / 2, y: Math.min(h - tableH - 2.2, h * 0.42), w: tableW, h: tableH, rotation: 0 });
+  } else {
+    items.push({ type: 'coffee_table', x: Math.min(w - tableH - 2.2, w * 0.42), y: (h - tableW) / 2, w: tableH, h: tableW, rotation: 0 });
+  }
+
+  return items;
+}
+
 function diningFurniture(w: number, h: number): FurnitureItem[] {
   const tableW = Math.min(5, w * 0.65);
   const tableH = Math.min(3, h * 0.45);
@@ -282,7 +378,7 @@ function sharedWallMidpoint(a: Room, wall: 'top'|'bottom'|'left'|'right', b: Roo
 }
 
 function getDoorType(roomTypeA: Room['type'], roomTypeB: Room['type']): 'standard' | 'open' {
-  const openTypes: Room['type'][] = ['living', 'kitchen', 'dining'];
+  const openTypes: Room['type'][] = ['living', 'lounge', 'kitchen', 'dining'];
   // If BOTH rooms are open-type (living↔kitchen, kitchen↔dining, etc.), use open door
   if (openTypes.includes(roomTypeA) && openTypes.includes(roomTypeB)) return 'open';
   // Bedroom and bathroom always get standard doors
@@ -298,13 +394,13 @@ function injectAdjacencyDoors(rooms: Room[]): void {
 
   const hasEntrance = (room: Room) => room.doors.some(d => {
     const c = rooms.find(r => r.id === d.connectsTo);
-    return c && (c.type === 'hallway' || c.type === 'staircase' || c.type === 'living');
+    return c && (c.type === 'hallway' || c.type === 'staircase' || c.type === 'living' || c.type === 'lounge');
   });
 
   // In no-hallway plans, check if bedroom already has any entrance (to living/kitchen/dining)
   const hasAnyEntrance = (room: Room) => room.doors.some(d => {
     const c = rooms.find(r => r.id === d.connectsTo);
-    return c && (c.type === 'hallway' || c.type === 'staircase' || c.type === 'living' || c.type === 'kitchen' || c.type === 'dining');
+    return c && (c.type === 'hallway' || c.type === 'staircase' || c.type === 'living' || c.type === 'lounge' || c.type === 'kitchen' || c.type === 'dining');
   });
 
   for (let i = 0; i < rooms.length; i++) {
@@ -325,7 +421,7 @@ function injectAdjacencyDoors(rooms: Room[]): void {
       if (a.type === 'bedroom' && b.type === 'bedroom') continue;
 
       if (hasDining && types.includes('kitchen')) {
-        if (types.includes('hallway') || types.includes('staircase') || types.includes('living')) continue;
+        if (types.includes('hallway') || types.includes('staircase') || types.includes('living') || types.includes('lounge')) continue;
       }
 
       if (types.includes('bathroom') && types.includes('bedroom')) {
@@ -346,7 +442,7 @@ function injectAdjacencyDoors(rooms: Room[]): void {
       if (a.type === 'bathroom' && b.type === 'bathroom') continue;
 
       // Bathroom connections to living/kitchen/dining
-      if (types.includes('bathroom') && ['living', 'kitchen', 'dining'].some(t => types.includes(t as any))) {
+      if (types.includes('bathroom') && ['living', 'lounge', 'kitchen', 'dining'].some(t => types.includes(t as any))) {
         if (hasHallway) continue;
         // In no-hallway plans, allow non-attached bathroom connections
         const bath = a.type === 'bathroom' ? a : b;
@@ -356,10 +452,10 @@ function injectAdjacencyDoors(rooms: Room[]): void {
       if (a.type === 'bathroom' && a.doors.length >= 1) continue;
       if (b.type === 'bathroom' && b.doors.length >= 1) continue;
 
-      if (a.type === 'bedroom' && ['hallway', 'staircase', 'living'].includes(b.type)) {
+      if (a.type === 'bedroom' && ['hallway', 'staircase', 'living', 'lounge'].includes(b.type)) {
         if (hasEntrance(a)) continue;
       }
-      if (b.type === 'bedroom' && ['hallway', 'staircase', 'living'].includes(a.type)) {
+      if (b.type === 'bedroom' && ['hallway', 'staircase', 'living', 'lounge'].includes(a.type)) {
         if (hasEntrance(b)) continue;
       }
 
@@ -462,7 +558,7 @@ function cleanupDoors(rooms: Room[]): void {
 
         if (connectedRoom.type === 'bathroom' || connectedRoom.type === 'balcony') {
           validDoors.push(door);
-        } else if (connectedRoom.type === 'hallway' || connectedRoom.type === 'staircase' || connectedRoom.type === 'living') {
+        } else if (connectedRoom.type === 'hallway' || connectedRoom.type === 'staircase' || connectedRoom.type === 'living' || connectedRoom.type === 'lounge') {
           if (!entranceFound) {
             validDoors.push(door);
             entranceFound = true;
@@ -527,17 +623,19 @@ function findAbsorptionDirection(candidate: Room, removed: Room): AbsorbDirectio
 
 function absorbRemovedRoomSpace(rooms: Room[], removedRoom: Room, c: ConfigState): void {
   const typePriority: Partial<Record<Room['type'], Partial<Record<Room['type'], number>>>> = {
-    bedroom:   { bedroom: 5, hallway: 4, staircase: 4, living: 3, dining: 2, kitchen: 2, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
-    bathroom:  { bathroom: 5, hallway: 4, staircase: 4, bedroom: 3, living: 2, kitchen: 1, dining: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
-    kitchen:   { kitchen: 5, dining: 4, living: 3, hallway: 2, staircase: 2, bedroom: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
-    living:    { living: 5, dining: 4, hallway: 3, staircase: 3, kitchen: 3, bedroom: 2, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
-    dining:    { dining: 5, kitchen: 4, living: 3, hallway: 2, staircase: 2, bedroom: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
-    balcony:   { balcony: 5, garden: 4, living: 3, hallway: 2, staircase: 2, bedroom: 1, bathroom: 1, kitchen: 1, carport: 0, entry: 0, dining: 0 },
-    carport:   { carport: 5, garden: 4, hallway: 2, staircase: 2, living: 1, bedroom: 0, bathroom: 0, kitchen: 0, dining: 0, balcony: 0, entry: 0 },
-    garden:    { garden: 5, balcony: 4, carport: 3, living: 2, hallway: 2, staircase: 2, bedroom: 1, bathroom: 1, kitchen: 1, dining: 1, entry: 0 },
-    entry:     { entry: 5, hallway: 4, staircase: 4, living: 3, bedroom: 2, bathroom: 1, kitchen: 1, dining: 1, balcony: 0, carport: 0, garden: 0 },
-    hallway:   { hallway: 5, staircase: 5, living: 4, dining: 3, kitchen: 3, bedroom: 2, bathroom: 2, balcony: 1, carport: 1, garden: 1, entry: 3 },
-    staircase: { staircase: 5, hallway: 5, living: 4, dining: 3, kitchen: 3, bedroom: 2, bathroom: 2, balcony: 1, carport: 1, garden: 1, entry: 3 },
+    bedroom:   { bedroom: 5, dressing: 4, hallway: 4, staircase: 4, living: 3, lounge: 3, dining: 2, kitchen: 2, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    bathroom:  { bathroom: 5, dressing: 3, hallway: 4, staircase: 4, bedroom: 3, living: 2, lounge: 2, kitchen: 1, dining: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    kitchen:   { kitchen: 5, dining: 4, living: 3, lounge: 3, hallway: 2, staircase: 2, bedroom: 1, dressing: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    living:    { living: 5, lounge: 4, dining: 4, hallway: 3, staircase: 3, kitchen: 3, bedroom: 2, dressing: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    lounge:    { lounge: 5, living: 4, dining: 4, hallway: 3, staircase: 3, kitchen: 3, bedroom: 2, dressing: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    dressing:  { dressing: 5, bedroom: 4, bathroom: 3, hallway: 2, staircase: 2, living: 1, lounge: 1, kitchen: 0, dining: 0, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    dining:    { dining: 5, kitchen: 4, living: 3, lounge: 3, hallway: 2, staircase: 2, bedroom: 1, dressing: 1, bathroom: 1, balcony: 0, carport: 0, garden: 0, entry: 0 },
+    balcony:   { balcony: 5, garden: 4, living: 3, lounge: 3, hallway: 2, staircase: 2, bedroom: 1, dressing: 1, bathroom: 1, kitchen: 1, carport: 0, entry: 0, dining: 0 },
+    carport:   { carport: 5, garden: 4, hallway: 2, staircase: 2, living: 1, lounge: 1, bedroom: 0, dressing: 0, bathroom: 0, kitchen: 0, dining: 0, balcony: 0, entry: 0 },
+    garden:    { garden: 5, balcony: 4, carport: 3, living: 2, lounge: 2, hallway: 2, staircase: 2, bedroom: 1, dressing: 1, bathroom: 1, kitchen: 1, dining: 1, entry: 0 },
+    entry:     { entry: 5, hallway: 4, staircase: 4, living: 3, lounge: 3, bedroom: 2, dressing: 2, bathroom: 1, kitchen: 1, dining: 1, balcony: 0, carport: 0, garden: 0 },
+    hallway:   { hallway: 5, staircase: 5, living: 4, lounge: 4, dining: 3, kitchen: 3, bedroom: 2, dressing: 2, bathroom: 2, balcony: 1, carport: 1, garden: 1, entry: 3 },
+    staircase: { staircase: 5, hallway: 5, living: 4, lounge: 4, dining: 3, kitchen: 3, bedroom: 2, dressing: 2, bathroom: 2, balcony: 1, carport: 1, garden: 1, entry: 3 },
   };
 
   let bestCandidate: Room | null = null;
@@ -582,7 +680,7 @@ function absorbRemovedRoomSpace(rooms: Room[], removedRoom: Room, c: ConfigState
       break;
   }
 
-  if (['bedroom', 'bathroom', 'kitchen', 'living', 'dining', 'balcony', 'garden'].includes(bestCandidate.type)) {
+  if (['bedroom', 'bathroom', 'kitchen', 'living', 'lounge', 'dressing', 'dining', 'balcony', 'garden'].includes(bestCandidate.type)) {
     bestCandidate.furniture = regenerateFurniture(bestCandidate, c.kitchen);
   }
 }

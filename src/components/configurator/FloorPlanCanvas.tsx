@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Stage, Layer, Rect, Text, Line, Group, Arc, Circle, Transformer } from 'react-konva';
-import { Plan, Room, FurnitureItem, DoorInfo, WindowInfo, regenerateFurniture } from '@/lib/floorplan';
+import { Plan, Room, FurnitureItem, DoorInfo, WindowInfo, regenerateFurniture, resolveStairGeometry } from '@/lib/floorplan';
 import { useConfig } from '@/store/configurator';
 import { RotateCw, Plus, Trash2, Maximize } from 'lucide-react';
 import Konva from 'konva';
@@ -10,10 +10,11 @@ interface Props {
   advanced?: boolean;
   minimal?: boolean;
   hideZoomHelper?: boolean;
+  floorLevel?: number; // 0 = ground, 1 = first floor, undefined = single storey
   onChange?: (plan: Plan) => void;
 }
 
-export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZoomHelper = false, onChange }: Props) => {
+export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZoomHelper = false, floorLevel, onChange }: Props) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const config = useConfig();
@@ -23,6 +24,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [selectedFurniture, setSelectedFurniture] = useState<{ roomId: string, furnitureIndex: number } | null>(null);
   const [selectedDoor, setSelectedDoor] = useState<{ roomId: string, doorIndex: number } | null>(null);
   const [selectedWindow, setSelectedWindow] = useState<{ roomId: string, windowIndex: number } | null>(null);
   const [isAddingDoor, setIsAddingDoor] = useState(false);
@@ -30,7 +32,9 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
   const [wallPopup, setWallPopup] = useState<{ roomId: string, wall: string, x: number, y: number } | null>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const roomRefs = useRef<{ [key: string]: Konva.Group }>({});
+  const furnitureRefs = useRef<{ [key: string]: Konva.Group }>({});
   const localPlanRef = useRef(localPlan);
+  const selectedFurnitureKey = selectedFurniture ? `${selectedFurniture.roomId}-f-${selectedFurniture.furnitureIndex}` : null;
 
   useEffect(() => {
     setLocalPlan(plan);
@@ -44,14 +48,25 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
   };
 
   useEffect(() => {
-    if (advanced && selectedRoomId && transformerRef.current && roomRefs.current[selectedRoomId]) {
+    if (advanced && selectedFurnitureKey && selectedFurniture && transformerRef.current && furnitureRefs.current[selectedFurnitureKey]) {
+      transformerRef.current.nodes([furnitureRefs.current[selectedFurnitureKey]]);
+      transformerRef.current.getLayer()?.batchDraw();
+    } else if (advanced && selectedRoomId && transformerRef.current && roomRefs.current[selectedRoomId]) {
       transformerRef.current.nodes([roomRefs.current[selectedRoomId]]);
       transformerRef.current.getLayer()?.batchDraw();
     } else if (transformerRef.current) {
       transformerRef.current.nodes([]);
       transformerRef.current.getLayer()?.batchDraw();
     }
-  }, [selectedRoomId, localPlan, advanced]);
+  }, [selectedFurnitureKey, selectedFurniture, selectedRoomId, localPlan, advanced]);
+
+  useEffect(() => {
+    if (!selectedFurniture) return;
+    const room = (localPlan.rooms || []).find((r) => r.id === selectedFurniture.roomId);
+    if (!room?.furniture?.[selectedFurniture.furnitureIndex]) {
+      setSelectedFurniture(null);
+    }
+  }, [selectedFurniture, localPlan]);
 
   useEffect(() => {
     if (!wrapRef.current) return;
@@ -172,6 +187,98 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
     };
     commitLocalPlan(updated);
     setSelectedRoomId(null);
+    if (selectedFurniture?.roomId === roomId) setSelectedFurniture(null);
+  };
+
+  const handleDeleteFurniture = (roomId: string, furnitureIndex: number) => {
+    const updated: Plan = {
+      ...localPlan,
+      rooms: (localPlan.rooms || []).map((r) => {
+        if (r.id !== roomId) return r;
+        return { ...r, furniture: (r.furniture || []).filter((_, idx) => idx !== furnitureIndex) };
+      }),
+    };
+    commitLocalPlan(updated);
+    setSelectedFurniture(null);
+  };
+
+  const handleFurnitureDragEnd = (roomId: string, furnitureIndex: number, e: Konva.KonvaEventObject<DragEvent>) => {
+    const room = (localPlan.rooms || []).find((r) => r.id === roomId);
+    const item = room?.furniture?.[furnitureIndex];
+    if (!room || !item) return;
+
+    const rot = item.rotation || 0;
+    const itemWidthPx = item.w * scale;
+    const itemHeightPx = item.h * scale;
+    const baseRoomX = buildingOffsetX + room.x * scale;
+    const baseRoomY = buildingOffsetY + room.y * scale;
+
+    let nextX = (e.target.x() - baseRoomX) / scale;
+    let nextY = (e.target.y() - baseRoomY) / scale;
+
+    if (rot !== 0) {
+      nextX = (e.target.x() - baseRoomX - itemWidthPx / 2) / scale;
+      nextY = (e.target.y() - baseRoomY - itemHeightPx / 2) / scale;
+    }
+
+    const clampedX = Math.max(0, Math.min(room.w - item.w, Math.round(nextX * 10) / 10));
+    const clampedY = Math.max(0, Math.min(room.h - item.h, Math.round(nextY * 10) / 10));
+
+    const updated: Plan = {
+      ...localPlan,
+      rooms: (localPlan.rooms || []).map((r) => {
+        if (r.id !== roomId) return r;
+        const furniture = [...(r.furniture || [])];
+        furniture[furnitureIndex] = { ...furniture[furnitureIndex], x: clampedX, y: clampedY };
+        return { ...r, furniture };
+      }),
+    };
+
+    commitLocalPlan(updated);
+  };
+
+  const handleFurnitureTransformEnd = (roomId: string, furnitureIndex: number) => {
+    const key = `${roomId}-f-${furnitureIndex}`;
+    const node = furnitureRefs.current[key];
+    const room = (localPlan.rooms || []).find((r) => r.id === roomId);
+    const item = room?.furniture?.[furnitureIndex];
+    if (!node || !room || !item) return;
+
+    const rot = item.rotation || 0;
+    const scaleX = node.scaleX();
+    const scaleY = node.scaleY();
+    const newW = Math.max(0.8, Math.round(item.w * scaleX * 10) / 10);
+    const newH = Math.max(0.8, Math.round(item.h * scaleY * 10) / 10);
+    const baseRoomX = buildingOffsetX + room.x * scale;
+    const baseRoomY = buildingOffsetY + room.y * scale;
+
+    let nextX = (node.x() - baseRoomX) / scale;
+    let nextY = (node.y() - baseRoomY) / scale;
+
+    if (rot !== 0) {
+      nextX = (node.x() - baseRoomX - (newW * scale) / 2) / scale;
+      nextY = (node.y() - baseRoomY - (newH * scale) / 2) / scale;
+    }
+
+    const clampedX = Math.max(0, Math.min(room.w - newW, Math.round(nextX * 10) / 10));
+    const clampedY = Math.max(0, Math.min(room.h - newH, Math.round(nextY * 10) / 10));
+
+    node.scaleX(1);
+    node.scaleY(1);
+    node.x(baseRoomX + clampedX * scale + (rot !== 0 ? (newW * scale) / 2 : 0));
+    node.y(baseRoomY + clampedY * scale + (rot !== 0 ? (newH * scale) / 2 : 0));
+
+    const updated: Plan = {
+      ...localPlan,
+      rooms: (localPlan.rooms || []).map((r) => {
+        if (r.id !== roomId) return r;
+        const furniture = [...(r.furniture || [])];
+        furniture[furnitureIndex] = { ...furniture[furnitureIndex], x: clampedX, y: clampedY, w: newW, h: newH };
+        return { ...r, furniture };
+      }),
+    };
+
+    commitLocalPlan(updated);
   };
 
   const setPlotEntrance = (pos: number, commit: boolean) => {
@@ -186,7 +293,29 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
 
   return (
     <div ref={wrapRef} className="relative h-full w-full overflow-hidden rounded-2xl bg-transparent shadow-inner">
-      {advanced && selectedRoomId && (
+      {advanced && selectedFurniture && (() => {
+        const room = (localPlan.rooms || []).find((r) => r.id === selectedFurniture.roomId);
+        const item = room?.furniture?.[selectedFurniture.furnitureIndex];
+        if (!room || !item) return null;
+
+        return (
+          <div className="absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
+            <span className="px-3 text-xs font-bold uppercase tracking-wider text-ink">
+              {item.type.replace(/_/g, ' ')}
+            </span>
+            <div className="h-6 w-px bg-border" />
+            <button
+              onClick={() => handleDeleteFurniture(selectedFurniture.roomId, selectedFurniture.furnitureIndex)}
+              className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-red-600 hover:bg-red-50 transition-all active:scale-95"
+              title="Delete Asset"
+            >
+              <Trash2 size={14} className="text-red-500" />
+              Delete Asset
+            </button>
+          </div>
+        );
+      })()}
+      {advanced && selectedRoomId && !selectedFurniture && (
         <div className="absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
           <button
             onClick={() => handleRotateRoom(selectedRoomId)}
@@ -263,6 +392,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
         onPointerDown={(e) => {
           if (e.target === e.target.getStage()) {
             setSelectedRoomId(null);
+            setSelectedFurniture(null);
             setSelectedDoor(null);
             setSelectedWindow(null);
             setWallPopup(null);
@@ -303,7 +433,9 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
               onPointerDown={() => {
                 if (advanced) {
                   setSelectedRoomId(room.id);
+                  setSelectedFurniture(null);
                   setSelectedDoor(null);
+                  setSelectedWindow(null);
                 }
               }}
               onWallToggle={(wall: string) => {
@@ -388,6 +520,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
                 };
                 commitLocalPlan(updatedPlan);
               }}
+              floorLevel={floorLevel}
             />
           ))}
           {advanced && (
@@ -407,7 +540,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
           )}
         </Layer>
 
-        <Layer listening={false}>
+        <Layer listening={advanced}>
           {(localPlan.rooms || []).map((room) =>
             room.furniture.map((f, fi) => (
               <FurnitureShape
@@ -418,6 +551,22 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
                 scale={scale}
                 offsetX={buildingOffsetX}
                 offsetY={buildingOffsetY}
+                draggable={advanced}
+                selected={selectedFurniture?.roomId === room.id && selectedFurniture?.furnitureIndex === fi}
+                innerRef={(node: any) => {
+                  if (node) furnitureRefs.current[`${room.id}-f-${fi}`] = node;
+                }}
+                onPointerDown={() => {
+                  if (advanced) {
+                    setSelectedFurniture({ roomId: room.id, furnitureIndex: fi });
+                    setSelectedRoomId(null);
+                    setSelectedDoor(null);
+                    setSelectedWindow(null);
+                    setWallPopup(null);
+                  }
+                }}
+                onDragEnd={(e: any) => handleFurnitureDragEnd(room.id, fi, e)}
+                onTransformEnd={() => handleFurnitureTransformEnd(room.id, fi)}
               />
             ))
           )}
@@ -444,6 +593,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
                       if (advanced) {
                         setSelectedDoor({ roomId: room.id, doorIndex: di });
                         setSelectedRoomId(null);
+                        setSelectedFurniture(null);
                         setSelectedWindow(null);
                       }
                     }}
@@ -496,6 +646,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
                     if (advanced) {
                       setSelectedWindow({ roomId: room.id, windowIndex: wi });
                       setSelectedRoomId(null);
+                      setSelectedFurniture(null);
                       setSelectedDoor(null);
                     }
                   }}
@@ -801,7 +952,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
 };
 
 /* ─── Room Shape ─── */
-const RoomShape = ({ room, scale, offsetX, offsetY, isSelected, onClick, onRotate, onMirror, draggable, onDragEnd, onContext, onFurnitureUpdate, showLabels = true, onPointerDown, onTransformEnd, innerRef, isWallMode, setWallPopup, onWallToggle }: any) => {
+const RoomShape = ({ room, scale, offsetX, offsetY, isSelected, onClick, onRotate, onMirror, draggable, onDragEnd, onContext, onFurnitureUpdate, showLabels = true, onPointerDown, onTransformEnd, innerRef, isWallMode, setWallPopup, onWallToggle, floorLevel }: any) => {
   const rx = offsetX + room.x * scale;
   const ry = offsetY + room.y * scale;
   const rw = room.w * scale;
@@ -826,7 +977,7 @@ const RoomShape = ({ room, scale, offsetX, offsetY, isSelected, onClick, onRotat
     >
       <Rect 
         width={rw} height={rh} 
-        fill={isTree ? 'rgba(34, 197, 94, 0.4)' : room.color} 
+        fill={isTree ? 'rgba(34, 197, 94, 0.4)' : (isStaircase ? 'transparent' : room.color)} 
         cornerRadius={isTree ? rw / 2 : 0}
         opacity={(isRooftop || isFence) ? 0.6 : 1} 
         dash={(isRooftop || isFence) ? [5, 5] : undefined}
@@ -1015,106 +1166,201 @@ const RoomShape = ({ room, scale, offsetX, offsetY, isSelected, onClick, onRotat
           ))}
         </Group>
       )}
-      {/* Staircase L-Shape Visualization */}
+      {/* Staircase L-Shape Visualization — Floor-Aware Architectural Style */}
       {isStaircase && (() => {
         const orient = room.orientation || 0;
-        const landingSize = Math.min(rw, rh) * 0.45;
-        const firstFlightSteps = 9;
-        const secondFlightSteps = 9;
+        // Derive compact stair geometry from room dimensions
+        const sg = resolveStairGeometry(room);
+        const sW = sg.stairWidth * scale; // compact stair width in px
+        const sL = sg.stairLength * scale; // compact stair length in px
+        const landingSize = sg.landingSize * scale;
         
+        // Use shared stairGeometry offsets as master coordinates
+        const stairOffsetX = sg.stairOffsetX * scale;
+        const stairOffsetY = sg.stairOffsetY * scale;
+
+        // ─── FIRST FLOOR: Landing + Opening Void ───
+        if (floorLevel === 1) {
+          const openW = sg.openingWidth * scale;
+          const openL = sg.openingLength * scale;
+          return (
+            <Group opacity={0.55} scaleX={isMirrored ? -1 : 1} x={isMirrored ? rw : 0}>
+              {/* Opening void outline */}
+              <Rect x={stairOffsetX} y={stairOffsetY} width={openW} height={openL}
+                stroke="#666" strokeWidth={1.2} dash={[6, 4]} fill="rgba(0,0,0,0.03)" />
+              
+              {/* Cross-hatching inside void (architectural convention for openings) */}
+              {(() => {
+                const hatchLines = [];
+                const hatchSpacing = 8;
+                const ox = stairOffsetX;
+                const oy = stairOffsetY;
+                // Diagonal lines from top-left to bottom-right
+                for (let d = hatchSpacing; d < openW + openL; d += hatchSpacing) {
+                  const x1 = Math.max(0, d - openL) + ox;
+                  const y1 = Math.min(d, openL) + oy;
+                  const x2 = Math.min(d, openW) + ox;
+                  const y2 = Math.max(0, d - openW) + oy;
+                  hatchLines.push(
+                    <Line key={`hatch-${d}`} points={[x1, y1, x2, y2]}
+                      stroke="#999" strokeWidth={0.3} opacity={0.5} />
+                  );
+                }
+                return hatchLines;
+              })()}
+
+              {/* Landing platform at arrival zone */}
+              {(() => {
+                let lx = stairOffsetX, ly = stairOffsetY;
+                if (orient === 0) { lx = stairOffsetX; ly = stairOffsetY; }
+                else if (orient === 1) { lx = stairOffsetX + openW - landingSize; ly = stairOffsetY; }
+                else if (orient === 2) { lx = stairOffsetX + openW - landingSize; ly = stairOffsetY + openL - landingSize; }
+                else if (orient === 3) { lx = stairOffsetX; ly = stairOffsetY + openL - landingSize; }
+                return <Rect x={lx} y={ly} width={landingSize} height={landingSize}
+                  stroke="#333" strokeWidth={1.0} fill="rgba(180,170,155,0.15)" />;
+              })()}
+              
+              {/* Guard rail line along opening edge */}
+              {(() => {
+                const railOffset = 2;
+                if (orient === 0) {
+                  return <Line points={[stairOffsetX + landingSize, stairOffsetY + railOffset, stairOffsetX + openW, stairOffsetY + railOffset]}
+                    stroke="#333" strokeWidth={1.5} />;
+                } else if (orient === 1) {
+                  return <Line points={[stairOffsetX + openW - landingSize - railOffset, stairOffsetY, stairOffsetX + openW - landingSize - railOffset, stairOffsetY + openL]}
+                    stroke="#333" strokeWidth={1.5} />;
+                } else if (orient === 2) {
+                  return <Line points={[stairOffsetX, stairOffsetY + openL - railOffset, stairOffsetX + openW - landingSize, stairOffsetY + openL - railOffset]}
+                    stroke="#333" strokeWidth={1.5} />;
+                } else {
+                  return <Line points={[stairOffsetX + landingSize + railOffset, stairOffsetY, stairOffsetX + landingSize + railOffset, stairOffsetY + openL]}
+                    stroke="#333" strokeWidth={1.5} />;
+                }
+              })()}
+
+              {/* DN label (architectural convention: down arrow) */}
+              <Text x={stairOffsetX + openW / 2 - 8} y={stairOffsetY + openL / 2 - 5}
+                text="DN" fontSize={10} fontStyle="bold" fill="#555" letterSpacing={1} />
+              
+              {/* Downward arrow */}
+              {(() => {
+                const cx = stairOffsetX + openW / 2;
+                const ay = stairOffsetY + openL / 2 + 8;
+                return (
+                  <Group opacity={0.6}>
+                    <Line points={[cx, ay, cx, ay + 12]} stroke="#555" strokeWidth={0.8} />
+                    <Line points={[cx - 3, ay + 9, cx, ay + 12, cx + 3, ay + 9]} stroke="#555" strokeWidth={0.8} />
+                  </Group>
+                );
+              })()}
+            </Group>
+          );
+        }
+
+        // ─── GROUND FLOOR: Full L-Shape Staircase ───
+        const displaySteps1 = Math.ceil(9 / 2);
+        const displaySteps2 = Math.ceil(9 / 2);
+
         return (
-          <Group opacity={0.6} scaleX={isMirrored ? -1 : 1} x={isMirrored ? rw : 0}>
+          <Group opacity={0.55} scaleX={isMirrored ? -1 : 1} x={isMirrored ? rw : 0}>
+            {/* Stair container outline (dashed, lightweight) */}
+            <Rect x={stairOffsetX} y={stairOffsetY} width={sW} height={sL} stroke="#444" strokeWidth={1.0} dash={[4, 3]} />
+
             {/* Landing */}
             {(() => {
-              let lx = 0, ly = 0;
-              if (orient === 0) { lx = 0; ly = 0; } // Top-left
-              else if (orient === 1) { lx = rw - landingSize; ly = 0; } // Top-right
-              else if (orient === 2) { lx = rw - landingSize; ly = rh - landingSize; } // Bottom-right
-              else if (orient === 3) { lx = 0; ly = rh - landingSize; } // Bottom-left
+              let lx = stairOffsetX, ly = stairOffsetY;
+              if (orient === 0) { lx = stairOffsetX; ly = stairOffsetY; }
+              else if (orient === 1) { lx = stairOffsetX + sW - landingSize; ly = stairOffsetY; }
+              else if (orient === 2) { lx = stairOffsetX + sW - landingSize; ly = stairOffsetY + sL - landingSize; }
+              else if (orient === 3) { lx = stairOffsetX; ly = stairOffsetY + sL - landingSize; }
               
-              return <Rect x={lx} y={ly} width={landingSize} height={landingSize} stroke="#333" strokeWidth={1} fill="rgba(0,0,0,0.05)" />;
+              return <Rect x={lx} y={ly} width={landingSize} height={landingSize} stroke="#333" strokeWidth={1.0} fill="rgba(0,0,0,0.04)" />;
             })()}
 
-            {/* Flight 1 & 2 Steps */}
+            {/* Flight 1 & 2 Steps — thin architectural drafting lines */}
             {(() => {
               const items = [];
               if (orient === 0) {
-                const f1H = rh - landingSize;
-                const f1StepH = f1H / firstFlightSteps;
-                for (let i = 1; i < firstFlightSteps; i++) {
-                  items.push(<Line key={`f1-${i}`} points={[0, rh - i * f1StepH, landingSize, rh - i * f1StepH]} stroke="#333" strokeWidth={1} />);
+                const f1H = sL - landingSize;
+                const f1StepH = f1H / displaySteps1;
+                for (let i = 1; i < displaySteps1; i++) {
+                  items.push(<Line key={`f1-${i}`} points={[stairOffsetX, stairOffsetY + sL - i * f1StepH, stairOffsetX + landingSize, stairOffsetY + sL - i * f1StepH]} stroke="#333" strokeWidth={0.7} />);
                 }
-                const f2W = rw - landingSize;
-                const f2StepW = f2W / secondFlightSteps;
-                for (let i = 1; i < secondFlightSteps; i++) {
-                  items.push(<Line key={`f2-${i}`} points={[landingSize + i * f2StepW, 0, landingSize + i * f2StepW, landingSize]} stroke="#333" strokeWidth={1} />);
+                const f2W = sW - landingSize;
+                const f2StepW = f2W / displaySteps2;
+                for (let i = 1; i < displaySteps2; i++) {
+                  items.push(<Line key={`f2-${i}`} points={[stairOffsetX + landingSize + i * f2StepW, stairOffsetY, stairOffsetX + landingSize + i * f2StepW, stairOffsetY + landingSize]} stroke="#333" strokeWidth={0.7} />);
                 }
               } else if (orient === 1) {
-                const f1W = rw - landingSize;
-                const f1StepW = f1W / firstFlightSteps;
-                for (let i = 1; i < firstFlightSteps; i++) {
-                  items.push(<Line key={`f1-${i}`} points={[i * f1StepW, 0, i * f1StepW, landingSize]} stroke="#333" strokeWidth={1} />);
+                const f1W = sW - landingSize;
+                const f1StepW = f1W / displaySteps1;
+                for (let i = 1; i < displaySteps1; i++) {
+                  items.push(<Line key={`f1-${i}`} points={[stairOffsetX + i * f1StepW, stairOffsetY, stairOffsetX + i * f1StepW, stairOffsetY + landingSize]} stroke="#333" strokeWidth={0.7} />);
                 }
-                const f2H = rh - landingSize;
-                const f2StepH = f2H / secondFlightSteps;
-                for (let i = 1; i < secondFlightSteps; i++) {
-                  items.push(<Line key={`f2-${i}`} points={[rw - landingSize, landingSize + i * f2StepH, rw, landingSize + i * f2StepH]} stroke="#333" strokeWidth={1} />);
+                const f2H = sL - landingSize;
+                const f2StepH = f2H / displaySteps2;
+                for (let i = 1; i < displaySteps2; i++) {
+                  items.push(<Line key={`f2-${i}`} points={[stairOffsetX + sW - landingSize, stairOffsetY + landingSize + i * f2StepH, stairOffsetX + sW, stairOffsetY + landingSize + i * f2StepH]} stroke="#333" strokeWidth={0.7} />);
                 }
               } else if (orient === 2) {
-                const f1H = rh - landingSize;
-                const f1StepH = f1H / firstFlightSteps;
-                for (let i = 1; i < firstFlightSteps; i++) {
-                  items.push(<Line key={`f1-${i}`} points={[rw - landingSize, i * f1StepH, rw, i * f1StepH]} stroke="#333" strokeWidth={1} />);
+                const f1H = sL - landingSize;
+                const f1StepH = f1H / displaySteps1;
+                for (let i = 1; i < displaySteps1; i++) {
+                  items.push(<Line key={`f1-${i}`} points={[stairOffsetX + sW - landingSize, stairOffsetY + i * f1StepH, stairOffsetX + sW, stairOffsetY + i * f1StepH]} stroke="#333" strokeWidth={0.7} />);
                 }
-                const f2W = rw - landingSize;
-                const f2StepW = f2W / secondFlightSteps;
-                for (let i = 1; i < secondFlightSteps; i++) {
-                  items.push(<Line key={`f2-${i}`} points={[rw - landingSize - i * f2StepW, rh - landingSize, rw - landingSize - i * f2StepW, rh]} stroke="#333" strokeWidth={1} />);
+                const f2W = sW - landingSize;
+                const f2StepW = f2W / displaySteps2;
+                for (let i = 1; i < displaySteps2; i++) {
+                  items.push(<Line key={`f2-${i}`} points={[stairOffsetX + sW - landingSize - i * f2StepW, stairOffsetY + sL - landingSize, stairOffsetX + sW - landingSize - i * f2StepW, stairOffsetY + sL]} stroke="#333" strokeWidth={0.7} />);
                 }
               } else if (orient === 3) {
-                const f1W = rw - landingSize;
-                const f1StepW = f1W / firstFlightSteps;
-                for (let i = 1; i < firstFlightSteps; i++) {
-                  items.push(<Line key={`f1-${i}`} points={[rw - i * f1StepW, rh - landingSize, rw - i * f1StepW, rh]} stroke="#333" strokeWidth={1} />);
+                const f1W = sW - landingSize;
+                const f1StepW = f1W / displaySteps1;
+                for (let i = 1; i < displaySteps1; i++) {
+                  items.push(<Line key={`f1-${i}`} points={[stairOffsetX + sW - i * f1StepW, stairOffsetY + sL - landingSize, stairOffsetX + sW - i * f1StepW, stairOffsetY + sL]} stroke="#333" strokeWidth={0.7} />);
                 }
-                const f2H = rh - landingSize;
-                const f2StepH = f2H / secondFlightSteps;
-                for (let i = 1; i < secondFlightSteps; i++) {
-                  items.push(<Line key={`f2-${i}`} points={[0, rh - landingSize - i * f2StepH, landingSize, rh - landingSize - i * f2StepH]} stroke="#333" strokeWidth={1} />);
+                const f2H = sL - landingSize;
+                const f2StepH = f2H / displaySteps2;
+                for (let i = 1; i < displaySteps2; i++) {
+                  items.push(<Line key={`f2-${i}`} points={[stairOffsetX, stairOffsetY + sL - landingSize - i * f2StepH, stairOffsetX + landingSize, stairOffsetY + sL - landingSize - i * f2StepH]} stroke="#333" strokeWidth={0.7} />);
                 }
               }
               return items;
             })()}
             
-            {/* Directional Path Arrow */}
+            {/* Directional Path Arrow — minimal architectural style */}
             {(() => {
-              const arrowHeadSize = 6;
-              let pathPoints = [];
-              let arrowPoints = [];
+              const arrowHeadSize = 4;
+              let pathPoints: number[] = [];
+              let arrowPoints: number[] = [];
               const mid = landingSize / 2;
               
               if (orient === 0) {
-                pathPoints = [mid, rh - 4, mid, mid, rw - 4, mid];
-                arrowPoints = [rw - 4 - arrowHeadSize, mid - arrowHeadSize/2, rw - 4, mid, rw - 4 - arrowHeadSize, mid + arrowHeadSize/2];
+                pathPoints = [stairOffsetX + mid, stairOffsetY + sL - 3, stairOffsetX + mid, stairOffsetY + mid, stairOffsetX + sW - 3, stairOffsetY + mid];
+                arrowPoints = [stairOffsetX + sW - 3 - arrowHeadSize, stairOffsetY + mid - arrowHeadSize/2, stairOffsetX + sW - 3, stairOffsetY + mid, stairOffsetX + sW - 3 - arrowHeadSize, stairOffsetY + mid + arrowHeadSize/2];
               } else if (orient === 1) {
-                pathPoints = [4, mid, rw - mid, mid, rw - mid, rh - 4];
-                arrowPoints = [rw - mid - arrowHeadSize/2, rh - 4 - arrowHeadSize, rw - mid, rh - 4, rw - mid + arrowHeadSize/2, rh - 4 - arrowHeadSize];
+                pathPoints = [stairOffsetX + 3, stairOffsetY + mid, stairOffsetX + sW - mid, stairOffsetY + mid, stairOffsetX + sW - mid, stairOffsetY + sL - 3];
+                arrowPoints = [stairOffsetX + sW - mid - arrowHeadSize/2, stairOffsetY + sL - 3 - arrowHeadSize, stairOffsetX + sW - mid, stairOffsetY + sL - 3, stairOffsetX + sW - mid + arrowHeadSize/2, stairOffsetY + sL - 3 - arrowHeadSize];
               } else if (orient === 2) {
-                pathPoints = [rw - mid, 4, rw - mid, rh - mid, 4, rh - mid];
-                arrowPoints = [4 + arrowHeadSize, rh - mid - arrowHeadSize/2, 4, rh - mid, 4 + arrowHeadSize, rh - mid + arrowHeadSize/2];
+                pathPoints = [stairOffsetX + sW - mid, stairOffsetY + 3, stairOffsetX + sW - mid, stairOffsetY + sL - mid, stairOffsetX + 3, stairOffsetY + sL - mid];
+                arrowPoints = [stairOffsetX + 3 + arrowHeadSize, stairOffsetY + sL - mid - arrowHeadSize/2, stairOffsetX + 3, stairOffsetY + sL - mid, stairOffsetX + 3 + arrowHeadSize, stairOffsetY + sL - mid + arrowHeadSize/2];
               } else if (orient === 3) {
-                pathPoints = [rw - 4, rh - mid, mid, rh - mid, mid, 4];
-                arrowPoints = [mid - arrowHeadSize/2, 4 + arrowHeadSize, mid, 4, mid + arrowHeadSize/2, 4 + arrowHeadSize];
+                pathPoints = [stairOffsetX + sW - 3, stairOffsetY + sL - mid, stairOffsetX + mid, stairOffsetY + sL - mid, stairOffsetX + mid, stairOffsetY + 3];
+                arrowPoints = [stairOffsetX + mid - arrowHeadSize/2, stairOffsetY + 3 + arrowHeadSize, stairOffsetX + mid, stairOffsetY + 3, stairOffsetX + mid + arrowHeadSize/2, stairOffsetY + 3 + arrowHeadSize];
               }
               
               return (
-                <Group opacity={0.8}>
-                  <Circle x={pathPoints[0]} y={pathPoints[1]} radius={2.5} fill="#333" />
-                  <Line points={pathPoints} stroke="#333" strokeWidth={1.5} tension={0.2} />
-                  <Line points={arrowPoints} stroke="#333" strokeWidth={1.5} />
+                <Group opacity={0.65}>
+                  <Circle x={pathPoints[0]} y={pathPoints[1]} radius={1.8} fill="#333" />
+                  <Line points={pathPoints} stroke="#333" strokeWidth={0.8} tension={0.15} />
+                  <Line points={arrowPoints} stroke="#333" strokeWidth={0.8} />
                 </Group>
               );
             })()}
+
+            {/* UP label */}
+            <Text x={stairOffsetX + sW / 2 - 6} y={stairOffsetY + sL + 3}
+              text="UP" fontSize={8} fontStyle="bold" fill="#666" letterSpacing={1} />
           </Group>
         );
       })()}
@@ -1140,7 +1386,7 @@ const RoomShape = ({ room, scale, offsetX, offsetY, isSelected, onClick, onRotat
 };
 
 /* ─── Furniture ─── */
-const FurnitureShape = ({ item, roomX, roomY, scale, offsetX, offsetY }: any) => {
+const FurnitureShape = ({ item, roomX, roomY, scale, offsetX, offsetY, draggable = false, selected = false, innerRef, onPointerDown, onDragEnd, onTransformEnd }: any) => {
   const w = item.w * scale;
   const h = item.h * scale;
   const rot = item.rotation || 0;
@@ -1149,7 +1395,22 @@ const FurnitureShape = ({ item, roomX, roomY, scale, offsetX, offsetY }: any) =>
   const colors = getFurnitureColors(item.type);
 
   return (
-    <Group x={x} y={y} rotation={rot} offsetX={rot !== 0 ? w / 2 : 0} offsetY={rot !== 0 ? h / 2 : 0}>
+    <Group
+      ref={innerRef}
+      x={x}
+      y={y}
+      rotation={rot}
+      offsetX={rot !== 0 ? w / 2 : 0}
+      offsetY={rot !== 0 ? h / 2 : 0}
+      draggable={draggable}
+      onPointerDown={(e: any) => {
+        e.cancelBubble = true;
+        onPointerDown?.();
+      }}
+      onDragEnd={onDragEnd}
+      onTransformEnd={onTransformEnd}
+    >
+      {selected && <Rect x={-3} y={-3} width={w + 6} height={h + 6} stroke="#2563eb" strokeWidth={2} dash={[5, 4]} cornerRadius={4} />}
       {item.type === 'bed' && (
         <Group>
            <Rect width={w} height={h} fill={colors.fill} cornerRadius={4} shadowColor="black" shadowBlur={5} shadowOpacity={0.2} shadowOffsetY={2} />

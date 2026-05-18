@@ -2,7 +2,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, ContactShadows, Html } from '@react-three/drei';
 import { Suspense, useMemo, useRef, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
-import { Plan } from '@/lib/floorplan';
+import { Plan, resolveStairGeometry } from '@/lib/floorplan';
 import { Material, RoofType, AddOn } from '@/store/configurator';
 import { Furniture3D } from './Furniture3D';
 import { SceneLighting } from './SceneLighting';
@@ -289,7 +289,7 @@ const Staircase3D = ({
           return (
             <group key={`f1-step-${i}`} position={[posX, posY, posZ]}>
               <mesh castShadow receiveShadow>
-                <boxGeometry args={[stepW, 0.35, stepL]} />
+                <boxGeometry args={[stepW, 0.25, stepL]} />
                 <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
               </mesh>
               <mesh position={[0, -stepH/2, 0]}>
@@ -301,14 +301,14 @@ const Staircase3D = ({
           );
         })}
 
-        {/* Landing */}
-        <group position={[-w/2 + landingSize/2, firstFlightCount * stepH + 0.1, -h/2 + landingSize/2]}>
+        {/* Landing — flush with last step of flight 1 */}
+        <group position={[-w/2 + landingSize/2, firstFlightCount * stepH, -h/2 + landingSize/2]}>
           <mesh castShadow receiveShadow>
-            <boxGeometry args={[landingSize, 0.35, landingSize]} />
+            <boxGeometry args={[landingSize, 0.25, landingSize]} />
             <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
           </mesh>
-          <mesh position={[0, -stepH, 0]}>
-            <boxGeometry args={[landingSize - 0.2, stepH * 2, landingSize - 0.2]} />
+          <mesh position={[0, -stepH * 0.5, 0]}>
+            <boxGeometry args={[landingSize - 0.2, stepH, landingSize - 0.2]} />
             <meshStandardMaterial color="#c0c0c0" roughness={0.5} />
           </mesh>
         </group>
@@ -323,7 +323,7 @@ const Staircase3D = ({
           return (
             <group key={`f2-step-${i}`} position={[posX, posY, posZ]}>
               <mesh castShadow receiveShadow>
-                <boxGeometry args={[stepW, 0.35, stepL]} />
+                <boxGeometry args={[stepW, 0.25, stepL]} />
                 <meshStandardMaterial color="#ffffff" map={marbleTextures.map} roughnessMap={marbleTextures.roughness} roughness={0.05} metalness={0.2} envMapIntensity={2} />
               </mesh>
               <mesh rotation={[0, Math.PI/2, 0]} position={[0, -stepH/2, 0]}>
@@ -1147,23 +1147,28 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
                 );
               })}
 
-              {/* Staircase Model */}
-              {isStaircaseRoom(r) && (
-                <group position={[cx, 0.02, cz]}>
-                  <Staircase3D 
-                    w={r.w} 
-                    h={r.h} 
-                    floorHeight={wallH} 
-                    isNight={isNight} 
-                    orientation={r.orientation || 0} 
-                    isMirrored={r.isMirrored}
-                    roomX={r.x}
-                    roomY={r.y}
-                    planWidth={W}
-                    planHeight={D}
-                  />
-                </group>
-              )}
+              {isStaircaseRoom(r) && (() => {
+                const sg = resolveStairGeometry(r);
+                // Position stair 3D model at offset position inside room, not room center
+                const stairCX = round2(r.x + sg.stairOffsetX + sg.stairWidth / 2 - W / 2);
+                const stairCZ = round2(r.y + sg.stairOffsetY + sg.stairLength / 2 - D / 2);
+                return (
+                  <group position={[stairCX, 0.02, stairCZ]}>
+                    <Staircase3D 
+                      w={sg.stairWidth} 
+                      h={sg.stairLength} 
+                      floorHeight={wallH} 
+                      isNight={isNight} 
+                      orientation={r.orientation || 0} 
+                      isMirrored={r.isMirrored}
+                      roomX={r.x}
+                      roomY={r.y}
+                      planWidth={W}
+                      planHeight={D}
+                    />
+                  </group>
+                );
+              })()}
             </group>
           );
         })}
@@ -1225,10 +1230,12 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
         accentShape.closePath();
         
         if (groundStaircaseForTrim) {
-          const hx = round2(groundStaircaseForTrim.x + groundStaircaseForTrim.w / 2 - W / 2 - roofCX);
-          const hz = round2(groundStaircaseForTrim.y + groundStaircaseForTrim.h / 2 - D / 2 - roofCZ);
-          const hw = groundStaircaseForTrim.w + 0.2; // Slightly larger for clearance
-          const hh = groundStaircaseForTrim.h + 0.2;
+          const sg = resolveStairGeometry(groundStaircaseForTrim);
+          // Opening position derived from stair offset inside room, NOT room center
+          const hx = round2(groundStaircaseForTrim.x + sg.stairOffsetX + sg.openingWidth / 2 - W / 2 - roofCX);
+          const hz = round2(groundStaircaseForTrim.y + sg.stairOffsetY + sg.openingLength / 2 - D / 2 - roofCZ);
+          const hw = sg.openingWidth + 0.2;
+          const hh = sg.openingLength + 0.2;
           
           const trimHole = new THREE.Path();
           trimHole.moveTo(hx - hw/2, hz - hh/2);
@@ -1293,12 +1300,16 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
       {/* Roof System */}
       {(() => {
         const groundStaircase = (plan.rooms || []).find(r => isStaircaseRoom(r));
-        const hole = groundStaircase ? {
-          x: round2(groundStaircase.x + groundStaircase.w / 2 - W / 2 - roofCX),
-          z: round2(groundStaircase.y + groundStaircase.h / 2 - D / 2 - roofCZ),
-          w: groundStaircase.w + 0.2, // Slightly larger for clearance
-          h: groundStaircase.h + 0.2
-        } : null;
+        const hole = groundStaircase ? (() => {
+          const sg = resolveStairGeometry(groundStaircase);
+          return {
+            // Opening position derived from stair offset, not room center
+            x: round2(groundStaircase.x + sg.stairOffsetX + sg.openingWidth / 2 - W / 2 - roofCX),
+            z: round2(groundStaircase.y + sg.stairOffsetY + sg.openingLength / 2 - D / 2 - roofCZ),
+            w: sg.openingWidth + 0.2,
+            h: sg.openingLength + 0.2
+          };
+        })() : null;
 
         // Ensure roof is always visible for single storey, and uses the correct type
         const finalHideRoof = isDoubleStorey ? hideRoof : false;
@@ -2847,10 +2858,101 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
     <group position={[0, floorY, 0]}>
       {/* Floor slab only beneath added upper-floor rooms */}
       {(firstFloorPlan?.rooms || [])
-        .filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && !isStaircaseRoom(r))
+        .filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony')
         .map(r => {
           const cx = round2(upperOffsetX + r.x + r.w / 2);
           const cz = round2(upperOffsetZ + r.y + r.h / 2);
+          
+          // For staircase rooms: render slab but only for the non-opening portion
+          if (isStaircaseRoom(r)) {
+            const sg = resolveStairGeometry(r);
+            const openW = sg.openingWidth;
+            const openL = sg.openingLength;
+            // Opening position derived from stair offset inside room
+            const openCX = round2(upperOffsetX + r.x + sg.stairOffsetX + openW / 2);
+            const openCZ = round2(upperOffsetZ + r.y + sg.stairOffsetY + openL / 2);
+            // Compute 4 slab segments around the offset opening
+            const EPS = 0.02; // tiny gap to prevent visual sealing
+            const slabs = [];
+            const slabY = 0.4;
+            const slabH = 0.8;
+            // Left slab: from room left edge to opening left edge
+            const leftW = sg.stairOffsetX - EPS;
+            if (leftW > 0.15) {
+              slabs.push(
+                <mesh key={`slab-l-${r.id}`} receiveShadow position={[round2(upperOffsetX + r.x + leftW / 2), slabY, cz]}>
+                  <boxGeometry args={[leftW, slabH, r.h]} />
+                  <meshStandardMaterial color="#9a8a78" roughness={0.8} />
+                </mesh>
+              );
+            }
+            // Right slab: from opening right edge to room right edge
+            const rightEdge = sg.stairOffsetX + openW;
+            const rightW = r.w - rightEdge - EPS;
+            if (rightW > 0.15) {
+              slabs.push(
+                <mesh key={`slab-r-${r.id}`} receiveShadow position={[round2(upperOffsetX + r.x + rightEdge + rightW / 2), slabY, cz]}>
+                  <boxGeometry args={[rightW, slabH, r.h]} />
+                  <meshStandardMaterial color="#9a8a78" roughness={0.8} />
+                </mesh>
+              );
+            }
+            // Top slab: from room top edge to opening top edge (within opening width)
+            const topH = sg.stairOffsetY - EPS;
+            if (topH > 0.15) {
+              slabs.push(
+                <mesh key={`slab-t-${r.id}`} receiveShadow position={[openCX, slabY, round2(upperOffsetZ + r.y + topH / 2)]}>
+                  <boxGeometry args={[openW, slabH, topH]} />
+                  <meshStandardMaterial color="#9a8a78" roughness={0.8} />
+                </mesh>
+              );
+            }
+            // Bottom slab: from opening bottom edge to room bottom edge
+            const bottomEdge = sg.stairOffsetY + openL;
+            const bottomH = r.h - bottomEdge - EPS;
+            if (bottomH > 0.15) {
+              slabs.push(
+                <mesh key={`slab-b-${r.id}`} receiveShadow position={[openCX, slabY, round2(upperOffsetZ + r.y + bottomEdge + bottomH / 2)]}>
+                  <boxGeometry args={[openW, slabH, bottomH]} />
+                  <meshStandardMaterial color="#9a8a78" roughness={0.8} />
+                </mesh>
+              );
+            }
+            // Stairwell trim beam — structural edge framing around opening
+            const beamT = 0.1; // beam thickness
+            const beamH = slabH + 0.1; // slightly taller than slab
+            const beamY = slabY;
+            // Front beam (along X at top of opening)
+            slabs.push(
+              <mesh key={`beam-f-${r.id}`} position={[openCX, beamY, round2(upperOffsetZ + r.y + sg.stairOffsetY - beamT / 2)]}>
+                <boxGeometry args={[openW + beamT * 2, beamH, beamT]} />
+                <meshStandardMaterial color="#7a6e62" roughness={0.7} />
+              </mesh>
+            );
+            // Back beam
+            slabs.push(
+              <mesh key={`beam-b-${r.id}`} position={[openCX, beamY, round2(upperOffsetZ + r.y + sg.stairOffsetY + openL + beamT / 2)]}>
+                <boxGeometry args={[openW + beamT * 2, beamH, beamT]} />
+                <meshStandardMaterial color="#7a6e62" roughness={0.7} />
+              </mesh>
+            );
+            // Left beam
+            slabs.push(
+              <mesh key={`beam-l-${r.id}`} position={[round2(upperOffsetX + r.x + sg.stairOffsetX - beamT / 2), beamY, openCZ]}>
+                <boxGeometry args={[beamT, beamH, openL]} />
+                <meshStandardMaterial color="#7a6e62" roughness={0.7} />
+              </mesh>
+            );
+            // Right beam
+            slabs.push(
+              <mesh key={`beam-r-${r.id}`} position={[round2(upperOffsetX + r.x + sg.stairOffsetX + openW + beamT / 2), beamY, openCZ]}>
+                <boxGeometry args={[beamT, beamH, openL]} />
+                <meshStandardMaterial color="#7a6e62" roughness={0.7} />
+              </mesh>
+            );
+            return <group key={`upper-slab-${r.id}`}>{slabs}</group>;
+          }
+          
           return (
             <mesh key={`upper-slab-${r.id}`} receiveShadow position={[cx, 0.4, cz]}>
               <boxGeometry args={[r.w, 0.8, r.h]} />
@@ -2871,7 +2973,7 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
           const cz = round2(r.y + r.h / 2);
           const isStaircase = isStaircaseRoom(r);
           
-          if (isStaircase) return null; // Create opening for staircase
+          // Staircase rooms now render normally — slab opening is handled by segmented slab above
 
           // Get floor material based on room type (same logic as House component)
           const isLivingDining = ['living', 'dining', 'hall', 'lobby', 'foyer', 'entry'].includes(r.type);
@@ -2907,23 +3009,25 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
 
           return (
             <group key={r.id}>
-              {/* Floor */}
-              <mesh receiveShadow position={[cx, 0.01, cz]}>
-                <boxGeometry args={[r.w, 0.02, r.h]} />
-                <meshStandardMaterial
-                  color={baseColor}
-                  map={map}
-                  normalMap={normalMap}
-                  normalScale={new THREE.Vector2(0.45, 0.45)}
-                  roughnessMap={roughnessMap}
-                  roughness={roughness}
-                  metalness={metalness}
-                  envMapIntensity={envMapIntensity}
-                />
-              </mesh>
+              {/* Floor — skip for staircase rooms (segmented slabs handle the floor above) */}
+              {!isStaircase && (
+                <mesh receiveShadow position={[cx, 0.01, cz]}>
+                  <boxGeometry args={[r.w, 0.02, r.h]} />
+                  <meshStandardMaterial
+                    color={baseColor}
+                    map={map}
+                    normalMap={normalMap}
+                    normalScale={new THREE.Vector2(0.45, 0.45)}
+                    roughnessMap={roughnessMap}
+                    roughness={roughness}
+                    metalness={metalness}
+                    envMapIntensity={envMapIntensity}
+                  />
+                </mesh>
+              )}
               
-              {/* Ceiling */}
-              {!hideRoof && r.type !== 'hallway' && (
+              {/* Ceiling — skip for staircase rooms (stairwell must be open) */}
+              {!hideRoof && r.type !== 'hallway' && !isStaircase && (
                 <mesh position={[cx, wallH - 0.01, cz]}>
                   <boxGeometry args={[r.w - 0.1, 0.02, r.h - 0.1]} />
                   <meshStandardMaterial color="#fafaf6" roughness={0.95} />

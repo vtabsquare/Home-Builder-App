@@ -1,0 +1,98 @@
+# Staircase Implementation — Final Polished Architecture
+# ======================================================
+# Updated: 2026-05-18 (Phase 4: Floor-Aware Architectural Representation)
+
+## ARCHITECTURE STATUS: COMPLETE ✓
+
+The staircase system has been fully refactored through 4 phases:
+  Phase 1: Data model decoupling (StairGeometry interface)
+  Phase 2: Offset alignment (single source of truth)
+  Phase 3: Rendering correctness + visual polish (opening slabs & trim beams)
+  Phase 4: Floor-aware architectural representation (this pass)
+
+## THE CORE ARCHITECTURAL RULE
+A staircase is not a room — it is a vertical circulation system. 
+Each floor must render a DIFFERENT part of the staircase.
+
+## FLOOR-AWARE 2D DRAFTING (FloorPlanCanvas & CustomEditorCanvas)
+
+  Props added: `floorLevel?: number` (0 = ground, 1 = first floor, undefined = single)
+
+  GROUND FLOOR (floorLevel === 0 || undefined):
+    - Renders the full staircase layout
+    - All flights visible
+    - Upward continuation arrow labeled "UP"
+    - Solid landing box
+
+  FIRST FLOOR (floorLevel === 1):
+    - Renders ONLY the arrival components
+    - Stairwell opening void (dashed line)
+    - Cross-hatched void area (architectural standard for open to below)
+    - Arrival landing platform
+    - Guard rail line along the exposed edge
+    - Downward arrow labeled "DN"
+
+## 3D VISIBILITY
+
+  - The `Staircase3D` mesh (steps/rails) is ONLY rendered on the Ground floor layout.
+  - The `SecondFloor` component does NOT re-render the stair geometry. 
+  - Instead, it only renders the Segmented Slabs + Trim Beams (the opening void).
+  - This perfectly matches the architectural behavior: the stair rises from the ground up through the upper slab, rather than being duplicated per floor.
+
+## DATA MODEL (floorplan.ts)
+
+  interface StairGeometry {
+    stairWidth: number;      // clamp(roomW * 0.42, 4, 5)
+    stairLength: number;     // clamp(roomH * 0.78, 10, 13)
+    landingSize: number;     // min(stairWidth, 4)
+    openingWidth: number;    // stairWidth + 1.5
+    openingLength: number;   // stairLength * 0.88
+    stepCount: number;       // 18 (9 per flight)
+    stepRise: number;        // 14ft / 18
+    treadDepth: number;      // derived
+    stairOffsetX: number;    // 0.6 (wall-hugging)
+    stairOffsetY: number;    // roomH * 0.08
+    stairType: 'L_SHAPE';
+  }
+
+  Helper functions:
+    computeStairGeometry(roomW, roomH)  → fresh StairGeometry
+    resolveStairGeometry(room)          → merge legacy + computed defaults
+
+## SEGMENTED SLAB SYSTEM (3D Upper Floor)
+
+  4 asymmetric slab segments around offset opening:
+    Left:   width = stairOffsetX - EPS
+    Right:  width = room.w - (stairOffsetX + openW) - EPS
+    Top:    height = stairOffsetY - EPS
+    Bottom: height = room.h - (stairOffsetY + openL) - EPS
+
+  EPS = 0.02 prevents visual sealing at opening edges
+
+## STAIRWELL TRIM BEAM (3D Structural Framing)
+
+  4 structural beams frame the opening perimeter:
+    - Front/Back: openW + 0.2 wide, 0.1 thick
+    - Left/Right: openL long, 0.1 thick
+    - Color: #7a6e62 (darker concrete)
+    - Height: slabH + 0.1 (slightly proud of slab)
+
+## ALIGNMENT CHAIN (Single Source of Truth)
+
+  computeStairGeometry() → resolveStairGeometry()
+       ↓
+  2D FloorPlanCanvas    (sg.stairOffsetX/Y * scale) + (floorLevel representation)
+  2D CustomEditorCanvas (sg.stairOffsetX/Y * scale) + (floorLevel representation)
+       ↓
+  3D Staircase3D        (room.x + sg.stairOffsetX + sg.stairWidth/2) — GROUND ONLY
+  3D Trim holes         (room.x + sg.stairOffsetX + sg.openingWidth/2)
+  3D Roof holes         (same formula)
+  3D Segmented slabs    (sg.stairOffsetX/Y for opening position)
+  3D Trim beams         (sg.stairOffsetX/Y for beam position)
+
+## FILES MODIFIED
+  1. src/lib/floorplan.ts                               — StairGeometry + offsets + resolveStairGeometry
+  2. src/components/configurator/FloorPlanCanvas.tsx    — 2D floor-aware rendering
+  3. src/components/configurator/CustomEditorCanvas.tsx — 2D floor-aware rendering
+  4. src/components/configurator/ElevationCanvas.tsx    — 3D segment slabs + trim beams
+  5. src/components/configurator/steps/StepPreview.tsx  — Passes `floorLevel` context
