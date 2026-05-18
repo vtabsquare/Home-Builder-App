@@ -2748,6 +2748,27 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
   const floorY = wallH; // Ground floor walls end at wallH
   const round2 = (n: number) => Math.round(n * 100) / 100;
 
+  // PBR Floor Textures from materials factory (same as House component)
+  const floorTextures = useMemo(() => ({
+    walnut: createWoodFloorTexture(2, 2),
+    walnutNormal: createWoodFloorNormal(2, 2),
+    walnutRough: createWoodFloorRoughness(2, 2),
+    oak: createOakFloorTexture(2, 2),
+    oakNormal: createOakFloorNormal(2, 2),
+    oakRough: createOakFloorRoughness(2, 2),
+    tile: createTileTexture(4, 4),
+    tileNormal: createTileNormal(4, 4),
+    tileRough: createTileRoughness(4, 4),
+    marble: createMarbleTexture(1.5, 1.5),
+    marbleRough: createMarbleRoughness(1.5, 1.5),
+  }), []);
+
+  // Door / panel wood textures
+  const doorTextures = useMemo(() => ({
+    map: createDoorWoodTexture(1, 2),
+    normal: createDoorWoodNormal(1, 2),
+  }), []);
+
   // Use firstFloorPlan dimensions (may be smaller than ground)
   const ffW = firstFloorPlan.width;
   const ffH = firstFloorPlan.height;
@@ -2805,10 +2826,21 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
     const getAbsWindows = (wall: string) => (room.windows || []).filter((w:any) => w.wall === wall).map((win:any) => ({
       ...win, absPos: (wall === 'top' || wall === 'bottom') ? rX + rW * win.position : rY + rH * win.position
     }));
-    addWall('h', rY, rX, rX + rW, getAbsDoors('top'), getAbsWindows('top'));
-    addWall('h', rY + rH, rX, rX + rW, getAbsDoors('bottom'), getAbsWindows('bottom'));
-    addWall('v', rX, rY, rY + rH, getAbsDoors('left'), getAbsWindows('left'));
-    addWall('v', rX + rW, rY, rY + rH, getAbsDoors('right'), getAbsWindows('right'));
+    
+    // Check openWalls property (skip if wall is marked as open/removed)
+    const openWalls = room.openWalls || [];
+    if (!openWalls.includes('top')) {
+      addWall('h', rY, rX, rX + rW, getAbsDoors('top'), getAbsWindows('top'));
+    }
+    if (!openWalls.includes('bottom')) {
+      addWall('h', rY + rH, rX, rX + rW, getAbsDoors('bottom'), getAbsWindows('bottom'));
+    }
+    if (!openWalls.includes('left')) {
+      addWall('v', rX, rY, rY + rH, getAbsDoors('left'), getAbsWindows('left'));
+    }
+    if (!openWalls.includes('right')) {
+      addWall('v', rX + rW, rY, rY + rH, getAbsDoors('right'), getAbsWindows('right'));
+    }
   });
 
   return (
@@ -2841,12 +2873,53 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
           
           if (isStaircase) return null; // Create opening for staircase
 
+          // Get floor material based on room type (same logic as House component)
+          const isLivingDining = ['living', 'dining', 'hall', 'lobby', 'foyer', 'entry'].includes(r.type);
+          const isBedroom = ['bedroom', 'master', 'guest'].includes(r.type);
+          const isKitchen = r.type === 'kitchen';
+          const isBath = r.type === 'bathroom';
+          const isCorridor = ['corridor', 'hallway', 'passage', 'staircase'].includes(r.type);
+
+          let map = floorTextures.oak;
+          let normalMap: THREE.Texture | undefined = floorTextures.oakNormal;
+          let roughnessMap: THREE.Texture = floorTextures.oakRough;
+          let baseColor = '#caa775';
+          let roughness = 0.55;
+          let metalness = 0;
+          let envMapIntensity = 0.6;
+
+          if (isLivingDining) {
+            map = floorTextures.walnut; normalMap = floorTextures.walnutNormal; roughnessMap = floorTextures.walnutRough;
+            baseColor = '#8a5d36'; roughness = 0.5; envMapIntensity = 0.8;
+          } else if (isBedroom) {
+            map = floorTextures.oak; normalMap = floorTextures.oakNormal; roughnessMap = floorTextures.oakRough;
+            baseColor = '#caa775'; roughness = 0.6; envMapIntensity = 0.6;
+          } else if (isKitchen) {
+            map = floorTextures.marble; normalMap = undefined; roughnessMap = floorTextures.marbleRough;
+            baseColor = '#f1ede5'; roughness = 0.18; metalness = 0.05; envMapIntensity = 1.4;
+          } else if (isBath) {
+            map = floorTextures.tile; normalMap = floorTextures.tileNormal; roughnessMap = floorTextures.tileRough;
+            baseColor = '#e6e8e7'; roughness = 0.22; metalness = 0.04; envMapIntensity = 1.2;
+          } else if (isCorridor) {
+            map = floorTextures.walnut; normalMap = floorTextures.walnutNormal; roughnessMap = floorTextures.walnutRough;
+            baseColor = '#8a5d36'; roughness = 0.55; envMapIntensity = 0.7;
+          }
+
           return (
             <group key={r.id}>
               {/* Floor */}
               <mesh receiveShadow position={[cx, 0.01, cz]}>
                 <boxGeometry args={[r.w, 0.02, r.h]} />
-                <meshStandardMaterial color={r.color} roughness={0.8} />
+                <meshStandardMaterial
+                  color={baseColor}
+                  map={map}
+                  normalMap={normalMap}
+                  normalScale={new THREE.Vector2(0.45, 0.45)}
+                  roughnessMap={roughnessMap}
+                  roughness={roughness}
+                  metalness={metalness}
+                  envMapIntensity={envMapIntensity}
+                />
               </mesh>
               
               {/* Ceiling */}
@@ -2913,9 +2986,9 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
 
 
           return roof === 'gable' ? (
-            <GableRoof W={upperRoofW} D={upperRoofD} cx={upperRoofCX} cz={upperRoofCZ} wallH={wallH} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
+            <GableRoof W={upperRoofW} D={upperRoofD} cx={upperRoofCX} cz={upperRoofCZ} wallH={wallH - 0.8} color={colors.roof} trimColor={colors.trim} rodColor={colors.rod} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} />
           ) : (
-            <FlatRoof W={upperRoofW} D={upperRoofD} cx={upperRoofCX} cz={upperRoofCZ} wallH={wallH} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} hole={holes} />
+            <FlatRoof W={upperRoofW} D={upperRoofD} cx={upperRoofCX} cz={upperRoofCZ} wallH={wallH - 0.8} color={colors.roof} transparent={hideRoof} opacity={hideRoof ? 0.1 : 1} hole={holes} />
           );
         })()}
 
