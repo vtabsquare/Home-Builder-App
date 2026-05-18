@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getElevationLookupKeys, getElevationPresetKey, getFamilyDoubleStoreyPackageKey, useConfig, RoofType, Material, KitchenType } from '@/store/configurator';
+import { getBuiltInPresetKey, getElevationLookupKeys, getElevationPresetKey, getFamilyDoubleStoreyPackageKey, getFamilyDoubleStoreyPackageLookupKeys, useConfig, RoofType, Material, KitchenType } from '@/store/configurator';
 import { useKitchenMeta } from '@/hooks/PricingContext';
 import { formatMoney } from '@/lib/cost';
 import { StepShell } from '../StepShell';
@@ -283,11 +283,15 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
   // Double storey floor splitting
   const canDoubleStorey = homeType === 'family' || homeType === 'premium';
-  const familyPackageKey = useMemo(() => getFamilyDoubleStoreyPackageKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey }), [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey]);
+  const familyPackageKey = useMemo(() => getFamilyDoubleStoreyPackageKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }), [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons]);
+  const familyPackageLookupKeys = useMemo(() => getFamilyDoubleStoreyPackageLookupKeys({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }), [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons]);
   const familyPackageLayout = useMemo(() => {
     if (!(homeType === 'family' && isDoubleStorey && presetId !== -1)) return null;
-    return packageLayouts[familyPackageKey] || packageLayouts[FAMILY_DOUBLE_STOREY_PACKAGE_KEY] || null;
-  }, [homeType, isDoubleStorey, presetId, packageLayouts, familyPackageKey]);
+    for (const key of familyPackageLookupKeys) {
+      if (packageLayouts[key]) return packageLayouts[key];
+    }
+    return null;
+  }, [homeType, isDoubleStorey, presetId, packageLayouts, familyPackageLookupKeys]);
 
   // Check preset overrides for a saved double storey layout (ground + first floor)
   const builtInOverride = useMemo(() => {

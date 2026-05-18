@@ -14,9 +14,13 @@ const BUILT_IN_PRESET_PREFIX = '__builtin_floor_plan__';
 const ELEVATION_PRESET_PREFIX = '__elevation_variant__';
 export const ELEVATION_VARIANT_VERSION = 'v1';
 const ELEVATION_VISUAL_ADDONS: AddOn[] = ['carport', 'landscaping', 'fence', 'solar', 'water_tank'];
+const FAMILY_DOUBLE_STOREY_LAYOUT_ADDONS: AddOn[] = ['carport', 'landscaping'];
 
 export const getElevationVisualAddons = (addons: AddOn[] = []) =>
   [...addons].filter((addon) => ELEVATION_VISUAL_ADDONS.includes(addon)).sort();
+
+export const getFamilyDoubleStoreyLayoutAddons = (addons: AddOn[] = []) =>
+  [...addons].filter((addon) => FAMILY_DOUBLE_STOREY_LAYOUT_ADDONS.includes(addon)).sort();
 
 export const getBuiltInPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>, presetId: number) => {
   // Exclude visual-only addons from the key (smart_home, solar, water_tank, fence)
@@ -52,8 +56,37 @@ export const getElevationLookupKeys = (state: Pick<ConfigState, 'homeType' | 'be
   return [exactKey, rawAddonKey].filter((key, index, keys) => key && keys.indexOf(key) === index);
 };
 
-export const getFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>) =>
+export const getLegacyFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>) =>
   `${FAMILY_DOUBLE_STOREY_PACKAGE_KEY}_${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}`;
+
+export const getFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>) => {
+  const layoutAddons = getFamilyDoubleStoreyLayoutAddons(state.addons || []);
+  return `${getLegacyFamilyDoubleStoreyPackageKey(state)}_addons_${layoutAddons.join('-') || 'none'}`;
+};
+
+export const getFamilyDoubleStoreyPackageLookupKeys = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>) =>
+  [
+    getFamilyDoubleStoreyPackageKey(state),
+    FAMILY_DOUBLE_STOREY_PACKAGE_KEY,
+  ].filter((key, index, keys) => key && keys.indexOf(key) === index);
+
+const inferFamilyDoubleStoreyLayoutAddonsFromPlan = (planData: any): AddOn[] => {
+  const groundRooms = Array.isArray(planData?.ground?.rooms) ? planData.ground.rooms : [];
+  const firstRooms = Array.isArray(planData?.first?.rooms) ? planData.first.rooms : [];
+  const allRooms = [...groundRooms, ...firstRooms];
+
+  const inferred: AddOn[] = [];
+
+  if (allRooms.some((room) => room?.type === 'carport' || `${room?.id || ''}`.includes('carport'))) {
+    inferred.push('carport');
+  }
+
+  if (allRooms.some((room) => room?.type === 'garden' || `${room?.label || ''}`.toUpperCase().includes('GARDEN') || `${room?.label || ''}`.toUpperCase().includes('TREE'))) {
+    inferred.push('landscaping');
+  }
+
+  return inferred.sort();
+};
 
 export interface ConfigState {
   step: number;
@@ -292,6 +325,19 @@ export const useConfig = create<ConfigState & ConfigActions>()(
         if (!error && data) {
           const packageLayouts = data.reduce<Record<string, any>>((acc, row) => {
             acc[row.package_key] = row.plan_data;
+
+            if (
+              typeof row.package_key === 'string' &&
+              row.package_key.startsWith(`${FAMILY_DOUBLE_STOREY_PACKAGE_KEY}_`) &&
+              !row.package_key.includes('_addons_')
+            ) {
+              const inferredAddons = inferFamilyDoubleStoreyLayoutAddonsFromPlan(row.plan_data);
+              const normalizedKey = `${row.package_key}_addons_${inferredAddons.join('-') || 'none'}`;
+              if (!acc[normalizedKey]) {
+                acc[normalizedKey] = row.plan_data;
+              }
+            }
+
             return acc;
           }, {});
           set({ packageLayouts });

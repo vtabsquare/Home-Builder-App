@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { FAMILY_DOUBLE_STOREY_PACKAGE_KEY, getBuiltInPresetKey, getFamilyDoubleStoreyPackageKey, useConfig } from '@/store/configurator';
+import { getBuiltInPresetKey, getFamilyDoubleStoreyPackageLookupKeys, useConfig } from '@/store/configurator';
 import { computeCost } from '@/lib/cost';
 import { PricingProvider, usePricing } from '@/hooks/PricingContext';
 import { computeCostDynamic } from '@/hooks/useDynamicPricing';
@@ -33,8 +33,9 @@ const IndexInner = () => {
     return generatePlan(config);
   }, [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.addons, config.presetId, config.land, config.landSize, config.customLandArea, config.roof, config.material, config.isDoubleStorey, config.activeFloor, presetOverrides]);
 
+  const familyPackageLookupKeys = useMemo(() => getFamilyDoubleStoreyPackageLookupKeys(config), [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.isDoubleStorey, config.addons]);
   const packageLayout = homeType === 'family' && isDoubleStorey
-    ? packageLayouts[getFamilyDoubleStoreyPackageKey(config)] || packageLayouts[FAMILY_DOUBLE_STOREY_PACKAGE_KEY]
+    ? familyPackageLookupKeys.map((key) => packageLayouts[key]).find(Boolean)
     : null;
   const selectedPlan = (config.presetId === -1 ? customPlan : null) || packageLayout?.ground || basePlan || { width: 0, height: 0, rooms: [] };
   // If a preset override exists for the current addon combination, the rooms are already
