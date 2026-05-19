@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Stage, Layer, Rect, Text, Line, Group, Arc, Circle, Transformer } from 'react-konva';
+import { Stage, Layer, Rect, Text, Line, Group, Arc, Circle, Transformer, Path } from 'react-konva';
 import { Plan, Room, FurnitureItem, DoorInfo, WindowInfo, regenerateFurniture, resolveStairGeometry } from '@/lib/floorplan';
 import { useConfig } from '@/store/configurator';
 import { RotateCw, Plus, Trash2, Maximize } from 'lucide-react';
@@ -576,6 +576,308 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
               />
             ))
           )}
+        </Layer>
+
+        {/* Staircase Overlay Layer — draws stairs above the furniture */}
+        <Layer listening={false}>
+          {(localPlan.rooms || [])
+            .filter((room) => room.type === 'staircase' || (room.label || '').toLowerCase().includes('staircase'))
+            .map((room) => {
+              const rx = buildingOffsetX + room.x * scale;
+              const ry = buildingOffsetY + room.y * scale;
+              const rw = room.w * scale;
+              const rh = room.h * scale;
+              const orient = room.orientation || 0;
+              const sg = resolveStairGeometry(room);
+              const sW = sg.stairWidth * scale;
+              const sL = sg.stairLength * scale;
+              const landingSize = sg.landingSize * scale;
+              const stairOffsetX = sg.stairOffsetX * scale;
+              const stairOffsetY = sg.stairOffsetY * scale;
+              const isMirrored = room.isMirrored || false;
+
+              // ─── FIRST FLOOR: Landing + Opening Void ───
+              if (floorLevel === 1) {
+                const openW = sg.openingWidth * scale;
+                const openL = sg.openingLength * scale;
+                return (
+                  <Group key={`stair-overlay-${room.id}`} x={rx} y={ry}>
+                    <Group opacity={0.85} scaleX={isMirrored ? -1 : 1} x={isMirrored ? rw : 0}>
+                      {/* Opening void outline */}
+                      <Rect x={stairOffsetX} y={stairOffsetY} width={openW} height={openL}
+                        stroke="#0f172a" strokeWidth={1.5} dash={[6, 4]} fill="rgba(15, 23, 42, 0.02)" />
+                      
+                      {/* Cross-hatching inside void */}
+                      {(() => {
+                        const hatchLines = [];
+                        const hatchSpacing = 8;
+                        const ox = stairOffsetX;
+                        const oy = stairOffsetY;
+                        for (let d = hatchSpacing; d < openW + openL; d += hatchSpacing) {
+                          const x1 = Math.max(0, d - openL) + ox;
+                          const y1 = Math.min(d, openL) + oy;
+                          const x2 = Math.min(d, openW) + ox;
+                          const y2 = Math.max(0, d - openW) + oy;
+                          hatchLines.push(
+                            <Line key={`hatch-${d}`} points={[x1, y1, x2, y2]}
+                              stroke="#64748b" strokeWidth={0.5} opacity={0.6} />
+                          );
+                        }
+                        return hatchLines;
+                      })()}
+
+                      {/* Landing platform */}
+                      {(() => {
+                        let lx = stairOffsetX, ly = stairOffsetY;
+                        if (orient === 0) { lx = stairOffsetX; ly = stairOffsetY; }
+                        else if (orient === 1) { lx = stairOffsetX + openW - landingSize; ly = stairOffsetY; }
+                        else if (orient === 2) { lx = stairOffsetX + openW - landingSize; ly = stairOffsetY + openL - landingSize; }
+                        else if (orient === 3) { lx = stairOffsetX; ly = stairOffsetY + openL - landingSize; }
+                        return <Rect x={lx} y={ly} width={landingSize} height={landingSize}
+                          stroke="#0f172a" strokeWidth={1.2} fill="rgba(241, 245, 249, 0.8)" />;
+                      })()}
+                      
+                      {/* Guard rail line */}
+                      {(() => {
+                        const railOffset = 2;
+                        if (orient === 0) {
+                          return <Line points={[stairOffsetX + landingSize, stairOffsetY + railOffset, stairOffsetX + openW, stairOffsetY + railOffset]}
+                            stroke="#0f172a" strokeWidth={1.8} />;
+                        } else if (orient === 1) {
+                          return <Line points={[stairOffsetX + openW - landingSize - railOffset, stairOffsetY, stairOffsetX + openW - landingSize - railOffset, stairOffsetY + openL]}
+                            stroke="#0f172a" strokeWidth={1.8} />;
+                        } else if (orient === 2) {
+                          return <Line points={[stairOffsetX, stairOffsetY + openL - railOffset, stairOffsetX + openW - landingSize, stairOffsetY + openL - railOffset]}
+                            stroke="#0f172a" strokeWidth={1.8} />;
+                        } else {
+                          return <Line points={[stairOffsetX + landingSize + railOffset, stairOffsetY, stairOffsetX + landingSize + railOffset, stairOffsetY + openL]}
+                            stroke="#0f172a" strokeWidth={1.8} />;
+                        }
+                      })()}
+
+                      {/* DN label */}
+                      <Text 
+                        x={stairOffsetX + openW / 2} 
+                        y={stairOffsetY + openL / 2 - 5}
+                        align="center"
+                        offsetX={8}
+                        scaleX={isMirrored ? -1 : 1}
+                        text="DN" 
+                        fontFamily="Urbanist"
+                        fontSize={9} 
+                        fontStyle="800" 
+                        fill="#0f172a" 
+                        letterSpacing={1.2} 
+                      />
+                      
+                      {/* Downward arrow */}
+                      {(() => {
+                        const cx = stairOffsetX + openW / 2;
+                        const ay = stairOffsetY + openL / 2 + 8;
+                        return (
+                          <Group opacity={0.8}>
+                            <Line points={[cx, ay, cx, ay + 12]} stroke="#0f172a" strokeWidth={1.2} />
+                            <Line points={[cx - 3, ay + 9, cx, ay + 12, cx + 3, ay + 9]} stroke="#0f172a" strokeWidth={1.2} />
+                          </Group>
+                        );
+                      })()}
+                    </Group>
+                  </Group>
+                );
+              }
+
+              // ─── GROUND FLOOR: Full L-Shape Staircase ───
+              const displaySteps1 = Math.ceil(9 / 2);
+              const displaySteps2 = Math.ceil(9 / 2);
+
+              return (
+                <Group key={`stair-overlay-${room.id}`} x={rx} y={ry}>
+                  <Group opacity={0.85} scaleX={isMirrored ? -1 : 1} x={isMirrored ? rw : 0}>
+                    {/* Landing */}
+                    {(() => {
+                      let lx = stairOffsetX, ly = stairOffsetY;
+                      if (orient === 0) { lx = stairOffsetX; ly = stairOffsetY; }
+                      else if (orient === 1) { lx = stairOffsetX + sW - landingSize; ly = stairOffsetY; }
+                      else if (orient === 2) { lx = stairOffsetX + sW - landingSize; ly = stairOffsetY + sL - landingSize; }
+                      else if (orient === 3) { lx = stairOffsetX; ly = stairOffsetY + sL - landingSize; }
+                      
+                      return <Rect x={lx} y={ly} width={landingSize} height={landingSize} stroke="#0f172a" strokeWidth={1.2} fill="rgba(241, 245, 249, 0.8)" />;
+                    })()}
+
+                    {/* Flight 1 & 2 Steps */}
+                    {(() => {
+                      const items = [];
+                      if (orient === 0) {
+                        const f1H = sL - landingSize;
+                        const f1StepH = f1H / displaySteps1;
+                        for (let i = 1; i < displaySteps1; i++) {
+                          items.push(<Line key={`f1-${i}`} points={[stairOffsetX, stairOffsetY + sL - i * f1StepH, stairOffsetX + landingSize, stairOffsetY + sL - i * f1StepH]} stroke="#1e293b" strokeWidth={1.0} />);
+                        }
+                        const f2W = sW - landingSize;
+                        const f2StepW = f2W / displaySteps2;
+                        for (let i = 1; i < displaySteps2; i++) {
+                          items.push(<Line key={`f2-${i}`} points={[stairOffsetX + landingSize + i * f2StepW, stairOffsetY, stairOffsetX + landingSize + i * f2StepW, stairOffsetY + landingSize]} stroke="#1e293b" strokeWidth={1.0} />);
+                        }
+                      } else if (orient === 1) {
+                        const f1W = sW - landingSize;
+                        const f1StepW = f1W / displaySteps1;
+                        for (let i = 1; i < displaySteps1; i++) {
+                          items.push(<Line key={`f1-${i}`} points={[stairOffsetX + i * f1StepW, stairOffsetY, stairOffsetX + i * f1StepW, stairOffsetY + landingSize]} stroke="#1e293b" strokeWidth={1.0} />);
+                        }
+                        const f2H = sL - landingSize;
+                        const f2StepH = f2H / displaySteps2;
+                        for (let i = 1; i < displaySteps2; i++) {
+                          items.push(<Line key={`f2-${i}`} points={[stairOffsetX + sW - landingSize, stairOffsetY + landingSize + i * f2StepH, stairOffsetX + sW, stairOffsetY + landingSize + i * f2StepH]} stroke="#1e293b" strokeWidth={1.0} />);
+                        }
+                      } else if (orient === 2) {
+                        const f1H = sL - landingSize;
+                        const f1StepH = f1H / displaySteps1;
+                        for (let i = 1; i < displaySteps1; i++) {
+                          items.push(<Line key={`f1-${i}`} points={[stairOffsetX + sW - landingSize, stairOffsetY + i * f1StepH, stairOffsetX + sW, stairOffsetY + i * f1StepH]} stroke="#1e293b" strokeWidth={1.0} />);
+                        }
+                        const f2W = sW - landingSize;
+                        const f2StepW = f2W / displaySteps2;
+                        for (let i = 1; i < displaySteps2; i++) {
+                          items.push(<Line key={`f2-${i}`} points={[stairOffsetX + sW - landingSize - i * f2StepW, stairOffsetY + sL - landingSize, stairOffsetX + sW - landingSize - i * f2StepW, stairOffsetY + sL]} stroke="#1e293b" strokeWidth={1.0} />);
+                        }
+                      } else if (orient === 3) {
+                        const f1W = sW - landingSize;
+                        const f1StepW = f1W / displaySteps1;
+                        for (let i = 1; i < displaySteps1; i++) {
+                          items.push(<Line key={`f1-${i}`} points={[stairOffsetX + sW - i * f1StepW, stairOffsetY + sL - landingSize, stairOffsetX + sW - i * f1StepW, stairOffsetY + sL]} stroke="#1e293b" strokeWidth={1.0} />);
+                        }
+                        const f2H = sL - landingSize;
+                        const f2StepH = f2H / displaySteps2;
+                        for (let i = 1; i < displaySteps2; i++) {
+                          items.push(<Line key={`f2-${i}`} points={[stairOffsetX, stairOffsetY + sL - landingSize - i * f2StepH, stairOffsetX + landingSize, stairOffsetY + sL - landingSize - i * f2StepH]} stroke="#1e293b" strokeWidth={1.0} />);
+                        }
+                      }
+                      return items;
+                    })()}
+                    
+                    {/* Directional Path Arrow */}
+                    {(() => {
+                      const arrowHeadSize = 5;
+                      let pathData = '';
+                      let startX = 0, startY = 0;
+                      let arrowPoints: number[] = [];
+                      const mid = landingSize / 2;
+                      
+                      if (orient === 0) {
+                        const x0 = stairOffsetX + mid;
+                        const y0 = stairOffsetY + sL - 3;
+                        const x1 = stairOffsetX + mid;
+                        const y1 = stairOffsetY + landingSize;
+                        const xc = stairOffsetX + mid;
+                        const yc = stairOffsetY + mid;
+                        const x2 = stairOffsetX + landingSize;
+                        const y2 = stairOffsetY + mid;
+                        const x3 = stairOffsetX + sW - 3;
+                        const y3 = stairOffsetY + mid;
+                        startX = x0;
+                        startY = y0;
+                        pathData = `M ${x0} ${y0} L ${x1} ${y1} Q ${xc} ${yc} ${x2} ${y2} L ${x3} ${y3}`;
+                        arrowPoints = [x3 - arrowHeadSize, y3 - arrowHeadSize * 0.6, x3, y3, x3 - arrowHeadSize, y3 + arrowHeadSize * 0.6];
+                      } else if (orient === 1) {
+                        const x0 = stairOffsetX + 3;
+                        const y0 = stairOffsetY + mid;
+                        const x1 = stairOffsetX + sW - landingSize;
+                        const y1 = stairOffsetY + mid;
+                        const xc = stairOffsetX + sW - mid;
+                        const yc = stairOffsetY + mid;
+                        const x2 = stairOffsetX + sW - mid;
+                        const y2 = stairOffsetY + landingSize;
+                        const x3 = stairOffsetX + sW - mid;
+                        const y3 = stairOffsetY + sL - 3;
+                        startX = x0;
+                        startY = y0;
+                        pathData = `M ${x0} ${y0} L ${x1} ${y1} Q ${xc} ${yc} ${x2} ${y2} L ${x3} ${y3}`;
+                        arrowPoints = [x3 - arrowHeadSize * 0.6, y3 - arrowHeadSize, x3, y3, x3 + arrowHeadSize * 0.6, y3 - arrowHeadSize];
+                      } else if (orient === 2) {
+                        const x0 = stairOffsetX + sW - mid;
+                        const y0 = stairOffsetY + 3;
+                        const x1 = stairOffsetX + sW - mid;
+                        const y1 = stairOffsetY + sL - landingSize;
+                        const xc = stairOffsetX + sW - mid;
+                        const yc = stairOffsetY + sL - mid;
+                        const x2 = stairOffsetX + sW - landingSize;
+                        const y2 = stairOffsetY + sL - mid;
+                        const x3 = stairOffsetX + 3;
+                        const y3 = stairOffsetY + sL - mid;
+                        startX = x0;
+                        startY = y0;
+                        pathData = `M ${x0} ${y0} L ${x1} ${y1} Q ${xc} ${yc} ${x2} ${y2} L ${x3} ${y3}`;
+                        arrowPoints = [x3 + arrowHeadSize, y3 - arrowHeadSize * 0.6, x3, y3, x3 + arrowHeadSize, y3 + arrowHeadSize * 0.6];
+                      } else { // orient === 3
+                        const x0 = stairOffsetX + sW - 3;
+                        const y0 = stairOffsetY + sL - mid;
+                        const x1 = stairOffsetX + landingSize;
+                        const y1 = stairOffsetY + sL - mid;
+                        const xc = stairOffsetX + mid;
+                        const yc = stairOffsetY + sL - mid;
+                        const x2 = stairOffsetX + mid;
+                        const y2 = stairOffsetY + sL - landingSize;
+                        const x3 = stairOffsetX + mid;
+                        const y3 = stairOffsetY + 3;
+                        startX = x0;
+                        startY = y0;
+                        pathData = `M ${x0} ${y0} L ${x1} ${y1} Q ${xc} ${yc} ${x2} ${y2} L ${x3} ${y3}`;
+                        arrowPoints = [x3 - arrowHeadSize * 0.6, y3 + arrowHeadSize, x3, y3, x3 + arrowHeadSize * 0.6, y3 + arrowHeadSize];
+                      }
+                      
+                      return (
+                        <Group>
+                          <Circle x={startX} y={startY} radius={2.2} fill="#0f172a" />
+                          <Path data={pathData} stroke="#0f172a" strokeWidth={1.3} lineCap="round" lineJoin="round" />
+                          <Line points={arrowPoints} stroke="#0f172a" strokeWidth={1.3} lineCap="round" lineJoin="round" />
+                        </Group>
+                      );
+                    })()}
+
+                    {/* Professional Inner Handrail Line */}
+                    {(() => {
+                      let hrPoints: number[] = [];
+                      if (orient === 0) {
+                        hrPoints = [stairOffsetX + landingSize - 2, stairOffsetY + sL, stairOffsetX + landingSize - 2, stairOffsetY + landingSize - 2, stairOffsetX + sW, stairOffsetY + landingSize - 2];
+                      } else if (orient === 1) {
+                        hrPoints = [stairOffsetX, stairOffsetY + landingSize - 2, stairOffsetX + sW - landingSize + 2, stairOffsetY + landingSize - 2, stairOffsetX + sW - landingSize + 2, stairOffsetY + sL];
+                      } else if (orient === 2) {
+                        hrPoints = [stairOffsetX + sW - landingSize + 2, stairOffsetY, stairOffsetX + sW - landingSize + 2, stairOffsetY + sL - landingSize + 2, stairOffsetX, stairOffsetY + sL - landingSize + 2];
+                      } else if (orient === 3) {
+                        hrPoints = [stairOffsetX + sW, stairOffsetY + sL - landingSize + 2, stairOffsetX + landingSize - 2, stairOffsetY + sL - landingSize + 2, stairOffsetX + landingSize - 2, stairOffsetY];
+                      }
+                      return (
+                        <Group>
+                          {/* Handrail base/shadow line */}
+                          <Line points={hrPoints} stroke="#94a3b8" strokeWidth={2.4} opacity={0.6} lineCap="round" lineJoin="round" />
+                          {/* Active handrail wood/bronze core */}
+                          <Line points={hrPoints} stroke="#0f172a" strokeWidth={1.2} lineCap="round" lineJoin="round" />
+                          {/* Modern glass/bronze baluster posts at start, corner, and end */}
+                          <Circle x={hrPoints[0]} y={hrPoints[1]} radius={1.8} fill="#0f172a" stroke="#fff" strokeWidth={0.5} />
+                          <Circle x={hrPoints[2]} y={hrPoints[3]} radius={2.2} fill="#0f172a" stroke="#fff" strokeWidth={0.5} />
+                          <Circle x={hrPoints[4]} y={hrPoints[5]} radius={1.8} fill="#0f172a" stroke="#fff" strokeWidth={0.5} />
+                        </Group>
+                      );
+                    })()}
+
+                    {/* UP label */}
+                    <Text 
+                      x={stairOffsetX + sW / 2} 
+                      y={stairOffsetY - 12}
+                      align="center"
+                      offsetX={6}
+                      scaleX={isMirrored ? -1 : 1}
+                      text="UP" 
+                      fontFamily="Urbanist"
+                      fontSize={9} 
+                      fontStyle="800" 
+                      fill="#0f172a" 
+                      letterSpacing={1.2} 
+                    />
+                  </Group>
+                </Group>
+              );
+            })}
         </Layer>
 
         <Layer listening={true}>
@@ -1172,227 +1474,10 @@ const RoomShape = ({ room, scale, offsetX, offsetY, isSelected, onClick, onRotat
           ))}
         </Group>
       )}
-      {/* Staircase L-Shape Visualization — Floor-Aware Architectural Style */}
-      {isStaircase && (() => {
-        const orient = room.orientation || 0;
-        // Derive compact stair geometry from room dimensions
-        const sg = resolveStairGeometry(room);
-        const sW = sg.stairWidth * scale; // compact stair width in px
-        const sL = sg.stairLength * scale; // compact stair length in px
-        const landingSize = sg.landingSize * scale;
-        
-        // Use shared stairGeometry offsets as master coordinates
-        const stairOffsetX = sg.stairOffsetX * scale;
-        const stairOffsetY = sg.stairOffsetY * scale;
-
-        // ─── FIRST FLOOR: Landing + Opening Void ───
-        if (floorLevel === 1) {
-          const openW = sg.openingWidth * scale;
-          const openL = sg.openingLength * scale;
-          return (
-            <Group opacity={0.55} scaleX={isMirrored ? -1 : 1} x={isMirrored ? rw : 0}>
-              {/* Opening void outline */}
-              <Rect x={stairOffsetX} y={stairOffsetY} width={openW} height={openL}
-                stroke="#666" strokeWidth={1.2} dash={[6, 4]} fill="rgba(0,0,0,0.03)" />
-              
-              {/* Cross-hatching inside void (architectural convention for openings) */}
-              {(() => {
-                const hatchLines = [];
-                const hatchSpacing = 8;
-                const ox = stairOffsetX;
-                const oy = stairOffsetY;
-                // Diagonal lines from top-left to bottom-right
-                for (let d = hatchSpacing; d < openW + openL; d += hatchSpacing) {
-                  const x1 = Math.max(0, d - openL) + ox;
-                  const y1 = Math.min(d, openL) + oy;
-                  const x2 = Math.min(d, openW) + ox;
-                  const y2 = Math.max(0, d - openW) + oy;
-                  hatchLines.push(
-                    <Line key={`hatch-${d}`} points={[x1, y1, x2, y2]}
-                      stroke="#999" strokeWidth={0.3} opacity={0.5} />
-                  );
-                }
-                return hatchLines;
-              })()}
-
-              {/* Landing platform at arrival zone */}
-              {(() => {
-                let lx = stairOffsetX, ly = stairOffsetY;
-                if (orient === 0) { lx = stairOffsetX; ly = stairOffsetY; }
-                else if (orient === 1) { lx = stairOffsetX + openW - landingSize; ly = stairOffsetY; }
-                else if (orient === 2) { lx = stairOffsetX + openW - landingSize; ly = stairOffsetY + openL - landingSize; }
-                else if (orient === 3) { lx = stairOffsetX; ly = stairOffsetY + openL - landingSize; }
-                return <Rect x={lx} y={ly} width={landingSize} height={landingSize}
-                  stroke="#333" strokeWidth={1.0} fill="rgba(180,170,155,0.15)" />;
-              })()}
-              
-              {/* Guard rail line along opening edge */}
-              {(() => {
-                const railOffset = 2;
-                if (orient === 0) {
-                  return <Line points={[stairOffsetX + landingSize, stairOffsetY + railOffset, stairOffsetX + openW, stairOffsetY + railOffset]}
-                    stroke="#333" strokeWidth={1.5} />;
-                } else if (orient === 1) {
-                  return <Line points={[stairOffsetX + openW - landingSize - railOffset, stairOffsetY, stairOffsetX + openW - landingSize - railOffset, stairOffsetY + openL]}
-                    stroke="#333" strokeWidth={1.5} />;
-                } else if (orient === 2) {
-                  return <Line points={[stairOffsetX, stairOffsetY + openL - railOffset, stairOffsetX + openW - landingSize, stairOffsetY + openL - railOffset]}
-                    stroke="#333" strokeWidth={1.5} />;
-                } else {
-                  return <Line points={[stairOffsetX + landingSize + railOffset, stairOffsetY, stairOffsetX + landingSize + railOffset, stairOffsetY + openL]}
-                    stroke="#333" strokeWidth={1.5} />;
-                }
-              })()}
-
-              {/* DN label (architectural convention: down arrow) */}
-              <Text 
-                x={stairOffsetX + openW / 2} 
-                y={stairOffsetY + openL / 2 - 5}
-                align="center"
-                offsetX={8}
-                scaleX={isMirrored ? -1 : 1}
-                text="DN" 
-                fontSize={10} 
-                fontStyle="bold" 
-                fill="#555" 
-                letterSpacing={1} 
-              />
-              
-              {/* Downward arrow */}
-              {(() => {
-                const cx = stairOffsetX + openW / 2;
-                const ay = stairOffsetY + openL / 2 + 8;
-                return (
-                  <Group opacity={0.6}>
-                    <Line points={[cx, ay, cx, ay + 12]} stroke="#555" strokeWidth={0.8} />
-                    <Line points={[cx - 3, ay + 9, cx, ay + 12, cx + 3, ay + 9]} stroke="#555" strokeWidth={0.8} />
-                  </Group>
-                );
-              })()}
-            </Group>
-          );
-        }
-
-        // ─── GROUND FLOOR: Full L-Shape Staircase ───
-        const displaySteps1 = Math.ceil(9 / 2);
-        const displaySteps2 = Math.ceil(9 / 2);
-
-        return (
-          <Group opacity={0.55} scaleX={isMirrored ? -1 : 1} x={isMirrored ? rw : 0}>
-            {/* Stair container outline (dashed, lightweight) */}
-            <Rect x={stairOffsetX} y={stairOffsetY} width={sW} height={sL} stroke="#444" strokeWidth={1.0} dash={[4, 3]} />
-
-            {/* Landing */}
-            {(() => {
-              let lx = stairOffsetX, ly = stairOffsetY;
-              if (orient === 0) { lx = stairOffsetX; ly = stairOffsetY; }
-              else if (orient === 1) { lx = stairOffsetX + sW - landingSize; ly = stairOffsetY; }
-              else if (orient === 2) { lx = stairOffsetX + sW - landingSize; ly = stairOffsetY + sL - landingSize; }
-              else if (orient === 3) { lx = stairOffsetX; ly = stairOffsetY + sL - landingSize; }
-              
-              return <Rect x={lx} y={ly} width={landingSize} height={landingSize} stroke="#333" strokeWidth={1.0} fill="rgba(0,0,0,0.04)" />;
-            })()}
-
-            {/* Flight 1 & 2 Steps — thin architectural drafting lines */}
-            {(() => {
-              const items = [];
-              if (orient === 0) {
-                const f1H = sL - landingSize;
-                const f1StepH = f1H / displaySteps1;
-                for (let i = 1; i < displaySteps1; i++) {
-                  items.push(<Line key={`f1-${i}`} points={[stairOffsetX, stairOffsetY + sL - i * f1StepH, stairOffsetX + landingSize, stairOffsetY + sL - i * f1StepH]} stroke="#333" strokeWidth={0.7} />);
-                }
-                const f2W = sW - landingSize;
-                const f2StepW = f2W / displaySteps2;
-                for (let i = 1; i < displaySteps2; i++) {
-                  items.push(<Line key={`f2-${i}`} points={[stairOffsetX + landingSize + i * f2StepW, stairOffsetY, stairOffsetX + landingSize + i * f2StepW, stairOffsetY + landingSize]} stroke="#333" strokeWidth={0.7} />);
-                }
-              } else if (orient === 1) {
-                const f1W = sW - landingSize;
-                const f1StepW = f1W / displaySteps1;
-                for (let i = 1; i < displaySteps1; i++) {
-                  items.push(<Line key={`f1-${i}`} points={[stairOffsetX + i * f1StepW, stairOffsetY, stairOffsetX + i * f1StepW, stairOffsetY + landingSize]} stroke="#333" strokeWidth={0.7} />);
-                }
-                const f2H = sL - landingSize;
-                const f2StepH = f2H / displaySteps2;
-                for (let i = 1; i < displaySteps2; i++) {
-                  items.push(<Line key={`f2-${i}`} points={[stairOffsetX + sW - landingSize, stairOffsetY + landingSize + i * f2StepH, stairOffsetX + sW, stairOffsetY + landingSize + i * f2StepH]} stroke="#333" strokeWidth={0.7} />);
-                }
-              } else if (orient === 2) {
-                const f1H = sL - landingSize;
-                const f1StepH = f1H / displaySteps1;
-                for (let i = 1; i < displaySteps1; i++) {
-                  items.push(<Line key={`f1-${i}`} points={[stairOffsetX + sW - landingSize, stairOffsetY + i * f1StepH, stairOffsetX + sW, stairOffsetY + i * f1StepH]} stroke="#333" strokeWidth={0.7} />);
-                }
-                const f2W = sW - landingSize;
-                const f2StepW = f2W / displaySteps2;
-                for (let i = 1; i < displaySteps2; i++) {
-                  items.push(<Line key={`f2-${i}`} points={[stairOffsetX + sW - landingSize - i * f2StepW, stairOffsetY + sL - landingSize, stairOffsetX + sW - landingSize - i * f2StepW, stairOffsetY + sL]} stroke="#333" strokeWidth={0.7} />);
-                }
-              } else if (orient === 3) {
-                const f1W = sW - landingSize;
-                const f1StepW = f1W / displaySteps1;
-                for (let i = 1; i < displaySteps1; i++) {
-                  items.push(<Line key={`f1-${i}`} points={[stairOffsetX + sW - i * f1StepW, stairOffsetY + sL - landingSize, stairOffsetX + sW - i * f1StepW, stairOffsetY + sL]} stroke="#333" strokeWidth={0.7} />);
-                }
-                const f2H = sL - landingSize;
-                const f2StepH = f2H / displaySteps2;
-                for (let i = 1; i < displaySteps2; i++) {
-                  items.push(<Line key={`f2-${i}`} points={[stairOffsetX, stairOffsetY + sL - landingSize - i * f2StepH, stairOffsetX + landingSize, stairOffsetY + sL - landingSize - i * f2StepH]} stroke="#333" strokeWidth={0.7} />);
-                }
-              }
-              return items;
-            })()}
-            
-            {/* Directional Path Arrow — minimal architectural style */}
-            {(() => {
-              const arrowHeadSize = 4;
-              let pathPoints: number[] = [];
-              let arrowPoints: number[] = [];
-              const mid = landingSize / 2;
-              
-              if (orient === 0) {
-                pathPoints = [stairOffsetX + mid, stairOffsetY + sL - 3, stairOffsetX + mid, stairOffsetY + mid, stairOffsetX + sW - 3, stairOffsetY + mid];
-                arrowPoints = [stairOffsetX + sW - 3 - arrowHeadSize, stairOffsetY + mid - arrowHeadSize/2, stairOffsetX + sW - 3, stairOffsetY + mid, stairOffsetX + sW - 3 - arrowHeadSize, stairOffsetY + mid + arrowHeadSize/2];
-              } else if (orient === 1) {
-                pathPoints = [stairOffsetX + 3, stairOffsetY + mid, stairOffsetX + sW - mid, stairOffsetY + mid, stairOffsetX + sW - mid, stairOffsetY + sL - 3];
-                arrowPoints = [stairOffsetX + sW - mid - arrowHeadSize/2, stairOffsetY + sL - 3 - arrowHeadSize, stairOffsetX + sW - mid, stairOffsetY + sL - 3, stairOffsetX + sW - mid + arrowHeadSize/2, stairOffsetY + sL - 3 - arrowHeadSize];
-              } else if (orient === 2) {
-                pathPoints = [stairOffsetX + sW - mid, stairOffsetY + 3, stairOffsetX + sW - mid, stairOffsetY + sL - mid, stairOffsetX + 3, stairOffsetY + sL - mid];
-                arrowPoints = [stairOffsetX + 3 + arrowHeadSize, stairOffsetY + sL - mid - arrowHeadSize/2, stairOffsetX + 3, stairOffsetY + sL - mid, stairOffsetX + 3 + arrowHeadSize, stairOffsetY + sL - mid + arrowHeadSize/2];
-              } else if (orient === 3) {
-                pathPoints = [stairOffsetX + sW - 3, stairOffsetY + sL - mid, stairOffsetX + mid, stairOffsetY + sL - mid, stairOffsetX + mid, stairOffsetY + 3];
-                arrowPoints = [stairOffsetX + mid - arrowHeadSize/2, stairOffsetY + 3 + arrowHeadSize, stairOffsetX + mid, stairOffsetY + 3, stairOffsetX + mid + arrowHeadSize/2, stairOffsetY + 3 + arrowHeadSize];
-              }
-              
-              return (
-                <Group opacity={0.65}>
-                  <Circle x={pathPoints[0]} y={pathPoints[1]} radius={1.8} fill="#333" />
-                  <Line points={pathPoints} stroke="#333" strokeWidth={0.8} tension={0.15} />
-                  <Line points={arrowPoints} stroke="#333" strokeWidth={0.8} />
-                </Group>
-              );
-            })()}
-
-            {/* UP label */}
-            <Text 
-              x={stairOffsetX + sW / 2} 
-              y={stairOffsetY - 12}
-              align="center"
-              offsetX={6}
-              scaleX={isMirrored ? -1 : 1}
-              text="UP" 
-              fontSize={8} 
-              fontStyle="bold" 
-              fill="#666" 
-              letterSpacing={1} 
-            />
-          </Group>
-        );
-      })()}
+      {/* Staircase graphics rendered in separate overlay layer above furniture */}
       
       {/* Floating Action Button (Specific for Staircase: Mirror) */}
-      {isStaircase && draggable && (
+      {isStaircase && draggable && isSelected && (
         <Group
           x={rw / 2 - 12}
           y={rh / 2 - 12}
