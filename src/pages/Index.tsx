@@ -38,7 +38,7 @@ const IndexInner = () => {
   const packageLayout = homeType === 'family' && isDoubleStorey
     ? familyPackageLookupKeys.map((key) => packageLayouts[key]).find(Boolean)
     : null;
-  const selectedPlan = ((config.presetId === -1 || isFamilyDoubleStoreyPackage) ? customPlan : null) || packageLayout?.ground || basePlan || { width: 0, height: 0, rooms: [] };
+  const selectedPlan = (config.presetId === -1 ? customPlan : null) || packageLayout?.ground || basePlan || { width: 0, height: 0, rooms: [] };
   // If a preset override exists for the current addon combination, the rooms are already
   // correctly positioned (including any carport/addon adjustments the user manually aligned).
   // Skip applyAddOnsToPlan to avoid double-shifting room positions.

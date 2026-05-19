@@ -53,7 +53,8 @@ export const getElevationVariantSignature = (state: Pick<ConfigState, 'homeType'
 export const getElevationLookupKeys = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons' | 'roof' | 'material'>, presetId: number) => {
   const exactKey = getElevationPresetKey(state, presetId);
   const rawAddonKey = `${ELEVATION_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_roof_${state.roof}_material_${state.material}_addons_${[...(state.addons || [])].sort().join('-') || 'none'}_${presetId}`;
-  return [exactKey, rawAddonKey].filter((key, index, keys) => key && keys.indexOf(key) === index);
+  const legacyBuiltInKey = getBuiltInPresetKey(state, presetId);
+  return [exactKey, rawAddonKey, legacyBuiltInKey].filter((key, index, keys) => key && keys.indexOf(key) === index);
 };
 
 export const getLegacyFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>) =>
@@ -349,7 +350,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
 
             return acc;
           }, {});
-          set({ packageLayouts: { ...packageLayouts, ...state.packageLayouts } });
+          set({ packageLayouts: { ...state.packageLayouts, ...packageLayouts } });
         }
       },
       savePackageLayout: async (packageKey, groundPlan, firstFloorPlan) => {
@@ -359,8 +360,6 @@ export const useConfig = create<ConfigState & ConfigActions>()(
             ...s.packageLayouts,
             [packageKey]: fullPlan,
           },
-          customPlan: groundPlan,
-          customFirstFloorPlan: firstFloorPlan,
         }));
         await supabase.from('package_layouts').upsert({
           package_key: packageKey,

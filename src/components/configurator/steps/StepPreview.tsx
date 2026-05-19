@@ -99,6 +99,13 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
       ...prev,
       [presetKey]: true,
     }));
+
+    useConfig.setState((state) => ({
+      elevationImages: {
+        ...state.elevationImages,
+        [presetKey]: collected.map((img) => img.image_url),
+      },
+    }));
   }, []);
 
   const handleElevationUpload = useCallback(async (file: File) => {
@@ -314,11 +321,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
   const savedGroundPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return plan;
-    // For family double-storey packages, also honor the in-memory customPlan so
-    // that Apply Changes is reflected immediately. setKitchen clears this so
-    // each kitchen stays isolated.
-    return ((isCustomPreset || isFamilyDoubleStoreyPackage) ? customPlan : null) || floors.ground;
-  }, [isDoubleStorey, floors, plan, isCustomPreset, isFamilyDoubleStoreyPackage, customPlan]);
+    return (isCustomPreset ? customPlan : null) || floors.ground;
+  }, [isDoubleStorey, floors, plan, isCustomPreset, customPlan]);
 
   // Fallback: if floors.first is missing (e.g. corrupted DB data), regenerate it
   const regeneratedFirstFloor = useMemo(() => {
@@ -1014,7 +1018,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       const hasFetchedRemoteImages = !!fetchedElevationKeys[presetKey];
                       const images = hasFetchedRemoteImages
                         ? remoteImages.map((img) => img.image_url)
-                        : (elevationImages[presetKey] || []);
+                        : [];
                       
                       if (images.length === 0) {
                         return (
