@@ -316,10 +316,17 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     return (isCustomPreset ? customPlan : null) || floors.ground;
   }, [isDoubleStorey, floors, plan, isCustomPreset, customPlan]);
 
+  // Fallback: if floors.first is missing (e.g. corrupted DB data), regenerate it
+  const regeneratedFirstFloor = useMemo(() => {
+    if (!isDoubleStorey) return null;
+    const generated = splitPlanToFloors(plan, homeType, kitchen, bedrooms, bathrooms, addons as string[]);
+    return generated.first || null;
+  }, [isDoubleStorey, plan, homeType, kitchen, bedrooms, bathrooms, addons]);
+
   const savedFirstFloorPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return null;
-    return (isCustomPreset ? customFirstFloorPlan : null) || floors.first || null;
-  }, [isDoubleStorey, floors, isCustomPreset, customFirstFloorPlan]);
+    return (isCustomPreset ? customFirstFloorPlan : null) || floors.first || regeneratedFirstFloor || null;
+  }, [isDoubleStorey, floors, isCustomPreset, customFirstFloorPlan, regeneratedFirstFloor]);
 
   // Determine which plan to show based on floor selection
   const displayPlan = useMemo(() => {
@@ -337,8 +344,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   const firstFloorDisplayPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return undefined;
     if (isEditingFirstFloor && stagedPlan) return stagedPlan;
-    return savedFirstFloorPlan || undefined;
-  }, [isDoubleStorey, floors, isEditingFirstFloor, stagedPlan, savedFirstFloorPlan]);
+    return savedFirstFloorPlan || regeneratedFirstFloor || undefined;
+  }, [isDoubleStorey, floors, isEditingFirstFloor, stagedPlan, savedFirstFloorPlan, regeneratedFirstFloor]);
 
   const currentPlan = useMemo(() => {
     const p = stagedPlan || displayPlan;
@@ -471,12 +478,19 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     const newGround = isEditingFirstFloor
       ? savedGroundPlan
       : stagedPlan;
+    // Ensure first floor is never null — fall back to regenerated plan
     const newFirst = isEditingFirstFloor
       ? stagedPlan
-      : savedFirstFloorPlan;
+      : (savedFirstFloorPlan || regeneratedFirstFloor);
 
     if (!isCustomPreset) {
-      setPresetOverride(presetId, newGround, newFirst);
+      // For family double-storey packages, skip setPresetOverride — the caller
+      // will persist via savePackageLayout which writes to package_layouts table.
+      // setPresetOverride writes to local presetOverrides which gets wiped by
+      // fetchSavedPresets, causing the first floor data to vanish on reload.
+      if (!isFamilyDoubleStoreyPackage) {
+        setPresetOverride(presetId, newGround, newFirst);
+      }
     } else if (isEditingFirstFloor) {
       setCustomFirstFloorPlan(newFirst);
     } else {
@@ -861,9 +875,10 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       const newGround = isEditingFirstFloor
                         ? savedGroundPlan
                         : editorPlan;
+                      // Ensure first floor is never null — fall back to regenerated plan
                       const newFirst = isEditingFirstFloor
                         ? editorPlan
-                        : savedFirstFloorPlan;
+                        : (savedFirstFloorPlan || regeneratedFirstFloor);
 
                       try {
                         if (isFamilyDoubleStoreyPackage) {

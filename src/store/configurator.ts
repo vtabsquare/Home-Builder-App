@@ -309,7 +309,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
         if (!error && data) {
           const state = get();
           const builtInRows = data.filter((row) => row.name?.startsWith(BUILT_IN_PRESET_PREFIX));
-          const presetOverrides = builtInRows.reduce<Record<string, { ground: any; first: any | null }>>((acc, row) => {
+          const dbOverrides = builtInRows.reduce<Record<string, { ground: any; first: any | null }>>((acc, row) => {
             const presetId = Number(row.name.slice(row.name.lastIndexOf('_') + 1));
             const planData = row.plan_data as any;
             if ((presetId === 0 || presetId === 1) && planData?.ground?.rooms) {
@@ -317,7 +317,11 @@ export const useConfig = create<ConfigState & ConfigActions>()(
             }
             return acc;
           }, {});
-          set({ savedPresets: data.filter((row) => !row.name?.startsWith(BUILT_IN_PRESET_PREFIX)), presetOverrides });
+          // Merge DB overrides with existing local overrides instead of replacing.
+          // This preserves locally-set overrides (e.g. family double-storey packages
+          // stored in package_layouts) that aren't present in the presets table.
+          const mergedOverrides = { ...state.presetOverrides, ...dbOverrides };
+          set({ savedPresets: data.filter((row) => !row.name?.startsWith(BUILT_IN_PRESET_PREFIX)), presetOverrides: mergedOverrides });
         }
       },
       fetchPackageLayouts: async () => {
