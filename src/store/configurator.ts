@@ -65,10 +65,10 @@ export const getFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeTy
 };
 
 export const getFamilyDoubleStoreyPackageLookupKeys = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>) =>
-  [
-    getFamilyDoubleStoreyPackageKey(state),
-    FAMILY_DOUBLE_STOREY_PACKAGE_KEY,
-  ].filter((key, index, keys) => key && keys.indexOf(key) === index);
+  // Only use the kitchen+addon-specific key. The legacy shared fallback was
+  // intentionally removed so each kitchen variant resolves to its own saved
+  // layout and does not leak edits across kitchen types.
+  [getFamilyDoubleStoreyPackageKey(state)].filter((key, index, keys) => key && keys.indexOf(key) === index);
 
 const inferFamilyDoubleStoreyLayoutAddonsFromPlan = (planData: any): AddOn[] => {
   const groundRooms = Array.isArray(planData?.ground?.rooms) ? planData.ground.rooms : [];
@@ -236,7 +236,11 @@ export const useConfig = create<ConfigState & ConfigActions>()(
           customFirstFloorPlan: null,
         };
       }),
-      setKitchen: (kitchen) => set({ kitchen }),
+      setKitchen: (kitchen) => set({
+        kitchen,
+        customPlan: null,
+        customFirstFloorPlan: null,
+      }),
       toggleAddon: (a) => set((s) => {
         const newAddons = s.addons.includes(a) ? s.addons.filter((x) => x !== a) : [...s.addons, a];
         // presetOverrides are keyed per addon combination, so no need to clear them.
@@ -327,6 +331,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       fetchPackageLayouts: async () => {
         const { data, error } = await supabase.from('package_layouts').select('*');
         if (!error && data) {
+          const state = get();
           const packageLayouts = data.reduce<Record<string, any>>((acc, row) => {
             acc[row.package_key] = row.plan_data;
 
@@ -344,7 +349,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
 
             return acc;
           }, {});
-          set({ packageLayouts });
+          set({ packageLayouts: { ...packageLayouts, ...state.packageLayouts } });
         }
       },
       savePackageLayout: async (packageKey, groundPlan, firstFloorPlan) => {

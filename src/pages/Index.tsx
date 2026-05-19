@@ -34,15 +34,17 @@ const IndexInner = () => {
   }, [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.addons, config.presetId, config.land, config.landSize, config.customLandArea, config.roof, config.material, config.isDoubleStorey, config.activeFloor, presetOverrides]);
 
   const familyPackageLookupKeys = useMemo(() => getFamilyDoubleStoreyPackageLookupKeys(config), [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.isDoubleStorey, config.addons]);
+  const isFamilyDoubleStoreyPackage = homeType === 'family' && isDoubleStorey && config.presetId !== -1;
   const packageLayout = homeType === 'family' && isDoubleStorey
     ? familyPackageLookupKeys.map((key) => packageLayouts[key]).find(Boolean)
     : null;
-  const selectedPlan = (config.presetId === -1 ? customPlan : null) || packageLayout?.ground || basePlan || { width: 0, height: 0, rooms: [] };
+  const selectedPlan = ((config.presetId === -1 || isFamilyDoubleStoreyPackage) ? customPlan : null) || packageLayout?.ground || basePlan || { width: 0, height: 0, rooms: [] };
   // If a preset override exists for the current addon combination, the rooms are already
   // correctly positioned (including any carport/addon adjustments the user manually aligned).
   // Skip applyAddOnsToPlan to avoid double-shifting room positions.
   const hasActiveOverride = config.presetId !== -1 && !!presetOverrides[getBuiltInPresetKey(config, config.presetId)]?.ground?.rooms;
-  const plan = useMemo(() => hasActiveOverride ? selectedPlan : applyAddOnsToPlan(selectedPlan, config), [selectedPlan, config.addons, hasActiveOverride]);
+  const hasPackageBackedPlan = isFamilyDoubleStoreyPackage && !!selectedPlan?.rooms;
+  const plan = useMemo(() => (hasActiveOverride || hasPackageBackedPlan) ? selectedPlan : applyAddOnsToPlan(selectedPlan, config), [selectedPlan, config.addons, hasActiveOverride, hasPackageBackedPlan]);
 
   useEffect(() => {
     config.fetchSavedPresets();
@@ -51,9 +53,11 @@ const IndexInner = () => {
 
   useEffect(() => {
     if (homeType !== 'family' || !isDoubleStorey || !packageLayout) return;
-    if (packageLayout.ground?.rooms) setCustomPlan(packageLayout.ground);
-    if (packageLayout.first?.rooms) setCustomFirstFloorPlan(packageLayout.first);
-  }, [homeType, isDoubleStorey, packageLayout, setCustomPlan, setCustomFirstFloorPlan]);
+    if (config.presetId === -1) {
+      if (packageLayout.ground?.rooms && !customPlan?.rooms) setCustomPlan(packageLayout.ground);
+      if (packageLayout.first?.rooms && !customFirstFloorPlan?.rooms) setCustomFirstFloorPlan(packageLayout.first);
+    }
+  }, [homeType, isDoubleStorey, packageLayout, config.presetId, customPlan, customFirstFloorPlan, setCustomPlan, setCustomFirstFloorPlan]);
 
   // Clear custom plan when switching away from Family Double Storey
   useEffect(() => {

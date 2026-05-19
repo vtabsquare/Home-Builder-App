@@ -310,11 +310,15 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   }, [isDoubleStorey, plan, homeType, kitchen, bedrooms, bathrooms, addons, familyPackageLayout, builtInOverride]);
 
   const isEditingFirstFloor = isDoubleStorey && activeFloor === 1;
+  const isFamilyDoubleStoreyPackage = homeType === 'family' && isDoubleStorey && presetId !== -1;
 
   const savedGroundPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return plan;
-    return (isCustomPreset ? customPlan : null) || floors.ground;
-  }, [isDoubleStorey, floors, plan, isCustomPreset, customPlan]);
+    // For family double-storey packages, also honor the in-memory customPlan so
+    // that Apply Changes is reflected immediately. setKitchen clears this so
+    // each kitchen stays isolated.
+    return ((isCustomPreset || isFamilyDoubleStoreyPackage) ? customPlan : null) || floors.ground;
+  }, [isDoubleStorey, floors, plan, isCustomPreset, isFamilyDoubleStoreyPackage, customPlan]);
 
   // Fallback: if floors.first is missing (e.g. corrupted DB data), regenerate it
   const regeneratedFirstFloor = useMemo(() => {
@@ -325,8 +329,11 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
   const savedFirstFloorPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return null;
-    return (isCustomPreset ? customFirstFloorPlan : null) || floors.first || regeneratedFirstFloor || null;
-  }, [isDoubleStorey, floors, isCustomPreset, customFirstFloorPlan, regeneratedFirstFloor]);
+    // For family double-storey packages, also honor the in-memory
+    // customFirstFloorPlan so that Apply Changes shows immediately. setKitchen
+    // clears this so each kitchen stays isolated.
+    return ((isCustomPreset || isFamilyDoubleStoreyPackage) ? customFirstFloorPlan : null) || floors.first || regeneratedFirstFloor || null;
+  }, [isDoubleStorey, floors, isCustomPreset, isFamilyDoubleStoreyPackage, customFirstFloorPlan, regeneratedFirstFloor]);
 
   // Determine which plan to show based on floor selection
   const displayPlan = useMemo(() => {
@@ -352,8 +359,6 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     // Ensure plan has required structure
     return p && p.rooms ? p : { width: 0, height: 0, rooms: [] };
   }, [stagedPlan, displayPlan]);
-
-  const isFamilyDoubleStoreyPackage = homeType === 'family' && isDoubleStorey && presetId !== -1;
 
   const handleCopyLayout = () => {
     const planToCopy: Plan = JSON.parse(JSON.stringify(currentPlan));
