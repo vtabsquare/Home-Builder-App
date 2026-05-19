@@ -13,6 +13,27 @@ interface Props {
   floorLevel?: number; // 0 = ground, 1 = first floor, undefined = single storey
 }
 
+const CADCar2D = ({ w, h }: { w: number; h: number }) => {
+  return (
+    <Group offsetX={w/2} offsetY={h/2}>
+      {/* Main body (chassis) */}
+      <Rect width={w} height={h} fill="rgba(37, 99, 235, 0.15)" stroke="#1e3a8a" strokeWidth={1.5} cornerRadius={w * 0.25} />
+      {/* Cabin / Windshield outline */}
+      <Rect x={w * 0.1} y={h * 0.25} width={w * 0.8} height={h * 0.45} fill="rgba(255,255,255,0.7)" stroke="#1e3a8a" strokeWidth={1} cornerRadius={w * 0.1} />
+      {/* Front Hood Line */}
+      <Line points={[0, h * 0.2, w, h * 0.2]} stroke="#1e3a8a" strokeWidth={1} />
+      {/* Trunk Line */}
+      <Line points={[0, h * 0.8, w, h * 0.8]} stroke="#1e3a8a" strokeWidth={1} />
+      {/* Headlights */}
+      <Rect x={w * 0.15} y={-2} width={w * 0.2} height={4} fill="#fde047" stroke="#1e3a8a" strokeWidth={0.8} cornerRadius={1} />
+      <Rect x={w * 0.65} y={-2} width={w * 0.2} height={4} fill="#fde047" stroke="#1e3a8a" strokeWidth={0.8} cornerRadius={1} />
+      {/* Side Mirrors */}
+      <Rect x={-4} y={h * 0.3} width={4} height={h * 0.08} fill="#1e3a8a" cornerRadius={1} />
+      <Rect x={w} y={h * 0.3} width={4} height={h * 0.08} fill="#1e3a8a" cornerRadius={1} />
+    </Group>
+  );
+};
+
 // Room block templates
 export const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaultW: number; defaultH: number; color: string; kitchenType?: Room['kitchenType'] }[] = [
   { type: 'bedroom', label: 'Bedroom', icon: BedDouble, defaultW: 12, defaultH: 10, color: 'hsl(33 35% 82%)' },
@@ -28,6 +49,7 @@ export const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaul
   { type: 'dining', label: 'Dining', icon: UtensilsCrossed, defaultW: 10, defaultH: 10, color: 'hsl(36 28% 82%)' },
   { type: 'balcony', label: 'Balcony', icon: Fence, defaultW: 12, defaultH: 4, color: 'hsl(120 18% 78%)' },
   { type: 'carport', label: 'Carport', icon: Car, defaultW: 12, defaultH: 14, color: 'hsl(0 0% 82%)' },
+  { type: 'garage', label: 'Car Garage', icon: Car, defaultW: 22, defaultH: 24, color: 'hsl(0 0% 78%)' },
   { type: 'garden', label: 'Garden', icon: Trees, defaultW: 10, defaultH: 10, color: 'hsl(120 30% 72%)' },
 ];
 
@@ -667,6 +689,20 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
                           points={[Math.min(i * scale, rw), Math.max(0, i * scale - rw), Math.max(0, i * scale - rh), Math.min(i * scale, rh)]}
                           stroke="hsl(0, 0%, 40%)" strokeWidth={0.8} />
                       ))}
+                    </Group>
+                  )}
+                  {room.type === 'garage' && (
+                    <Group>
+                      {/* Two 2D CAD Cars */}
+                      <Group x={rw * 0.25} y={rh * 0.5}>
+                        <CADCar2D w={rw * 0.38} h={rh * 0.65} />
+                      </Group>
+                      <Group x={rw * 0.75} y={rh * 0.5}>
+                        <CADCar2D w={rw * 0.38} h={rh * 0.65} />
+                      </Group>
+                      {/* Workbenches/cabinets lines at the top of the garage */}
+                      <Rect x={4} y={4} width={rw - 8} height={12} fill="rgba(0,0,0,0.06)" stroke="#475569" strokeWidth={1} cornerRadius={1} />
+                      <Text x={4} y={7} width={rw - 8} text="STORAGE & TOOL RACKS" fontSize={6} fontFamily="Urbanist" fontStyle="600" fill="#475569" align="center" />
                     </Group>
                   )}
 

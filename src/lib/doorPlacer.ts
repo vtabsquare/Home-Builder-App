@@ -86,7 +86,7 @@ function getDoorType(typeA: Room['type'], typeB: Room['type']): 'standard' | 'op
 
 // Is this a room type that should be excluded from door connections?
 function isExcludedType(type: Room['type']): boolean {
-  return type === 'garden' || type === 'carport';
+  return type === 'garden' || type === 'carport' || type === 'garage';
 }
 
 // "Corridor" rooms that serve as connectors
@@ -356,6 +356,63 @@ export function intelligentlyPlaceDoors(plan: Plan): Plan {
         connected.add(k);
       }
     }
+  }
+
+  // ── Phase 7: Connect garage to adjacent house interior and place sectional door ──
+  const garages = rooms.filter(r => r.type === 'garage');
+  for (const gar of garages) {
+    // Find best adjacent interior room (hallway > living > kitchen > dining)
+    const priority: Room['type'][] = ['hallway', 'staircase', 'living', 'kitchen', 'dining'];
+    
+    let bestAdj: Adjacency | null = null;
+    let bestPriority = priority.length;
+
+    for (const other of rooms) {
+      if (other.id === gar.id) continue;
+      if (isExcludedType(other.type) && other.type !== 'garage') continue; // don't connect to garden/carport
+      const adj = checkAdjacency(gar, other);
+      if (!adj.shared) continue;
+      if (adj.overlapLength < 2.5) continue;
+
+      const idx = priority.indexOf(other.type);
+      if (idx !== -1 && (idx < bestPriority || (idx === bestPriority && bestAdj && adj.overlapLength > bestAdj.overlapLength))) {
+        const wallA = adj.wall;
+        const wallB = OPPOSITE_WALL[wallA];
+        const midA = clampDoorPos(sharedWallMidpoint(gar, wallA, other));
+        const midB = clampDoorPos(sharedWallMidpoint(other, wallB, gar));
+        bestAdj = {
+          roomA: gar,
+          roomB: other,
+          wallA,
+          wallB,
+          midA,
+          midB,
+          overlapLength: adj.overlapLength
+        };
+        bestPriority = idx;
+      }
+    }
+
+    if (bestAdj) {
+      const k = key(gar.id, bestAdj.roomB.id);
+      if (!connected.has(k)) {
+        addDoorPair(gar, bestAdj.wallA, bestAdj.midA, bestAdj.roomB, bestAdj.wallB, bestAdj.midB, 3);
+        connected.add(k);
+      }
+    }
+    
+    // Sectional garage door (16ft wide double garage door) facing front/road orientation
+    const frontWalls: DoorInfo['wall'][] = ['bottom', 'left', 'top', 'right'];
+    const garageDoorWall = frontWalls[gar.orientation || 0];
+    
+    gar.doors.push({
+      wall: garageDoorWall,
+      position: 0.5,
+      width: 16,
+      swing: 'out',
+      doorType: 'standard',
+      label: 'GARAGE DOOR'
+    });
   }
 
   return { ...plan, rooms };

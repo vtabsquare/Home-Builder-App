@@ -2,7 +2,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, ContactShadows, Html } from '@react-three/drei';
 import { Suspense, useMemo, useRef, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
-import { Plan, resolveStairGeometry } from '@/lib/floorplan';
+import { Plan, resolveStairGeometry, ensureGarageDoors } from '@/lib/floorplan';
 import { Material, RoofType, AddOn } from '@/store/configurator';
 import { Furniture3D } from './Furniture3D';
 import { SceneLighting } from './SceneLighting';
@@ -64,7 +64,7 @@ const getCarportInfo = (plan: Plan): { cx: number; cz: number; w: number; h: num
   if (!c) return null;
   const W = plan.width || 0;
   const D = plan.height || 0;
-  const main = (plan.rooms || []).filter((r) => r.type !== 'carport' && r.type !== 'garden' && r.type !== 'balcony');
+  const main = (plan.rooms || []).filter((r) => r.type !== 'carport' && r.type !== 'garden' && r.type !== 'balcony' && r.type !== 'garage');
   if (main.length === 0) return null;
   const mMinX = Math.min(...main.map((r) => r.x));
   const mMaxX = Math.max(...main.map((r) => r.x + r.w));
@@ -490,17 +490,20 @@ export const ElevationCanvas = ({
   plan, roof, material, addons = [], activeRoom, isDoubleStorey = false, 
   activeFloor, firstFloorPlan, hideHelpers = false, isNight = false 
 }: Props) => {
+  const ensuredPlan = useMemo(() => ensureGarageDoors(plan), [plan]);
+  const ensuredFirstFloorPlan = useMemo(() => firstFloorPlan ? ensureGarageDoors(firstFloorPlan) : undefined, [firstFloorPlan]);
+
   const currentFloor = activeFloor ?? 2;
   const hideRoof = isDoubleStorey ? currentFloor !== 2 : false;
-  const safeW = plan.width || 0;
-  const safeD = plan.height || 0;
+  const safeW = ensuredPlan.width || 0;
+  const safeD = ensuredPlan.height || 0;
   const plotW = safeW + PLOT_PADDING_FT * 2;
   const plotD = safeD + PLOT_PADDING_FT * 2;
-  const mainDoor = useMemo(() => findMainDoorWorld(plan), [plan]);
+  const mainDoor = useMemo(() => findMainDoorWorld(ensuredPlan), [ensuredPlan]);
   const gateConfig = useMemo(() => {
     const hw = plotW / 2;
     const hd = plotD / 2;
-    const gPos = Math.max(0.1, Math.min(0.9, plan.plotEntranceX ?? 0.5));
+    const gPos = Math.max(0.1, Math.min(0.9, ensuredPlan.plotEntranceX ?? 0.5));
     
     // Default fallback
     const defaultGate = { x: -hw + gPos * plotW, z: hd, side: 'bottom' as Side };
@@ -515,9 +518,9 @@ export const ElevationCanvas = ({
     if (mainDoor.nx === 1) return { x: hw, z: mainDoor.z, side: 'right' as Side };
 
     return defaultGate;
-  }, [mainDoor, plan.plotEntranceX, plotW, plotD]);
+  }, [mainDoor, ensuredPlan.plotEntranceX, plotW, plotD]);
 
-  const carportInfo = useMemo(() => getCarportInfo(plan), [plan]);
+  const carportInfo = useMemo(() => getCarportInfo(ensuredPlan), [ensuredPlan]);
 
   const gates = useMemo(() => {
     const list = [{ ...gateConfig, isCarGate: false }];
@@ -571,21 +574,24 @@ export const ElevationCanvas = ({
           {addons.includes('landscaping') && <GrassField planW={safeW} planD={safeD} />}
           
           {/* Ground Floor Model */}
-          <House plan={plan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={currentFloor !== 2} plotW={plotW} plotD={plotD} isDoubleStorey={isDoubleStorey} />
+          <House plan={ensuredPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={currentFloor !== 2} plotW={plotW} plotD={plotD} isDoubleStorey={isDoubleStorey} />
           
           {/* Second Floor (Double Storey) */}
-          {isDoubleStorey && firstFloorPlan && currentFloor !== 0 && (
-            <SecondFloor plan={plan} firstFloorPlan={firstFloorPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} hideRoof={currentFloor !== 2} />
+          {isDoubleStorey && ensuredFirstFloorPlan && currentFloor !== 0 && (
+            <SecondFloor plan={ensuredPlan} firstFloorPlan={ensuredFirstFloorPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} hideRoof={currentFloor !== 2} isNight={isNight} />
           )}
           
           
-          {addons.includes('carport') && <Carport plan={plan} plotW={plotW} plotD={plotD} gateSide={gateConfig.side} />}
+          {addons.includes('carport') && <Carport plan={ensuredPlan} plotW={plotW} plotD={plotD} gateSide={gateConfig.side} />}
+          {ensuredPlan.rooms.some(r => r.type === 'garage') && (
+            <GarageDriveway plan={ensuredPlan} plotW={plotW} plotD={plotD} isNight={isNight} />
+          )}
 
           {addons.includes('landscaping') && (() => {
-            const corridors = computeCorridors(plan, plotW, plotD, gateConfig.x, gateConfig.z, gateConfig.side);
+            const corridors = computeCorridors(ensuredPlan, plotW, plotD, gateConfig.x, gateConfig.z, gateConfig.side);
             return (
               <>
-                <FrontWalkway plan={plan} gateX={gateConfig.x} plotD={plotD} />
+                <FrontWalkway plan={ensuredPlan} gateX={gateConfig.x} plotD={plotD} />
                 <Trees planW={plotW} planD={plotD} corridors={corridors} />
                 <Bushes planW={plotW} planD={plotD} corridors={corridors} />
               </>
@@ -593,7 +599,7 @@ export const ElevationCanvas = ({
           })()}
           {addons.includes('fence') && <FenceAround planW={plotW} planD={plotD} gates={gates} isNight={isNight} />}
           
-          <CameraController activeRoom={activeRoom} plan={plan} firstFloorPlan={firstFloorPlan} activeFloor={currentFloor} isDoubleStorey={isDoubleStorey} />
+          <CameraController activeRoom={activeRoom} plan={ensuredPlan} firstFloorPlan={ensuredFirstFloorPlan} activeFloor={currentFloor} isDoubleStorey={isDoubleStorey} />
           <ContactShadows position={[0, 0.02, 0]} opacity={isNight ? 0.28 : 0.32} scale={80} blur={2} far={40} />
           <OrbitControls
             makeDefault
@@ -925,7 +931,8 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
   }), []);
 
   // 1. & 4. Compute exact bounding box for the structure
-  const mainRooms = (plan.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony');
+  const mainRooms = (plan.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony' && r.type !== 'garage');
+  const houseRooms = (plan.rooms || []).filter(r => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony');
   const minX = Math.min(...mainRooms.map(r => r.x));
   const maxX = Math.max(...mainRooms.map(r => r.x + r.w));
   const minZ = Math.min(...mainRooms.map(r => r.y));
@@ -948,7 +955,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const extractedWalls: any[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const addWall = (type: 'h'|'v', coord: number, start: number, end: number, doors: any[], windows: any[]) => {
+  const addWall = (type: 'h'|'v', coord: number, start: number, end: number, doors: any[], windows: any[], height = wallH) => {
     coord = round2(coord);
     start = round2(start);
     end = round2(end);
@@ -960,6 +967,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
     if (existing) {
       existing.start = Math.min(existing.start, start);
       existing.end = Math.max(existing.end, end);
+      existing.height = Math.max(existing.height || wallH, height);
       // Dedup doors/windows by absPos so shared-wall openings (e.g., hallway↔room)
       // don't render twice when both rooms contribute the same wall segment.
       for (const d of doors) {
@@ -975,7 +983,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
         }
       }
     } else {
-      extractedWalls.push({ type, coord, start, end, doors: [...doors], windows: [...windows] });
+      extractedWalls.push({ type, coord, start, end, doors: [...doors], windows: [...windows], height });
     }
   };
 
@@ -1013,19 +1021,21 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
       ...win, absPos: (wall === 'top' || wall === 'bottom') ? rX + rW * win.position : rY + rH * win.position
     }));
 
+    const rHeight = room.type === 'garage' ? 10 : wallH;
+
     // 2. Add walls perfectly aligned to room edges (skip if wall is marked as open/removed)
     const openWalls = room.openWalls || [];
     if (!openWalls.includes('top')) {
-      addWall('h', rY, rX, rX + rW, getAbsDoors('top'), getAbsWindows('top'));
+      addWall('h', rY, rX, rX + rW, getAbsDoors('top'), getAbsWindows('top'), rHeight);
     }
     if (!openWalls.includes('bottom')) {
-      addWall('h', rY + rH, rX, rX + rW, getAbsDoors('bottom'), getAbsWindows('bottom'));
+      addWall('h', rY + rH, rX, rX + rW, getAbsDoors('bottom'), getAbsWindows('bottom'), rHeight);
     }
     if (!openWalls.includes('left')) {
-      addWall('v', rX, rY, rY + rH, getAbsDoors('left'), getAbsWindows('left'));
+      addWall('v', rX, rY, rY + rH, getAbsDoors('left'), getAbsWindows('left'), rHeight);
     }
     if (!openWalls.includes('right')) {
-      addWall('v', rX + rW, rY, rY + rH, getAbsDoors('right'), getAbsWindows('right'));
+      addWall('v', rX + rW, rY, rY + rH, getAbsDoors('right'), getAbsWindows('right'), rHeight);
     }  });
 
   // Find main entrance door position for canopy & wall lights
@@ -1060,7 +1070,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
 
       {/* Per-room Foundations for perfect spatial accuracy */}
       <group position={[0, 0.8, 0]}>
-        {mainRooms.map(r => {
+        {houseRooms.map(r => {
           const cx = round2(r.x + r.w / 2 - W / 2);
           const cz = round2(r.y + r.h / 2 - D / 2);
           const isActive = activeRoom === r.type;
@@ -1126,6 +1136,9 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
                 } else if (isCorridor) {
                   map = floorTextures.walnut; normalMap = floorTextures.walnutNormal; roughnessMap = floorTextures.walnutRough;
                   baseColor = '#8a5d36'; roughness = 0.55; envMapIntensity = 0.7;
+                } else if (r.type === 'garage') {
+                  map = undefined; normalMap = undefined; roughnessMap = undefined;
+                  baseColor = '#1e293b'; roughness = 0.08; metalness = 0.75; envMapIntensity = 2.2;
                 }
 
                 return (
@@ -1209,6 +1222,10 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
                   </group>
                 );
               })()}
+
+              {r.type === 'garage' && (
+                <GarageInterior r={r} cx={cx} cz={cz} isNight={isNight} wallH={10} />
+              )}
             </group>
           );
         })}
@@ -1230,19 +1247,19 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
           if (wall.type === 'h') {
             const posX = round2(wall.start + len/2 - W/2);
             const posZ = round2(wall.coord - D/2);
-            return <WallSegment key={`wall-${i}`} w={w} h={wallH} t={t} color={colors.wall}
+            return <WallSegment key={`wall-${i}`} w={w} h={wall.height || wallH} t={t} color={colors.wall}
               doors={mappedDoors} windows={mappedWindows} materialType={material}
               position={[posX, 0, posZ]} rotation={[0, 0, 0]}
               frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door}
-              hideRoof={hideRoof} wallTextures={wallTextures} doorTextures={doorTextures} />;
+              hideRoof={hideRoof} wallTextures={wallTextures} doorTextures={doorTextures} isNight={isNight} />;
           } else {
             const posX = round2(wall.coord - W/2);
             const posZ = round2(wall.start + len/2 - D/2);
-            return <WallSegment key={`wall-${i}`} w={w} h={wallH} t={t} color={colors.wall}
+            return <WallSegment key={`wall-${i}`} w={w} h={wall.height || wallH} t={t} color={colors.wall}
               doors={mappedDoors} windows={mappedWindows} materialType={material}
               position={[posX, 0, posZ]} rotation={[0, -Math.PI/2, 0]}
               frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door}
-              hideRoof={hideRoof} wallTextures={wallTextures} doorTextures={doorTextures} />;
+              hideRoof={hideRoof} wallTextures={wallTextures} doorTextures={doorTextures} isNight={isNight} />;
           }
         })}
       </group>
@@ -1379,6 +1396,10 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
         );
       })()}
 
+      {!hideRoof && (plan.rooms || []).filter(r => r.type === 'garage').map(r => (
+        <GarageRoof key={`groof-${r.id}`} garage={r} planW={W} planH={D} wallH={10} colors={colors} wallTextures={wallTextures} />
+      ))}
+
       {/* Rooftop Equipment */}
       {addons.includes('solar') && !hideRoof && !isDoubleStorey && <SolarPanels minX={minX - W/2} maxX={maxX - W/2} minZ={minZ - D/2} maxZ={maxZ - D/2} roofType={roofType} wallH={wallH} />}
       {addons.includes('water_tank') && !hideRoof && !isDoubleStorey && <WaterTank maxX={maxX - W/2} maxZ={maxZ - D/2} wallH={wallH} roofType={roofType} />}
@@ -1434,9 +1455,10 @@ interface WallSegmentProps {
   wallTextures?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   doorTextures?: any;
+  isNight?: boolean;
 }
 
-const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frameColor, glassColor, doorColor, materialType, hideRoof, wallTextures, doorTextures }: WallSegmentProps) => {
+const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frameColor, glassColor, doorColor, materialType, hideRoof, wallTextures, doorTextures, isNight }: WallSegmentProps) => {
   const shape = useMemo(() => {
     const s = new THREE.Shape();
     s.moveTo(-w/2, 0);
@@ -1450,10 +1472,12 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
       const dh = getDoorHeight(d);
       const dx = w * d.relPos - w/2 - dw/2;
       const hole = new THREE.Path();
-      hole.moveTo(dx, 0);
-      hole.lineTo(dx + dw, 0);
-      hole.lineTo(dx + dw, dh);
+      // Start slightly below the bottom edge (y = -0.1) and use Clockwise (CW) winding direction
+      // to avoid coincident boundary triangulation errors in Earcut.
+      hole.moveTo(dx, -0.1);
       hole.lineTo(dx, dh);
+      hole.lineTo(dx + dw, dh);
+      hole.lineTo(dx + dw, -0.1);
       hole.closePath();
       s.holes.push(hole);
     });
@@ -1464,10 +1488,11 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
       const wy = 5.5;
       const wx = w * win.relPos - w/2 - ww/2;
       const hole = new THREE.Path();
+      // Use Clockwise (CW) winding direction for holes.
       hole.moveTo(wx, wy);
-      hole.lineTo(wx + ww, wy);
-      hole.lineTo(wx + ww, wy + wh);
       hole.lineTo(wx, wy + wh);
+      hole.lineTo(wx + ww, wy + wh);
+      hole.lineTo(wx + ww, wy);
       hole.closePath();
       s.holes.push(hole);
     });
@@ -1497,6 +1522,123 @@ const WallSegment = ({ w, h, t, color, doors, windows, position, rotation, frame
         const dh = getDoorHeight(d);
         const dx = w * d.relPos - w/2;
         const isOpen = d.doorType === 'open';
+
+        if (d.label === 'GARAGE DOOR') {
+          // ── PREMIUM SECTIONAL GARAGE DOOR ──
+          const segCount = 4;
+          const segH = dh / segCount;
+          const glassMat = (
+            <meshStandardMaterial
+              color="#0b0f19"
+              roughness={0.02}
+              metalness={0.9}
+              transparent
+              opacity={0.88}
+              envMapIntensity={2.5}
+            />
+          );
+
+          return (
+            <group key={`d-${i}`} position={[dx, dh/2, 0]}>
+              {/* Premium Matte Black Aluminum Outer Frame */}
+              <group>
+                {/* Top frame header */}
+                <mesh position={[0, dh/2 + 0.1, 0]} castShadow>
+                  <boxGeometry args={[dw + 0.4, 0.2, t + 0.1]} />
+                  <meshStandardMaterial color="#030712" roughness={0.5} metalness={0.4} />
+                </mesh>
+                {/* Left jamb */}
+                <mesh position={[-dw/2 - 0.1, 0, 0]} castShadow>
+                  <boxGeometry args={[0.2, dh, t + 0.1]} />
+                  <meshStandardMaterial color="#030712" roughness={0.5} metalness={0.4} />
+                </mesh>
+                {/* Right jamb */}
+                <mesh position={[dw/2 + 0.1, 0, 0]} castShadow>
+                  <boxGeometry args={[0.2, dh, t + 0.1]} />
+                  <meshStandardMaterial color="#030712" roughness={0.5} metalness={0.4} />
+                </mesh>
+              </group>
+
+              {/* Sectional Panels (4 horizontal segments) */}
+              {Array.from({ length: segCount }).map((_, sIdx) => {
+                const sY = -dh/2 + sIdx * segH + segH/2;
+                const isGlassSegment = sIdx === 1 || sIdx === 2;
+
+                return (
+                  <group key={`seg-${sIdx}`} position={[0, sY, 0.02]}>
+                    {/* Main segment backing */}
+                    <mesh castShadow receiveShadow>
+                      <boxGeometry args={[dw - 0.08, segH - 0.04, 0.08]} />
+                      <meshStandardMaterial color="#0f172a" roughness={0.3} metalness={0.8} />
+                    </mesh>
+
+                    {/* Segment borders / divisions */}
+                    <mesh position={[0, segH/2 - 0.01, 0.05]}>
+                      <boxGeometry args={[dw - 0.04, 0.02, 0.02]} />
+                      <meshStandardMaterial color="#030712" roughness={0.4} />
+                    </mesh>
+
+                    {/* Left and right end caps */}
+                    <mesh position={[-dw/2 + 0.05, 0, 0.05]}>
+                      <boxGeometry args={[0.1, segH - 0.08, 0.02]} />
+                      <meshStandardMaterial color="#030712" roughness={0.4} />
+                    </mesh>
+                    <mesh position={[dw/2 - 0.05, 0, 0.05]}>
+                      <boxGeometry args={[0.1, segH - 0.08, 0.02]} />
+                      <meshStandardMaterial color="#030712" roughness={0.4} />
+                    </mesh>
+
+                    {/* Inner design layout */}
+                    {isGlassSegment ? (
+                      <group>
+                        {/* 4 glass panes per segment */}
+                        {[-1.5, -0.5, 0.5, 1.5].map((paneOff, pIdx) => (
+                          <group key={`pane-${pIdx}`} position={[paneOff * (dw/4), 0, 0.04]}>
+                            <mesh>
+                              <boxGeometry args={[dw/4.3, segH - 0.15, 0.02]} />
+                              {glassMat}
+                            </mesh>
+                            <mesh position={[0, 0, 0.01]}>
+                              <boxGeometry args={[dw/4.3 + 0.02, segH - 0.15 + 0.02, 0.005]} />
+                              <meshStandardMaterial color="#1e293b" roughness={0.5} metalness={0.8} />
+                            </mesh>
+                          </group>
+                        ))}
+                      </group>
+                    ) : (
+                      <group>
+                        {[-0.15, 0, 0.15].map((lineY, lIdx) => (
+                          <mesh key={`line-${lIdx}`} position={[0, lineY * segH, 0.04]}>
+                            <boxGeometry args={[dw - 0.4, 0.02, 0.02]} />
+                            <meshStandardMaterial color="#1f2937" roughness={0.2} metalness={0.9} />
+                          </mesh>
+                        ))}
+                      </group>
+                    )}
+                  </group>
+                );
+              })}
+
+              {/* Optional soft LED light strips around frame (Glowing warm amber/white) */}
+              {isNight && (
+                <group>
+                  <mesh position={[-dw/2 - 0.12, 0, t/2 + 0.06]}>
+                    <boxGeometry args={[0.02, dh, 0.02]} />
+                    <meshBasicMaterial color="#ffcc80" toneMapped={false} />
+                  </mesh>
+                  <mesh position={[dw/2 + 0.12, 0, t/2 + 0.06]}>
+                    <boxGeometry args={[0.02, dh, 0.02]} />
+                    <meshBasicMaterial color="#ffcc80" toneMapped={false} />
+                  </mesh>
+                  <mesh position={[0, dh/2 + 0.12, t/2 + 0.06]}>
+                    <boxGeometry args={[dw + 0.24, 0.02, 0.02]} />
+                    <meshBasicMaterial color="#ffcc80" toneMapped={false} />
+                  </mesh>
+                </group>
+              )}
+            </group>
+          );
+        }
 
         if (isOpen) {
           // Open archway — frame only, no door panel
@@ -2061,6 +2203,339 @@ const WaterTank = ({ maxX, maxZ, wallH, roofType }: { maxX: number; maxZ: number
   );
 };
 
+const GarageDriveway = ({ plan, plotW, plotD, isNight }: { plan: Plan; plotW: number; plotD: number; isNight: boolean }) => {
+  const garage = (plan.rooms || []).find(r => r.type === 'garage');
+  if (!garage) return null;
+
+  const halfPlotW = plotW / 2;
+  const halfPlotD = plotD / 2;
+  const garageElevation = 0.8;
+  const rampL = 3.0; // ramp length
+
+  const frontWalls: ('top' | 'bottom' | 'left' | 'right')[] = ['bottom', 'left', 'top', 'right'];
+  const doorWall = frontWalls[garage.orientation || 0];
+
+  let rampCX = 0;
+  let rampCZ = 0;
+  let rampRotY = 0;
+  let rampH = garage.w;
+  
+  let dwW = 0;
+  let dwD = 0;
+  let dwCX = 0;
+  let dwCZ = 0;
+  let isVertical = false;
+
+  const planW = plan.width;
+  const planH = plan.height;
+
+  if (doorWall === 'bottom') {
+    const gCX = garage.x + garage.w / 2 - planW / 2;
+    const gCZ = garage.y + garage.h - planH / 2;
+    rampH = garage.w;
+    rampCX = gCX;
+    rampCZ = gCZ + rampL / 2;
+    rampRotY = 0;
+
+    const dwMinX = gCX - rampH / 2 + 0.6;
+    const dwMaxX = gCX + rampH / 2 - 0.6;
+    const dwMinZ = gCZ + rampL;
+    const dwMaxZ = halfPlotD;
+    dwW = dwMaxX - dwMinX;
+    dwD = Math.max(0.1, dwMaxZ - dwMinZ);
+    dwCX = (dwMinX + dwMaxX) / 2;
+    dwCZ = (dwMinZ + dwMaxZ) / 2;
+    isVertical = true;
+  } else if (doorWall === 'top') {
+    const gCX = garage.x + garage.w / 2 - planW / 2;
+    const gCZ = garage.y - planH / 2;
+    rampH = garage.w;
+    rampCX = gCX;
+    rampCZ = gCZ - rampL / 2;
+    rampRotY = Math.PI;
+
+    const dwMinX = gCX - rampH / 2 + 0.6;
+    const dwMaxX = gCX + rampH / 2 - 0.6;
+    const dwMinZ = -halfPlotD;
+    const dwMaxZ = gCZ - rampL;
+    dwW = dwMaxX - dwMinX;
+    dwD = Math.max(0.1, dwMaxZ - dwMinZ);
+    dwCX = (dwMinX + dwMaxX) / 2;
+    dwCZ = (dwMinZ + dwMaxZ) / 2;
+    isVertical = true;
+  } else if (doorWall === 'left') {
+    const gCX = garage.x - planW / 2;
+    const gCZ = garage.y + garage.h / 2 - planH / 2;
+    rampH = garage.h;
+    rampCX = gCX - rampL / 2;
+    rampCZ = gCZ;
+    rampRotY = Math.PI / 2;
+
+    const dwMinX = -halfPlotW;
+    const dwMaxX = gCX - rampL;
+    const dwMinZ = gCZ - rampH / 2 + 0.6;
+    const dwMaxZ = gCZ + rampH / 2 - 0.6;
+    dwW = Math.max(0.1, dwMaxX - dwMinX);
+    dwD = dwMaxZ - dwMinZ;
+    dwCX = (dwMinX + dwMaxX) / 2;
+    dwCZ = (dwMinZ + dwMaxZ) / 2;
+    isVertical = false;
+  } else { // right
+    const gCX = garage.x + garage.w - planW / 2;
+    const gCZ = garage.y + garage.h / 2 - planH / 2;
+    rampH = garage.h;
+    rampCX = gCX + rampL / 2;
+    rampCZ = gCZ;
+    rampRotY = -Math.PI / 2;
+
+    const dwMinX = gCX + rampL;
+    const dwMaxX = halfPlotW;
+    const dwMinZ = gCZ - rampH / 2 + 0.6;
+    const dwMaxZ = gCZ + rampH / 2 - 0.6;
+    dwW = Math.max(0.1, dwMaxX - dwMinX);
+    dwD = dwMaxZ - dwMinZ;
+    dwCX = (dwMinX + dwMaxX) / 2;
+    dwCZ = (dwMinZ + dwMaxZ) / 2;
+    isVertical = false;
+  }
+
+  const rampAngle = Math.atan2(garageElevation, rampL);
+  const rampHypot = Math.hypot(garageElevation, rampL);
+
+  return (
+    <group>
+      {/* Ramp from 0 to 0.8 */}
+      <mesh position={[rampCX, garageElevation / 2, rampCZ]} rotation={[rampAngle, rampRotY, 0]} receiveShadow castShadow>
+        <boxGeometry args={[rampH - 1.2, 0.08, rampHypot]} />
+        <meshStandardMaterial color="#555558" roughness={0.88} />
+      </mesh>
+
+      {/* Main Driveway Slab (Pavers/Concrete) */}
+      {dwW > 0.5 && dwD > 0.5 && (
+        <group position={[dwCX, 0.01, dwCZ]}>
+          {/* Main slab */}
+          <mesh receiveShadow>
+            <boxGeometry args={[dwW, 0.02, dwD]} />
+            <meshStandardMaterial color="#3a3a3d" roughness={0.8} />
+          </mesh>
+
+          {/* Premium Paver Grid Overlay lines */}
+          {isVertical ? (
+            <>
+              {Array.from({ length: Math.ceil(dwD / 2) }).map((_, i) => (
+                <mesh key={`pLine-${i}`} position={[0, 0.011, -dwD/2 + i * 2]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <planeGeometry args={[dwW, 0.02]} />
+                  <meshBasicMaterial color="#1a1a1a" transparent opacity={0.6} />
+                </mesh>
+              ))}
+              {Array.from({ length: Math.ceil(dwW / 3) }).map((_, i) => (
+                <mesh key={`pCol-${i}`} position={[-dwW/2 + i * 3, 0.011, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <planeGeometry args={[0.02, dwD]} />
+                  <meshBasicMaterial color="#1a1a1a" transparent opacity={0.6} />
+                </mesh>
+              ))}
+            </>
+          ) : (
+            <>
+              {Array.from({ length: Math.ceil(dwW / 2) }).map((_, i) => (
+                <mesh key={`pLine-${i}`} position={[-dwW/2 + i * 2, 0.011, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <planeGeometry args={[0.02, dwD]} />
+                  <meshBasicMaterial color="#1a1a1a" transparent opacity={0.6} />
+                </mesh>
+              ))}
+              {Array.from({ length: Math.ceil(dwD / 3) }).map((_, i) => (
+                <mesh key={`pCol-${i}`} position={[0, 0.011, -dwD/2 + i * 3]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <planeGeometry args={[dwW, 0.02]} />
+                  <meshBasicMaterial color="#1a1a1a" transparent opacity={0.6} />
+                </mesh>
+              ))}
+            </>
+          )}
+
+          {/* Subtle LED Edge Lighting */}
+          {isNight && (
+            <group>
+              {isVertical ? (
+                <>
+                  <mesh position={[-dwW / 2 - 0.1, 0.03, 0]}>
+                    <boxGeometry args={[0.04, 0.03, dwD]} />
+                    <meshBasicMaterial color="#ffcc80" toneMapped={false} />
+                  </mesh>
+                  <mesh position={[dwW / 2 + 0.1, 0.03, 0]}>
+                    <boxGeometry args={[0.04, 0.03, dwD]} />
+                    <meshBasicMaterial color="#ffcc80" toneMapped={false} />
+                  </mesh>
+                </>
+              ) : (
+                <>
+                  <mesh position={[0, 0.03, -dwD / 2 - 0.1]}>
+                    <boxGeometry args={[dwW, 0.03, 0.04]} />
+                    <meshBasicMaterial color="#ffcc80" toneMapped={false} />
+                  </mesh>
+                  <mesh position={[0, 0.03, dwD / 2 + 0.1]}>
+                    <boxGeometry args={[dwW, 0.03, 0.04]} />
+                    <meshBasicMaterial color="#ffcc80" toneMapped={false} />
+                  </mesh>
+                </>
+              )}
+            </group>
+          )}
+        </group>
+      )}
+    </group>
+  );
+};
+
+const GarageInterior = ({ r, cx, cz, isNight, wallH = 10 }: { r: Plan['rooms'][number]; cx: number; cz: number; isNight: boolean; wallH?: number }) => {
+  const w = r.w;
+  const h = r.h;
+  const t = 0.4;
+
+  const orient = r.orientation || 0;
+  const rotationY = -orient * Math.PI / 2;
+
+  return (
+    <group position={[cx, 0, cz]} rotation={[0, rotationY, 0]}>
+      {/* Two Premium Vehicles Side-by-Side */}
+      <group position={[-w * 0.22, 0.02, 0]} rotation={[0, 0, 0]} scale={[1.8, 1.8, 1.8]}>
+        <ParkedCar color="#0f172a" />
+      </group>
+      <group position={[w * 0.22, 0.02, 0]} rotation={[0, 0, 0]} scale={[1.8, 1.8, 1.8]}>
+        <ParkedCar color="#7f1d1d" />
+      </group>
+
+      {/* Side Storage Cabinets (Right Wall) */}
+      <group position={[w/2 - t - 0.5, 0.02, -h * 0.1]}>
+        {[-3, 0, 3].map((zOff) => (
+          <group key={zOff} position={[0, 0, zOff]}>
+            <mesh position={[0, 1.5, 0]} castShadow receiveShadow>
+              <boxGeometry args={[1.0, 3.0, 2.5]} />
+              <meshStandardMaterial color="#2d3748" metalness={0.7} roughness={0.3} />
+            </mesh>
+            <mesh position={[0, 5.5, 0]} castShadow>
+              <boxGeometry args={[0.8, 1.8, 2.5]} />
+              <meshStandardMaterial color="#2d3748" metalness={0.7} roughness={0.3} />
+            </mesh>
+            <mesh position={[-0.1, 3.05, 0]} castShadow>
+              <boxGeometry args={[1.1, 0.1, 2.52]} />
+              <meshStandardMaterial color="#e2e8f0" metalness={0.9} roughness={0.15} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+
+      {/* Tool Wall Pegboard (Left Wall) */}
+      <group position={[-w/2 + t + 0.05, 3.5, -h * 0.1]} rotation={[0, Math.PI/2, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[8.0, 4.0, 0.1]} />
+          <meshStandardMaterial color="#1a202c" roughness={0.9} />
+        </mesh>
+        <mesh position={[0, 0, 0.06]}>
+          <boxGeometry args={[8.2, 4.2, 0.02]} />
+          <meshStandardMaterial color="#111" roughness={0.6} />
+        </mesh>
+        {[-2.5, 0, 2.5].map((xOff, idx) => (
+          <mesh key={xOff} position={[xOff, -0.8, 0.2]} castShadow>
+            <boxGeometry args={[1.5, 0.3, 0.5]} />
+            <meshStandardMaterial color={idx === 1 ? '#e53e3e' : '#3182ce'} metalness={0.5} />
+          </mesh>
+        ))}
+        {/* EV Charging Station */}
+        <group position={[4.8, -0.5, 0.2]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.8, 1.4, 0.4]} />
+            <meshStandardMaterial color="#1e293b" roughness={0.3} metalness={0.8} />
+          </mesh>
+          <mesh position={[0, 0.2, 0.21]} rotation={[Math.PI/2, 0, 0]}>
+            <cylinderGeometry args={[0.2, 0.2, 0.02, 16]} />
+            <meshBasicMaterial color={isNight ? '#00e676' : '#222'} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, -0.4, 0.22]} castShadow>
+            <boxGeometry args={[0.2, 0.4, 0.3]} />
+            <meshStandardMaterial color="#000" roughness={0.5} />
+          </mesh>
+        </group>
+      </group>
+
+      {/* Ceiling Recessed LED Lighting Grids */}
+      <group position={[0, wallH - 0.05, 0]}>
+        {[-w * 0.22, w * 0.22].map((xOff, idx) => (
+          <group key={idx} position={[xOff, 0, 0]}>
+            <mesh receiveShadow>
+              <boxGeometry args={[6.0, 0.04, 12.0]} />
+              <meshStandardMaterial color="#1a1a1a" roughness={0.5} />
+            </mesh>
+            <mesh position={[0, -0.01, 0]}>
+              <boxGeometry args={[5.6, 0.02, 11.6]} />
+              <meshBasicMaterial color="#ffffff" toneMapped={false} />
+            </mesh>
+            <pointLight position={[0, -2.0, 0]} intensity={1.5} distance={20} color="#ffffff" decay={2} castShadow />
+          </group>
+        ))}
+      </group>
+    </group>
+  );
+};
+
+const GarageRoof = ({ garage, planW, planH, wallH, colors, wallTextures }: { garage: Plan['rooms'][number]; planW: number; planH: number; wallH: number; colors: Record<string, string>; wallTextures: Record<string, THREE.Texture> }) => {
+  const gCX = garage.x + garage.w / 2 - planW / 2;
+  const gCZ = garage.y + garage.h / 2 - planH / 2;
+  const gw = garage.w;
+  const gd = garage.h;
+  const t = 0.4;
+  const parapetH = 1.8; // Parapet height
+
+  return (
+    <group position={[gCX, wallH, gCZ]}>
+      {/* Roof Slab */}
+      <mesh position={[0, -0.1, 0]} castShadow receiveShadow>
+        <boxGeometry args={[gw + 0.2, 0.2, gd + 0.2]} />
+        <meshStandardMaterial color={colors.trim} roughness={0.6} />
+      </mesh>
+
+      {/* Parapet Walls */}
+      <mesh position={[0, parapetH / 2, gd / 2 - t / 2]} castShadow receiveShadow>
+        <boxGeometry args={[gw, parapetH, t]} />
+        <meshStandardMaterial color={colors.wall} map={wallTextures?.map} normalMap={wallTextures?.normal} roughness={0.9} />
+      </mesh>
+      <mesh position={[0, parapetH / 2, -gd / 2 + t / 2]} castShadow receiveShadow>
+        <boxGeometry args={[gw, parapetH, t]} />
+        <meshStandardMaterial color={colors.wall} map={wallTextures?.map} normalMap={wallTextures?.normal} roughness={0.9} />
+      </mesh>
+      <mesh position={[-gw / 2 + t / 2, parapetH / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[t, parapetH, gd - 2 * t]} />
+        <meshStandardMaterial color={colors.wall} map={wallTextures?.map} normalMap={wallTextures?.normal} roughness={0.9} />
+      </mesh>
+      <mesh position={[gw / 2 - t / 2, parapetH / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[t, parapetH, gd - 2 * t]} />
+        <meshStandardMaterial color={colors.wall} map={wallTextures?.map} normalMap={wallTextures?.normal} roughness={0.9} />
+      </mesh>
+
+      {/* Metal Trim Cap on Parapets (4 thin border cap segments instead of a solid box) */}
+      {/* Front Trim */}
+      <mesh position={[0, parapetH, gd / 2 - t / 2]} castShadow>
+        <boxGeometry args={[gw + 0.08, 0.08, t + 0.08]} />
+        <meshStandardMaterial color={colors.trim} roughness={0.5} />
+      </mesh>
+      {/* Back Trim */}
+      <mesh position={[0, parapetH, -gd / 2 + t / 2]} castShadow>
+        <boxGeometry args={[gw + 0.08, 0.08, t + 0.08]} />
+        <meshStandardMaterial color={colors.trim} roughness={0.5} />
+      </mesh>
+      {/* Left Trim */}
+      <mesh position={[-gw / 2 + t / 2, parapetH, 0]} castShadow>
+        <boxGeometry args={[t + 0.08, 0.08, gd - 2 * t]} />
+        <meshStandardMaterial color={colors.trim} roughness={0.5} />
+      </mesh>
+      {/* Right Trim */}
+      <mesh position={[gw / 2 - t / 2, parapetH, 0]} castShadow>
+        <boxGeometry args={[t + 0.08, 0.08, gd - 2 * t]} />
+        <meshStandardMaterial color={colors.trim} roughness={0.5} />
+      </mesh>
+    </group>
+  );
+};
+
 /* Low-poly parked car. Car length runs along +/- Z (rotate the parent group to orient). */
 const ParkedCar = ({ color = '#1f2937', accent = '#0a0a0a' }: { color?: string; accent?: string }) => {
   return (
@@ -2336,6 +2811,48 @@ const computeCorridors = (
       const clearH = Math.max(ch / 2 + 1.5, 7.5);
       if (openingSide === 'left') rects.push({ minX: -halfPlotW - 1.0, maxX: cx - cw / 2 + 1.0, minZ: cz - clearH, maxZ: cz + clearH });
       else rects.push({ minX: cx + cw / 2 - 1.0, maxX: halfPlotW + 1.0, minZ: cz - clearH, maxZ: cz + clearH });
+    }
+  }
+
+  // Garage driveway corridor
+  const garageRoom = (plan.rooms || []).find(r => r.type === 'garage');
+  if (garageRoom) {
+    const frontWalls: ('top' | 'bottom' | 'left' | 'right')[] = ['bottom', 'left', 'top', 'right'];
+    const doorWall = frontWalls[garageRoom.orientation || 0];
+
+    const gCX = garageRoom.x + garageRoom.w / 2 - plan.width / 2;
+    const gCZ = garageRoom.y + garageRoom.h / 2 - plan.height / 2;
+    const gW = garageRoom.w;
+    const gH = garageRoom.h;
+
+    if (doorWall === 'bottom') {
+      rects.push({
+        minX: gCX - gW / 2 - 1.5,
+        maxX: gCX + gW / 2 + 1.5,
+        minZ: gCZ + gH / 2 - 1.0,
+        maxZ: halfPlotD + 1.0
+      });
+    } else if (doorWall === 'top') {
+      rects.push({
+        minX: gCX - gW / 2 - 1.5,
+        maxX: gCX + gW / 2 + 1.5,
+        minZ: -halfPlotD - 1.0,
+        maxZ: gCZ - gH / 2 + 1.0
+      });
+    } else if (doorWall === 'left') {
+      rects.push({
+        minX: -halfPlotW - 1.0,
+        maxX: gCX - gW / 2 + 1.0,
+        minZ: gCZ - gH / 2 - 1.5,
+        maxZ: gCZ + gH / 2 + 1.5
+      });
+    } else { // right
+      rects.push({
+        minX: gCX + gW / 2 - 1.0,
+        maxX: halfPlotW + 1.0,
+        minZ: gCZ - gH / 2 - 1.5,
+        maxZ: gCZ + gH / 2 + 1.5
+      });
     }
   }
 
@@ -2795,8 +3312,8 @@ const FenceAround = ({ planW, planD, gates, isNight }: { planW: number; planD: n
 };
 
 /* ─── Second Floor (Double Storey) ─── */
-const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons = [], hideRoof }: {
-  plan: Plan; firstFloorPlan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons?: AddOn[]; hideRoof?: boolean;
+const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons = [], hideRoof, isNight }: {
+  plan: Plan; firstFloorPlan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons?: AddOn[]; hideRoof?: boolean; isNight?: boolean;
 }) => {
   const colors = MATERIAL_COLORS[material];
   const W = plan.width;
@@ -3109,13 +3626,13 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
               doors={mappedDoors} windows={mappedWindows} materialType={material}
               position={[round2(wall.start + len/2), 0, round2(wall.coord)]} rotation={[0, 0, 0]}
               frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} hideRoof={hideRoof}
-              wallTextures={{}} doorTextures={{ }} />;
+              wallTextures={{}} doorTextures={{ }} isNight={isNight} />;
           } else {
             return <WallSegment key={`w2-${i}`} w={w} h={wallH} t={t} color={colors.wall}
               doors={mappedDoors} windows={mappedWindows} materialType={material}
               position={[round2(wall.coord), 0, round2(wall.start + len/2)]} rotation={[0, -Math.PI/2, 0]}
               frameColor={colors.trim} glassColor={colors.window} doorColor={colors.door} hideRoof={hideRoof}
-              wallTextures={{ }} doorTextures={{ }} />;
+              wallTextures={{ }} doorTextures={{ }} isNight={isNight} />;
           }
         })}
 

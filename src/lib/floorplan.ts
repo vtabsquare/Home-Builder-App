@@ -80,7 +80,7 @@ export function resolveStairGeometry(room: { w: number; h: number; stairGeometry
 
 export interface Room {
   id: string;
-  type: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'lounge' | 'dressing' | 'dining' | 'entry' | 'hallway' | 'staircase' | 'balcony' | 'carport' | 'garden';
+  type: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'lounge' | 'dressing' | 'dining' | 'entry' | 'hallway' | 'staircase' | 'balcony' | 'carport' | 'garden' | 'garage';
   label: string;
   x: number; // ft
   y: number;
@@ -118,6 +118,7 @@ const COLORS: Record<string, string> = {
   balcony:  'hsl(120 18% 78%)',
   carport:  'hsl(0 0% 82%)',
   garden:   'hsl(120 30% 72%)',
+  garage:   'hsl(0 0% 78%)',
 };
 
 // ── Furniture helpers (all wall-aligned, walking-space aware) ──────────────
@@ -147,6 +148,8 @@ export function regenerateFurniture(room: Room, kitchenType: string = 'open'): F
       ];
     case 'garden':
       return gardenFurniture(room.w, room.h);
+    case 'garage':
+      return [];
     default:
       return room.furniture;
   }
@@ -1148,7 +1151,7 @@ export function generatePlan(c: ConfigState): Plan {
       plan = starterPresetA(c);
   }
 
-  return applyDynamicChanges(plan, c);
+  return ensureGarageDoors(applyDynamicChanges(plan, c));
 }
 
 const ADDON_ROOM_PREFIXES = ['addon-'];
@@ -1347,7 +1350,7 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
     });
   }
 
-  return { ...plan, rooms, width: W, height: H };
+  return ensureGarageDoors({ ...plan, rooms, width: W, height: H });
 }
 
 function applyDynamicChanges(plan: Plan, c: ConfigState): Plan {
@@ -1966,6 +1969,7 @@ export function splitPlanToFloors(
     result = { ground: groundWithAddons, first };
   }
 
+  result.ground = ensureGarageDoors(result.ground);
   return result;
 }
 
@@ -2157,5 +2161,105 @@ function _splitPlanGeneric(plan: Plan): { ground: Plan; first: Plan } {
     first: { width: W, height: H, rooms: fRooms },
   };
 }
+
+export function ensureGarageDoors(plan: Plan): Plan {
+  const rooms = plan.rooms.map(r => {
+    if (r.type !== 'garage') return r;
+
+    // Create a copy of the garage room
+    const gar = { ...r, doors: [...(r.doors || [])] };
+
+    // Check if the garage already has a door labeled 'GARAGE DOOR'
+    const hasGarageDoor = gar.doors.some(d => d.label === 'GARAGE DOOR');
+    if (!hasGarageDoor) {
+      const frontWalls: DoorInfo['wall'][] = ['bottom', 'left', 'top', 'right'];
+      const garageDoorWall = frontWalls[gar.orientation || 0];
+      gar.doors.push({
+        wall: garageDoorWall,
+        position: 0.5,
+        width: 16,
+        swing: 'out',
+        doorType: 'standard',
+        label: 'GARAGE DOOR'
+      });
+    }
+
+    // Check if the garage has an internal connecting door
+    const hasConnectingDoor = gar.doors.some(d => d.connectsTo);
+    if (!hasConnectingDoor) {
+      // Find adjacent interior room to connect to
+      const priority: string[] = ['hallway', 'staircase', 'living', 'kitchen', 'dining'];
+      let bestAdj: { otherId: string; wall: 'top'|'bottom'|'left'|'right'; otherWall: 'top'|'bottom'|'left'|'right'; pos: number; otherPos: number } | null = null;
+      let bestPriority = priority.length;
+
+      for (const other of plan.rooms) {
+        if (other.id === gar.id) continue;
+        if (other.type === 'garden' || other.type === 'carport' || other.type === 'garage') continue;
+
+        // Check adjacency
+        const isAdj = roomsAreAdjacent(gar, other);
+        if (!isAdj.shared) continue;
+
+        const idx = priority.indexOf(other.type);
+        if (idx !== -1 && idx < bestPriority) {
+          const wallA = isAdj.wall;
+          const oppositeWall: Record<'top' | 'bottom' | 'left' | 'right', 'top' | 'bottom' | 'left' | 'right'> = {
+            top: 'bottom',
+            bottom: 'top',
+            left: 'right',
+            right: 'left',
+          };
+          const wallB = oppositeWall[wallA];
+          const midA = Math.max(0.15, Math.min(0.85, sharedWallMidpoint(gar, wallA, other)));
+          const midB = Math.max(0.15, Math.min(0.85, sharedWallMidpoint(other, wallB, gar)));
+          bestAdj = {
+            otherId: other.id,
+            wall: wallA,
+            otherWall: wallB,
+            pos: midA,
+            otherPos: midB
+          };
+          bestPriority = idx;
+        }
+      }
+
+      if (bestAdj) {
+        // Add connecting door to garage
+        gar.doors.push({
+          wall: bestAdj.wall,
+          position: bestAdj.pos,
+          width: 3,
+          swing: 'in',
+          connectsTo: bestAdj.otherId,
+          doorType: 'standard'
+        });
+
+        // Also add the corresponding connecting door to the adjacent room
+        const adjRoomIdx = plan.rooms.findIndex(rm => rm.id === bestAdj!.otherId);
+        if (adjRoomIdx !== -1) {
+          const adjRoom = plan.rooms[adjRoomIdx];
+          if (!adjRoom.doors.some(d => d.connectsTo === gar.id)) {
+            adjRoom.doors = [
+              ...adjRoom.doors,
+              {
+                wall: bestAdj.otherWall,
+                position: bestAdj.otherPos,
+                width: 3,
+                swing: 'in',
+                connectsTo: gar.id,
+                doorType: 'standard'
+              }
+            ];
+          }
+        }
+      }
+    }
+
+    return gar;
+  });
+
+  return { ...plan, rooms };
+}
+
 
 
