@@ -34,7 +34,7 @@ export function useAddonMeta() {
     solar: 'Solar Panels',
     carport: 'Carport',
     water_tank: 'Water Tank',
-    smart_home: 'Smart Home Package',
+    smart_home: 'Generator',
     fence: 'Perimeter Fence',
     landscaping: 'Landscaping',
   };

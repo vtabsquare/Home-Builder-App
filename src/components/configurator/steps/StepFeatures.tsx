@@ -2,10 +2,10 @@ import { useConfig, AddOn, KitchenType, HOME_TYPE_LIMITS } from '@/store/configu
 import { StepShell } from '../StepShell';
 import { formatMoney } from '@/lib/cost';
 import { useAddonMeta, useKitchenMeta, useRoomPricingMeta } from '@/hooks/PricingContext';
-import { Minus, Plus, Sun, Car, Droplets, Cpu, Check, Fence, Trees } from 'lucide-react';
+import { Minus, Plus, Sun, Car, Droplets, Cpu, Check, Fence, Trees, LucideIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const ADDON_ICON: Record<AddOn, any> = {
+const ADDON_ICON: Record<AddOn, LucideIcon> = {
   solar: Sun,
   carport: Car,
   water_tank: Droplets,

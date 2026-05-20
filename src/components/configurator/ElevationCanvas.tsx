@@ -1003,7 +1003,10 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const getAbsDoors = (wall: string) => (room.doors || []).filter((d:any) => d.wall === wall).map((d:any) => {
       let doorCategory: 'main' | 'room' | 'bathroom' = 'room';
-      if (d.label === 'MAIN DOOR' || (!d.connectsTo && d.doorType !== 'open')) {
+      if (d.label === 'GARAGE DOOR') {
+        // Garage doors keep 'room' category — height is handled specially in getDoorHeight
+        doorCategory = 'room';
+      } else if (d.label === 'MAIN DOOR' || (!d.connectsTo && d.doorType !== 'open')) {
         doorCategory = 'main';
       } else if (room.type === 'bathroom') {
         doorCategory = 'bathroom';
@@ -1025,7 +1028,8 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
 
     // 2. Add walls perfectly aligned to room edges (skip if wall is marked as open/removed)
     const openWalls = room.openWalls || [];
-    if (!openWalls.includes('top')) {
+    // For garage rooms, always omit the front (top) wall to expose the garage door.
+    if (room.type !== 'garage' && !openWalls.includes('top')) {
       addWall('h', rY, rX, rX + rW, getAbsDoors('top'), getAbsWindows('top'), rHeight);
     }
     if (!openWalls.includes('bottom')) {
@@ -1430,6 +1434,8 @@ const DOOR_DIMS: Record<string, { height: number; minWidth: number }> = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getDoorHeight = (d: { doorType?: string; [key: string]: any } | any): number => {
+  // Garage doors should cut through the entire wall height (13 units) to avoid blocking.
+  if (d.label === 'GARAGE DOOR') return 13;
   const cat = d.doorCategory || 'room';
   return DOOR_DIMS[cat]?.height ?? 9;
 };
