@@ -72,6 +72,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
     return generateEmptyPlan(homeType);
   });
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [isSelectedAll, setIsSelectedAll] = useState(false);
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [roomCounter, setRoomCounter] = useState(0);
@@ -189,6 +190,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
     const updated = { ...plan, rooms: [...plan.rooms, newRoom] };
     setPlan(updated);
     setSelectedRoomId(id);
+    setIsSelectedAll(false);
     onChange?.(updated);
   };
 
@@ -196,6 +198,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
     const updated = { ...plan, rooms: plan.rooms.filter(r => r.id !== id) };
     setPlan(updated);
     setSelectedRoomId(null);
+    setIsSelectedAll(false);
     onChange?.(updated);
   };
 
@@ -352,6 +355,20 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
     onSave?.(finalPlan);
   };
 
+  const getLayoutBoundingBox = () => {
+    if (plan.rooms.length === 0) return null;
+    const minX = Math.min(...plan.rooms.map(r => r.x));
+    const minY = Math.min(...plan.rooms.map(r => r.y));
+    const maxX = Math.max(...plan.rooms.map(r => r.x + r.w));
+    const maxY = Math.max(...plan.rooms.map(r => r.y + r.h));
+    return {
+      x: minX,
+      y: minY,
+      w: maxX - minX,
+      h: maxY - minY
+    };
+  };
+
   const totalUsedArea = plan.rooms.reduce((sum, r) => sum + r.w * r.h, 0);
   const totalArea = plan.width * plan.height;
   const usagePercent = Math.round((totalUsedArea / totalArea) * 100);
@@ -361,6 +378,24 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-white/80 backdrop-blur-sm">
+        <button
+          onClick={() => {
+            setIsSelectedAll(!isSelectedAll);
+            setSelectedRoomId(null);
+            setWallPopup(null);
+          }}
+          className={`flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider border transition-all active:scale-95 shadow-sm ${
+            isSelectedAll
+              ? 'bg-clay text-white border-transparent'
+              : 'bg-white border-border hover:bg-surface hover:border-clay/40 text-foreground'
+          }`}
+        >
+          <Move size={12} />
+          ALL (Move Layout)
+        </button>
+
+        <div className="h-6 w-px bg-border mx-2" />
+
         <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mr-2">
           Add Room:
         </div>
@@ -418,6 +453,16 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
 
       {/* Canvas */}
       <div ref={wrapRef} className="relative flex-1 overflow-hidden bg-[#f0f2f5]">
+        {/* Floating banner alert for Move Layout (All) mode */}
+        {isSelectedAll && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+            <div className="flex items-center gap-2 rounded-full bg-clay text-white px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider shadow-lg animate-pulse border border-white/10">
+              <Move size={12} className="animate-bounce" />
+              Whole Layout Selected · Drag any room to place
+            </div>
+          </div>
+        )}
+
         <Stage
           ref={stageRef}
           width={size.w}
@@ -428,6 +473,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
           y={stagePos.y}
           onWheel={handleWheel}
           onPointerDown={(e) => {
+            if (isSelectedAll) return;
             if (e.target === e.target.getStage()) {
               setSelectedRoomId(null);
               setWallPopup(null);
@@ -479,32 +525,99 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
 
           {/* Rooms */}
           <Layer>
-            {[...plan.rooms].sort((a, b) => {
-              const aIsStair = a.type === 'staircase' || (a.label || '').toLowerCase().includes('staircase');
-              const bIsStair = b.type === 'staircase' || (b.label || '').toLowerCase().includes('staircase');
-              if (aIsStair && !bIsStair) return 1;
-              if (!aIsStair && bIsStair) return -1;
-              return 0;
-            }).map((room) => {
-              const rx = offsetX + room.x * scale;
-              const ry = offsetY + room.y * scale;
-              const rw = room.w * scale;
-              const rh = room.h * scale;
-              const isSelected = selectedRoomId === room.id;
-
+            {/* Dashed Bounding Box around all rooms when Select All is active */}
+            {isSelectedAll && (() => {
+              const box = getLayoutBoundingBox();
+              if (!box) return null;
               return (
-                <Group
-                  key={room.id}
-                  x={rx}
-                  y={ry}
-                  draggable
-                  onDragEnd={(e: any) => handleDragEnd(room.id, e)}
-                  onPointerDown={() => setSelectedRoomId(room.id)}
-                  onTransformEnd={() => handleTransformEnd(room.id)}
-                  ref={(node: any) => {
-                    if (node) roomRefs.current[room.id] = node;
-                  }}
-                >
+                <Rect
+                  x={offsetX + box.x * scale - 6}
+                  y={offsetY + box.y * scale - 6}
+                  width={box.w * scale + 12}
+                  height={box.h * scale + 12}
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  dash={[6, 4]}
+                  cornerRadius={4}
+                  listening={false}
+                />
+              );
+            })()}
+
+            <Group
+              draggable={isSelectedAll}
+              onDragEnd={(e: any) => {
+                if (!isSelectedAll) return;
+                const dx = Math.round(e.currentTarget.x() / scale);
+                const dy = Math.round(e.currentTarget.y() / scale);
+                
+                if (dx !== 0 || dy !== 0) {
+                  const updatedRooms = plan.rooms.map(r => ({
+                    ...r,
+                    x: r.x + dx,
+                    y: r.y + dy,
+                  }));
+
+                  // Clamp the whole bounding box within the plan boundaries
+                  let minX = Math.min(...updatedRooms.map(r => r.x));
+                  let minY = Math.min(...updatedRooms.map(r => r.y));
+                  let maxX = Math.max(...updatedRooms.map(r => r.x + r.w));
+                  let maxY = Math.max(...updatedRooms.map(r => r.y + r.h));
+                  
+                  let offsetXAdjust = 0;
+                  let offsetYAdjust = 0;
+                  if (minX < 0) offsetXAdjust = -minX;
+                  if (minY < 0) offsetYAdjust = -minY;
+                  if (maxX > plan.width) offsetXAdjust = plan.width - maxX;
+                  if (maxY > plan.height) offsetYAdjust = plan.height - maxY;
+                  
+                  const finalRooms = updatedRooms.map(r => ({
+                    ...r,
+                    x: Math.max(0, Math.min(plan.width - r.w, r.x + offsetXAdjust)),
+                    y: Math.max(0, Math.min(plan.height - r.h, r.y + offsetYAdjust)),
+                  }));
+
+                  const updated = { ...plan, rooms: finalRooms };
+                  setPlan(updated);
+                  onChange?.(updated);
+                }
+                
+                e.currentTarget.x(0);
+                e.currentTarget.y(0);
+                e.currentTarget.getLayer()?.batchDraw();
+              }}
+            >
+              {[...plan.rooms].sort((a, b) => {
+                const aIsStair = a.type === 'staircase' || (a.label || '').toLowerCase().includes('staircase');
+                const bIsStair = b.type === 'staircase' || (b.label || '').toLowerCase().includes('staircase');
+                if (aIsStair && !bIsStair) return 1;
+                if (!aIsStair && bIsStair) return -1;
+                return 0;
+              }).map((room) => {
+                const rx = offsetX + room.x * scale;
+                const ry = offsetY + room.y * scale;
+                const rw = room.w * scale;
+                const rh = room.h * scale;
+                const isSelected = selectedRoomId === room.id;
+
+                return (
+                  <Group
+                    key={room.id}
+                    x={rx}
+                    y={ry}
+                    draggable={!isSelectedAll}
+                    onDragEnd={(e: any) => handleDragEnd(room.id, e)}
+                    onPointerDown={() => {
+                      if (isSelectedAll) {
+                        return;
+                      }
+                      setSelectedRoomId(room.id);
+                    }}
+                    onTransformEnd={() => handleTransformEnd(room.id)}
+                    ref={(node: any) => {
+                      if (node) roomRefs.current[room.id] = node;
+                    }}
+                  >
                   <Rect
                     width={rw}
                     height={rh}
@@ -937,6 +1050,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
                 </Group>
               );
             })}
+            </Group>
 
             <Transformer
               ref={transformerRef}

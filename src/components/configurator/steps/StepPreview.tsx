@@ -10,7 +10,7 @@ import { Plan, splitPlanToFloors, Room, generateEmptyPlan, regenerateFurniture, 
 import { fetchElevationImagesByVariant, fetchElevationVariantFamily, normalizeParsedVariantAddons, resolveElevationVariant } from '@/lib/elevationVariants';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash, Copy, ClipboardPaste, Upload, Plus, Image as ImageIcon } from 'lucide-react';
+import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash, Copy, ClipboardPaste, Upload, Plus, Image as ImageIcon, Move } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
@@ -63,6 +63,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   const [stagedPlan, setStagedPlan] = useState<Plan | null>(null);
   const [roomCounter, setRoomCounter] = useState(0);
   const [hasCopiedPlan, setHasCopiedPlan] = useState(!!floorPlanClipboard);
+  const [isSelectedAll, setIsSelectedAll] = useState(false);
   const [remoteElevationImages, setRemoteElevationImages] = useState<Record<string, { id: string; image_url: string; image_path: string; variant_id?: string | null; preset_key?: string }[]>>({});
   const [fetchedElevationKeys, setFetchedElevationKeys] = useState<Record<string, boolean>>({});
   const [uploadingElevation, setUploadingElevation] = useState(false);
@@ -528,7 +529,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 {(['2d', '3d', 'elevation'] as const).map((v) => (
                   <button
                     key={v}
-                    onClick={() => { setView(v); setAdvancedEditorMode(false); }}
+                    onClick={() => { setView(v); setAdvancedEditorMode(false); setIsSelectedAll(false); }}
                     className={`relative rounded-lg px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
                       view === v && !advancedEditorMode ? 'text-white' : 'text-muted-foreground hover:text-foreground'
                     }`}
@@ -600,7 +601,11 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                     Custom Editor
                   </button>
                   <button
-                    onClick={() => setAdvanced((v) => !v)}
+                    onClick={() => {
+                      const nextVal = !advanced;
+                      setAdvanced(nextVal);
+                      if (!nextVal) setIsSelectedAll(false);
+                    }}
                     className={`h-10 md:h-11 rounded-xl border px-4 md:px-6 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
                       advanced ? 'border-primary bg-primary text-white shadow-lg' : 'border-border bg-white text-muted-foreground hover:bg-soft-section hover:text-foreground'
                     }`}
@@ -693,7 +698,6 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                         {([
                           { id: 'standard' as KitchenType, label: 'Standard', desc: 'Closed kitchen' },
                           { id: 'open' as KitchenType, label: 'Open Plan', desc: 'Merged layout' },
-                          { id: 'galley' as KitchenType, label: 'Galley', desc: 'Two-wall compact' },
                         ]).map((k) => {
                           const active = kitchen === k.id;
                           const kitchenMeta = KITCHEN_META[k.id];
@@ -703,6 +707,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                               onClick={() => {
                                 setKitchen(k.id);
                                 setStagedPlan(null);
+                                setIsSelectedAll(false);
                               }}
                               className={`group relative flex-1 overflow-hidden rounded-xl p-4 text-left transition-all duration-500 border ${
                                 active
@@ -750,6 +755,26 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                               Paste <span className="opacity-50 lowercase ml-1">({floorPlanClipboard?.label})</span>
                             </button>
                           )}
+                        </div>
+                      </div>
+
+                      {/* Movement Section */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">Whole Layout</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setIsSelectedAll(!isSelectedAll)}
+                            className={`flex items-center gap-2.5 h-11 rounded-xl border px-5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all active:scale-95 shadow-sm ${
+                              isSelectedAll
+                                ? 'bg-clay text-white border-transparent'
+                                : 'bg-white border-border hover:bg-surface hover:border-clay/40 text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            <Move size={14} className={isSelectedAll ? 'animate-bounce' : ''} />
+                            ALL (Move Layout)
+                          </button>
                         </div>
                       </div>
 
@@ -922,7 +947,14 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 <motion.div key={`2d-${activeFloor}`} className="h-full w-full"
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
-                  <FloorPlanCanvas plan={stagedPlan || getHighlightedPlan()} advanced={advanced} hideZoomHelper={true} floorLevel={isDoubleStorey ? activeFloor : undefined} onChange={(updatedHighlightedPlan) => {
+                  <FloorPlanCanvas 
+                    plan={stagedPlan || getHighlightedPlan()} 
+                    advanced={advanced} 
+                    hideZoomHelper={true} 
+                    floorLevel={isDoubleStorey ? activeFloor : undefined} 
+                    isSelectedAll={isSelectedAll}
+                    onSelectedAllChange={setIsSelectedAll}
+                    onChange={(updatedHighlightedPlan) => {
                     const newPlan = {
                       ...(stagedPlan || displayPlan),
                       width: updatedHighlightedPlan.width,
@@ -1116,6 +1148,16 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
               <div className="pointer-events-none absolute left-8 top-8 flex items-center gap-3 rounded-xl bg-clay/5 border border-clay/20 px-4 py-2.5 shadow-lg backdrop-blur-md">
                 <div className="h-1.5 w-1.5 rounded-full bg-clay animate-pulse" /> 
                 <span className="text-[10px] font-bold text-clay uppercase tracking-[0.2em]">Unsaved Drafting Changes</span>
+              </div>
+            )}
+
+            {/* Whole layout movement banner */}
+            {isSelectedAll && !advancedEditorMode && (
+              <div className="absolute top-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+                <div className="flex items-center gap-2 rounded-full bg-clay text-white px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider shadow-lg animate-pulse border border-white/10">
+                  <Move size={12} className="animate-bounce" />
+                  Whole Layout Selected · Drag any room to place
+                </div>
               </div>
             )}
 

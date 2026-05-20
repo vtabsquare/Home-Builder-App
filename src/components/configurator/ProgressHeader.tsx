@@ -3,7 +3,7 @@ import { useConfig } from '@/store/configurator';
 import { Check, QrCode, X } from 'lucide-react';
 import { useState } from 'react';
 
-const STEPS = ['Land', 'Home Type', 'Customize', 'Preview', 'Lead'];
+const STEPS = ['Home Type', 'Customize', 'Preview', 'Lead'];
 
 interface Props {
   onReset?: () => void;

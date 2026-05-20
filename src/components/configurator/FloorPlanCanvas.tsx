@@ -11,6 +11,8 @@ interface Props {
   minimal?: boolean;
   hideZoomHelper?: boolean;
   floorLevel?: number; // 0 = ground, 1 = first floor, undefined = single storey
+  isSelectedAll?: boolean;
+  onSelectedAllChange?: (val: boolean) => void;
   onChange?: (plan: Plan) => void;
 }
 
@@ -36,7 +38,7 @@ const CADCar2D = ({ w, h }: { w: number; h: number }) => {
 };
 
 
-export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZoomHelper = false, floorLevel, onChange }: Props) => {
+export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZoomHelper = false, floorLevel, isSelectedAll = false, onSelectedAllChange, onChange }: Props) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const config = useConfig();
@@ -57,6 +59,20 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
   const furnitureRefs = useRef<{ [key: string]: Konva.Group }>({});
   const localPlanRef = useRef(localPlan);
   const selectedFurnitureKey = selectedFurniture ? `${selectedFurniture.roomId}-f-${selectedFurniture.furnitureIndex}` : null;
+
+  const getLayoutBoundingBox = () => {
+    if (!localPlan.rooms || localPlan.rooms.length === 0) return null;
+    const minX = Math.min(...localPlan.rooms.map(r => r.x));
+    const minY = Math.min(...localPlan.rooms.map(r => r.y));
+    const maxX = Math.max(...localPlan.rooms.map(r => r.x + r.w));
+    const maxY = Math.max(...localPlan.rooms.map(r => r.y + r.h));
+    return {
+      x: minX,
+      y: minY,
+      w: maxX - minX,
+      h: maxY - minY
+    };
+  };
 
   useEffect(() => {
     setLocalPlan(plan);
@@ -412,6 +428,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
         y={stagePos.y}
         onWheel={handleWheel}
         onPointerDown={(e) => {
+          if (isSelectedAll) return;
           if (e.target === e.target.getStage()) {
             setSelectedRoomId(null);
             setSelectedFurniture(null);
@@ -442,30 +459,95 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
         </Layer>
 
         <Layer>
-          {[...(localPlan.rooms || [])].sort((a, b) => {
-            const aIsStair = a.type === 'staircase' || (a.label || '').toLowerCase().includes('staircase');
-            const bIsStair = b.type === 'staircase' || (b.label || '').toLowerCase().includes('staircase');
-            if (aIsStair && !bIsStair) return 1;
-            if (!aIsStair && bIsStair) return -1;
-            return 0;
-          }).map((room) => (            <RoomShape
-              key={room.id}
-              room={room}
-              scale={scale}
-              offsetX={buildingOffsetX}
-              offsetY={buildingOffsetY}
-              draggable={advanced}
-              isWallMode={isWallMode}
-              isSelected={selectedRoomId === room.id}
-              setWallPopup={setWallPopup}
-              onPointerDown={() => {
-                if (advanced) {
-                  setSelectedRoomId(room.id);
-                  setSelectedFurniture(null);
-                  setSelectedDoor(null);
-                  setSelectedWindow(null);
-                }
-              }}
+          {/* Dashed Bounding Box around all rooms when Select All is active */}
+          {isSelectedAll && (() => {
+            const box = getLayoutBoundingBox();
+            if (!box) return null;
+            return (
+              <Rect
+                x={buildingOffsetX + box.x * scale - 6}
+                y={buildingOffsetY + box.y * scale - 6}
+                width={box.w * scale + 12}
+                height={box.h * scale + 12}
+                stroke="#2563eb"
+                strokeWidth={2}
+                dash={[6, 4]}
+                cornerRadius={4}
+                listening={false}
+              />
+            );
+          })()}
+
+          <Group
+            draggable={isSelectedAll}
+            onDragEnd={(e: any) => {
+              if (!isSelectedAll) return;
+              const dx = Math.round(e.currentTarget.x() / scale);
+              const dy = Math.round(e.currentTarget.y() / scale);
+              
+              if (dx !== 0 || dy !== 0) {
+                const updatedRooms = (localPlan.rooms || []).map(r => ({
+                  ...r,
+                  x: r.x + dx,
+                  y: r.y + dy,
+                }));
+
+                // Clamp the whole bounding box within the plan boundaries
+                let minX = Math.min(...updatedRooms.map(r => r.x));
+                let minY = Math.min(...updatedRooms.map(r => r.y));
+                let maxX = Math.max(...updatedRooms.map(r => r.x + r.w));
+                let maxY = Math.max(...updatedRooms.map(r => r.y + r.h));
+                
+                let offsetXAdjust = 0;
+                let offsetYAdjust = 0;
+                if (minX < 0) offsetXAdjust = -minX;
+                if (minY < 0) offsetYAdjust = -minY;
+                if (maxX > localPlan.width) offsetXAdjust = localPlan.width - maxX;
+                if (maxY > localPlan.height) offsetYAdjust = localPlan.height - maxY;
+                
+                const finalRooms = updatedRooms.map(r => ({
+                  ...r,
+                  x: Math.max(0, Math.min(localPlan.width - r.w, r.x + offsetXAdjust)),
+                  y: Math.max(0, Math.min(localPlan.height - r.h, r.y + offsetYAdjust)),
+                }));
+
+                const updated = { ...localPlan, rooms: finalRooms };
+                commitLocalPlan(updated);
+              }
+              
+              e.currentTarget.x(0);
+              e.currentTarget.y(0);
+              e.currentTarget.getLayer()?.batchDraw();
+            }}
+          >
+            {[...(localPlan.rooms || [])].sort((a, b) => {
+              const aIsStair = a.type === 'staircase' || (a.label || '').toLowerCase().includes('staircase');
+              const bIsStair = b.type === 'staircase' || (b.label || '').toLowerCase().includes('staircase');
+              if (aIsStair && !bIsStair) return 1;
+              if (!aIsStair && bIsStair) return -1;
+              return 0;
+            }).map((room) => (
+              <RoomShape
+                key={room.id}
+                room={room}
+                scale={scale}
+                offsetX={buildingOffsetX}
+                offsetY={buildingOffsetY}
+                draggable={advanced && !isSelectedAll}
+                isWallMode={isWallMode}
+                isSelected={selectedRoomId === room.id}
+                setWallPopup={setWallPopup}
+                onPointerDown={() => {
+                  if (advanced) {
+                    if (isSelectedAll) {
+                      return;
+                    }
+                    setSelectedRoomId(room.id);
+                    setSelectedFurniture(null);
+                    setSelectedDoor(null);
+                    setSelectedWindow(null);
+                  }
+                }}
               onWallToggle={(wall: string) => {
                 if (!advanced) return;
                 const sourceRoom = room;
@@ -551,6 +633,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
               floorLevel={floorLevel}
             />
           ))}
+          </Group>
           {advanced && (
             <Transformer
               ref={transformerRef}
@@ -579,13 +662,16 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
                 scale={scale}
                 offsetX={buildingOffsetX}
                 offsetY={buildingOffsetY}
-                draggable={advanced}
+                draggable={advanced && !isSelectedAll}
                 selected={selectedFurniture?.roomId === room.id && selectedFurniture?.furnitureIndex === fi}
                 innerRef={(node: any) => {
                   if (node) furnitureRefs.current[`${room.id}-f-${fi}`] = node;
                 }}
                 onPointerDown={() => {
                   if (advanced) {
+                    if (isSelectedAll) {
+                      return;
+                    }
                     setSelectedFurniture({ roomId: room.id, furnitureIndex: fi });
                     setSelectedRoomId(null);
                     setSelectedDoor(null);
@@ -921,6 +1007,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
                     selected={selectedDoor?.roomId === room.id && selectedDoor?.doorIndex === di}
                     onSelect={() => {
                       if (advanced) {
+                        if (isSelectedAll) return;
                         setSelectedDoor({ roomId: room.id, doorIndex: di });
                         setSelectedRoomId(null);
                         setSelectedFurniture(null);
@@ -974,6 +1061,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
                   selected={selectedWindow?.roomId === room.id && selectedWindow?.windowIndex === wi}
                   onSelect={() => {
                     if (advanced) {
+                      if (isSelectedAll) return;
                       setSelectedWindow({ roomId: room.id, windowIndex: wi });
                       setSelectedRoomId(null);
                       setSelectedFurniture(null);

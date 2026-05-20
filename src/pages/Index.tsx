@@ -8,7 +8,6 @@ import { applyAddOnsToPlan, generatePlan, Plan } from '@/lib/floorplan';
 import { ProgressHeader } from '@/components/configurator/ProgressHeader';
 import { CostPanel } from '@/components/configurator/CostPanel';
 import { FloorPlanCanvas } from '@/components/configurator/FloorPlanCanvas';
-import { StepLand } from '@/components/configurator/steps/StepLand';
 import { StepHomeType } from '@/components/configurator/steps/StepHomeType';
 import { StepFeatures } from '@/components/configurator/steps/StepFeatures';
 import { StepPreview } from '@/components/configurator/steps/StepPreview';
@@ -98,11 +97,10 @@ const IndexInner = () => {
 
   const renderStep = () => {
     switch (step) {
-      case 0: return <StepLand key="0" />;
-      case 1: return <StepHomeType key="1" />;
-      case 2: return <StepFeatures key="2" />;
-      case 3: return <StepPreview key="3" plan={plan} onChange={setCustomPlan} onResetPlan={() => setCustomPlan(null)} />;
-      case 4: return <StepLeadCapture key="4" cost={cost} />;
+      case 0: return <StepHomeType key="0" />;
+      case 1: return <StepFeatures key="1" />;
+      case 2: return <StepPreview key="2" plan={plan} onChange={setCustomPlan} onResetPlan={() => setCustomPlan(null)} />;
+      case 3: return <StepLeadCapture key="3" cost={cost} />;
       default: return null;
     }
   };
@@ -125,7 +123,7 @@ const IndexInner = () => {
               }}
               onExplore={() => {
                 setShowLanding(false);
-                config.setStep(3);
+                config.setStep(2);
               }}
             />
           </motion.div>
@@ -145,38 +143,36 @@ const IndexInner = () => {
           setShowLanding(true);
         }} />
 
-        <main className="flex-1 relative">
-          <div className="mx-auto max-w-[1440px] px-4 sm:px-6 md:px-8 py-4 md:py-6 lg:py-8">
-            <div className={`grid gap-8 lg:gap-10 ${[3].includes(step) ? 'max-w-6xl mx-auto w-full' : 'lg:grid-cols-[1fr_400px]'}`}>
-              {/* Step content */}
-              <div className="min-h-[60vh]">
-                <AnimatePresence mode="wait">
-                  {renderStep()}
-                </AnimatePresence>
-              </div>
+      <main className="flex-1 relative">
+        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 md:px-8 py-4 md:py-6 lg:py-8">
+          <div className={`grid gap-8 lg:gap-10 ${[2].includes(step) ? 'max-w-6xl mx-auto w-full' : 'lg:grid-cols-[1fr_400px]'}`}>
+            {/* Step content */}
+            <div className="min-h-[60vh]">
+              <AnimatePresence mode="wait">
+                {renderStep()}
+              </AnimatePresence>
+            </div>
 
-              {/* Sticky live preview / Cost Sidebar */}
-              {![3].includes(step) && (
-                <aside className="lg:sticky lg:top-28 lg:self-start space-y-6 md:space-y-8 pb-12 lg:pb-0">
-                  <AnimatePresence>
-                    {(step !== 0) && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                        animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
-                        exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                        className="relative overflow-hidden rounded-2xl border border-border/40 glass-dark-panel shadow-elev"
-                      >
-                        <div className="h-[240px] md:h-[280px]">
-                          <FloorPlanCanvas plan={plan} minimal={true} onChange={setCustomPlan} />
-                        </div>
-                        <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-ink/60 backdrop-blur-md px-2.5 py-1 text-[9px] font-display font-semibold uppercase tracking-[0.15em] text-white/80 border border-white/5">
-                          Live Overview · {plan?.width || 0}′×{plan?.height || 0}′
-                        </div>
-                        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_30px_rgba(0,0,0,0.3)] mix-blend-overlay rounded-2xl" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+            {/* Sticky live preview / Cost Sidebar */}
+            {![2].includes(step) && (
+              <aside className="lg:sticky lg:top-28 lg:self-start space-y-6 md:space-y-8 pb-12 lg:pb-0">
+                <AnimatePresence>
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                    className="relative overflow-hidden rounded-2xl border border-border/40 glass-dark-panel shadow-elev"
+                  >
+                    <div className="h-[240px] md:h-[280px]">
+                      <FloorPlanCanvas plan={plan} minimal={true} onChange={setCustomPlan} />
+                    </div>
+                    <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-ink/60 backdrop-blur-md px-2.5 py-1 text-[9px] font-display font-semibold uppercase tracking-[0.15em] text-white/80 border border-white/5">
+                      Live Overview · {plan?.width || 0}′×{plan?.height || 0}′
+                    </div>
+                    <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_30px_rgba(0,0,0,0.3)] mix-blend-overlay rounded-2xl" />
+                  </motion.div>
+                </AnimatePresence>
                   
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}

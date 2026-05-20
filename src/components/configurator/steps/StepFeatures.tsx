@@ -17,7 +17,6 @@ const ADDON_ICON: Record<AddOn, any> = {
 const KITCHENS: { id: KitchenType; label: string; desc: string }[] = [
   { id: 'standard', label: 'Standard', desc: 'Closed kitchen with separate dining' },
   { id: 'open', label: 'Open Plan', desc: 'Merged kitchen + living + dining' },
-  { id: 'galley', label: 'Galley', desc: 'Compact two-wall kitchen' },
 ];
 
 export const StepFeatures = () => {

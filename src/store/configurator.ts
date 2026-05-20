@@ -178,7 +178,7 @@ export const HOME_TYPE_LIMITS: Record<HomeType, { bedrooms: { min: number; max: 
 
 const initial: ConfigState = {
   step: 0,
-  land: null,
+  land: 'own',
   landSize: null,
   customLandArea: 0,
   homeType: 'family',
@@ -212,7 +212,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
     (set, get) => ({
       ...initial,
       setStep: (step) => set({ step }),
-      next: () => set({ step: Math.min(get().step + 1, 4) }),
+      next: () => set({ step: Math.min(get().step + 1, 3) }),
       prev: () => set({ step: Math.max(get().step - 1, 0) }),
       setLand: (land) => set(land === 'own' ? { land, landSize: null, customLandArea: 0 } : { land }),
       setLandSize: (landSize) => set({ landSize }),
