@@ -1744,6 +1744,14 @@ const FurnitureShape = ({ item, roomX, roomY, scale, offsetX, offsetY, draggable
            <Rect x={3} y={h*0.1} width={3} height={h*0.3} fill="#9ca3af" cornerRadius={1} />
         </Group>
       )}
+      {item.type === 'generator' && (
+        <Group>
+           <Rect width={w} height={h} fill={colors.fill} stroke={colors.stroke} strokeWidth={1} cornerRadius={2} shadowColor="black" shadowBlur={4} shadowOpacity={0.2} shadowOffsetY={2} />
+           <Rect x={w * 0.1} y={h * 0.1} width={w * 0.8} height={h * 0.8} fill={colors.detail} cornerRadius={1} />
+           <Circle x={w * 0.3} y={h * 0.5} radius={Math.min(w,h) * 0.2} fill={colors.stroke} />
+           <Circle x={w * 0.7} y={h * 0.5} radius={Math.min(w,h) * 0.2} fill={colors.stroke} />
+        </Group>
+      )}
       {['counter', 'island', 'desk', 'nightstand', 'bookshelf', 'washing_machine'].includes(item.type) && (
         <Group>
            <Rect width={w} height={h} fill={colors.fill} stroke={colors.stroke} strokeWidth={1} cornerRadius={2} shadowColor="black" shadowBlur={3} shadowOpacity={0.15} shadowOffsetY={1} />
@@ -1775,6 +1783,7 @@ function getFurnitureColors(type: FurnitureItem['type']) {
     rug: { fill: '#f1f5f9', stroke: '#cbd5e1', detail: '#f8fafc' },
     bookshelf: { fill: '#bda78f', stroke: '#a38d75', detail: '#c9b59e' },
     washing_machine: { fill: '#f8fafc', stroke: '#cbd5e1', detail: '#e2e8f0' },
+    generator: { fill: '#6b7280', stroke: '#374151', detail: '#4b5563' },
   };
   return map[type] || { fill: '#e2e8f0', stroke: '#94a3b8', detail: '#cbd5e1' };
 }

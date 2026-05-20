@@ -4,7 +4,7 @@ import { computeArea } from './cost';
 export interface FurnitureItem {
   type: 'bed' | 'wardrobe' | 'desk' | 'nightstand' | 'toilet' | 'sink' | 'shower' | 'bathtub' |
   'stove' | 'fridge' | 'counter' | 'island' | 'dining_table' | 'sofa' | 'tv' | 'coffee_table' |
-  'plant' | 'rug' | 'bookshelf' | 'washing_machine' | 'table' | 'chair';
+  'plant' | 'rug' | 'bookshelf' | 'washing_machine' | 'table' | 'chair' | 'generator';
   x: number; // relative to room
   y: number;
   w: number;
@@ -80,7 +80,7 @@ export function resolveStairGeometry(room: { w: number; h: number; stairGeometry
 
 export interface Room {
   id: string;
-  type: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'lounge' | 'dressing' | 'dining' | 'entry' | 'hallway' | 'staircase' | 'balcony' | 'carport' | 'garden' | 'garage';
+  type: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'lounge' | 'dressing' | 'dining' | 'entry' | 'hallway' | 'staircase' | 'balcony' | 'carport' | 'garden' | 'garage' | 'generator';
   label: string;
   x: number; // ft
   y: number;
@@ -119,6 +119,7 @@ const COLORS: Record<string, string> = {
   carport:  'hsl(0 0% 82%)',
   garden:   'hsl(120 30% 72%)',
   garage:   'hsl(0 0% 78%)',
+  generator:'hsl(0 0% 65%)',
 };
 
 // ── Furniture helpers (all wall-aligned, walking-space aware) ──────────────
@@ -150,6 +151,8 @@ export function regenerateFurniture(room: Room, kitchenType: string = 'open'): F
       return gardenFurniture(room.w, room.h);
     case 'garage':
       return [];
+    case 'generator':
+      return [{ type: 'generator', x: room.w / 2 - 2, y: room.h / 2 - 1.5, w: 4, h: 3, rotation: 0 }];
     default:
       return room.furniture;
   }

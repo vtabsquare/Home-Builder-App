@@ -3,7 +3,7 @@ import { Stage, Layer, Rect, Text, Line, Group, Transformer, Circle } from 'reac
 import { Plan, Room, FurnitureItem, generateEmptyPlan, regenerateFurniture, resolveStairGeometry } from '@/lib/floorplan';
 import { useConfig, HomeType } from '@/store/configurator';
 import Konva from 'konva';
-import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed, Waypoints, Car, Fence } from 'lucide-react';
+import { RotateCw, Trash2, Save, Plus, Move, Maximize, Trees, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed, Waypoints, Car, Fence, Zap } from 'lucide-react';
 
 interface Props {
   homeType: HomeType;
@@ -51,6 +51,7 @@ export const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaul
   { type: 'carport', label: 'Carport', icon: Car, defaultW: 12, defaultH: 14, color: 'hsl(0 0% 82%)' },
   { type: 'garage', label: 'Car Garage', icon: Car, defaultW: 22, defaultH: 24, color: 'hsl(0 0% 78%)' },
   { type: 'garden', label: 'Garden', icon: Trees, defaultW: 10, defaultH: 10, color: 'hsl(120 30% 72%)' },
+  { type: 'generator', label: 'Generator', icon: Zap, defaultW: 8, defaultH: 6, color: 'hsl(0 0% 65%)' },
 ];
 
 export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, floorLevel }: Props) => {

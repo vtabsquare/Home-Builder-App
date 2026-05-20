@@ -840,6 +840,48 @@ export const Furniture3D = ({ item, isNight }: Props) => {
         </mesh>
       );
 
+    case 'generator':
+      return (
+        <group>
+          {/* Base */}
+          <mesh position={[0, 0.4, 0]} castShadow receiveShadow>
+            <boxGeometry args={[w, 0.8, h]} />
+            <meshStandardMaterial color="#4b5563" roughness={0.7} metalness={0.4} />
+          </mesh>
+          {/* Main body */}
+          <mesh position={[0, 1.8, 0]} castShadow receiveShadow>
+            <boxGeometry args={[w * 0.9, 2.0, h * 0.9]} />
+            <meshStandardMaterial color="#374151" roughness={0.6} metalness={0.5} />
+          </mesh>
+          {/* Top cover/vent */}
+          <mesh position={[0, 2.85, 0]} castShadow>
+            <boxGeometry args={[w * 0.8, 0.1, h * 0.8]} />
+            <meshStandardMaterial color="#1f2937" roughness={0.8} />
+          </mesh>
+          {/* Side panel vents */}
+          {[-1, 1].map(side => (
+            <mesh key={`vent-${side}`} position={[side * (w * 0.45 + 0.02), 1.8, 0]} castShadow>
+              <boxGeometry args={[0.04, 1.2, h * 0.6]} />
+              <meshStandardMaterial color="#111827" roughness={0.9} />
+            </mesh>
+          ))}
+          {/* Control panel */}
+          <mesh position={[0, 2.2, h * 0.45 + 0.02]} castShadow>
+            <boxGeometry args={[w * 0.5, 0.4, 0.04]} />
+            <meshStandardMaterial color="#1f2937" roughness={0.7} />
+          </mesh>
+          {/* Indicator lights */}
+          <mesh position={[-w * 0.15, 2.2, h * 0.45 + 0.04]} rotation={[Math.PI / 2, 0, 0]}>
+             <cylinderGeometry args={[0.04, 0.04, 0.02, 12]} />
+             <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.8} />
+          </mesh>
+          <mesh position={[-w * 0.05, 2.2, h * 0.45 + 0.04]} rotation={[Math.PI / 2, 0, 0]}>
+             <cylinderGeometry args={[0.04, 0.04, 0.02, 12]} />
+             <meshStandardMaterial color="#10b981" emissive="#10b981" emissiveIntensity={0.8} />
+          </mesh>
+        </group>
+      );
+
     default:
       return (
         <mesh position={[0, 1.5, 0]} castShadow receiveShadow>
