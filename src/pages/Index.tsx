@@ -13,6 +13,7 @@ import { StepFeatures } from '@/components/configurator/steps/StepFeatures';
 import { StepPreview } from '@/components/configurator/steps/StepPreview';
 import { StepLeadCapture } from '@/components/configurator/steps/StepLeadCapture';
 import { LandingPage } from '@/components/LandingPage';
+import { GatePage } from '@/components/GatePage';
 import { useInactivityReset } from '@/hooks/useInactivityReset';
 import { Maximize2, Minimize2, Sparkles } from 'lucide-react';
 
@@ -20,6 +21,7 @@ const IndexInner = () => {
   const config = useConfig();
   const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts, presetOverrides } = config;
 
+  const [showGate, setShowGate] = useState(true);
   const [showLanding, setShowLanding] = useState(true);
   const pricing = usePricing();
 
@@ -82,6 +84,7 @@ const IndexInner = () => {
 
   useInactivityReset(() => {
     reset();
+    setShowGate(true);
     setShowLanding(true);
   }, 60000, kioskMode);
 
@@ -107,6 +110,20 @@ const IndexInner = () => {
 
   return (
     <>
+      <AnimatePresence>
+        {showGate && (
+          <motion.div
+            key="gate"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.08, filter: "blur(20px)" }}
+            transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed inset-0 z-[60]"
+          >
+            <GatePage onProceed={() => setShowGate(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showLanding && (
           <motion.div
