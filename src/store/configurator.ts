@@ -124,6 +124,8 @@ export interface ConfigState {
   presetOverrides: Record<string, { ground: any; first: any | null }>;
   // Elevation images: keyed by composite preset key, each value is an array of base64 image data URLs
   elevationImages: Record<string, string[]>;
+  // Garage shutter state
+  garageShutterOpen: boolean;
 }
 
 export interface ConfigActions {
@@ -161,6 +163,7 @@ export interface ConfigActions {
   savePackageLayout: (packageKey: string, groundPlan: any, firstFloorPlan: any) => Promise<void>;
   addElevationImage: (presetKey: string, imageDataUrl: string) => void;
   removeElevationImage: (presetKey: string, index: number) => void;
+  setGarageShutterOpen: (v: boolean) => void;
   reset: () => void;
 }
 
@@ -205,6 +208,7 @@ const initial: ConfigState = {
   packageLayouts: {},
   presetOverrides: {},
   elevationImages: {},
+  garageShutterOpen: false,
 };
 
 export const useConfig = create<ConfigState & ConfigActions>()(
@@ -449,6 +453,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
           [presetKey]: (s.elevationImages[presetKey] || []).filter((_, i) => i !== index),
         },
       })),
+      setGarageShutterOpen: (v) => set({ garageShutterOpen: v }),
       reset: () => set((state) => ({
         ...initial,
         savedPresets: state.savedPresets,

@@ -54,12 +54,13 @@ function getRoomTabs(plan: Plan): RoomTab[] {
 }
 
 export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
-  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, setKitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset, presetOverrides, elevationImages, addElevationImage, removeElevationImage } = useConfig();
+  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, setKitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset, presetOverrides, elevationImages, addElevationImage, removeElevationImage, garageShutterOpen, setGarageShutterOpen } = useConfig();
   const KITCHEN_META = useKitchenMeta();
   const isCustomPreset = presetId === -1;
   const [view, setView] = useState<'2d' | '3d' | 'elevation'>('2d');
   const [advanced, setAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [singleStoreyViewMode, setSingleStoreyViewMode] = useState<'exterior' | 'interior'>('exterior');
   const [stagedPlan, setStagedPlan] = useState<Plan | null>(null);
   const [roomCounter, setRoomCounter] = useState(0);
   const [hasCopiedPlan, setHasCopiedPlan] = useState(!!floorPlanClipboard);
@@ -1009,7 +1010,38 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 <motion.div key={`3d-${activeFloor}`} className="h-full w-full"
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
-                  <ElevationCanvas plan={isDoubleStorey ? groundFloorPlan : currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={firstFloorDisplayPlan} hideHelpers={true} activeFloor={activeFloor} />
+                  {!isDoubleStorey && (
+                    <>
+                      <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-border bg-white/90 backdrop-blur-md p-1 shadow-elev">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setSingleStoreyViewMode('exterior')}
+                            className={`rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] transition-all ${singleStoreyViewMode === 'exterior' ? 'bg-foreground text-white shadow-md' : 'text-muted-foreground hover:text-foreground'}`}
+                          >
+                            Exterior
+                          </button>
+                          <button
+                            onClick={() => setSingleStoreyViewMode('interior')}
+                            className={`rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] transition-all ${singleStoreyViewMode === 'interior' ? 'bg-foreground text-white shadow-md' : 'text-muted-foreground hover:text-foreground'}`}
+                          >
+                            Interior
+                          </button>
+                        </div>
+                      </div>
+                      {/* Garage Shutter Toggle - Only show if garage exists in premium */}
+                      {(groundFloorPlan.rooms || []).some(r => r.type === 'garage') && homeType === 'premium' && (
+                        <div className="absolute right-4 top-4 z-20">
+                          <button
+                            onClick={() => setGarageShutterOpen(!garageShutterOpen)}
+                            className={`rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] transition-all shadow-md border border-border ${garageShutterOpen ? 'bg-green-600 text-white border-green-600' : 'bg-white/90 text-foreground'}`}
+                          >
+                            {garageShutterOpen ? 'Shutter Open' : 'Shutter Closed'}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <ElevationCanvas plan={isDoubleStorey ? groundFloorPlan : currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={firstFloorDisplayPlan} hideHelpers={true} activeFloor={activeFloor} interiorMode={!isDoubleStorey && singleStoreyViewMode === 'interior'} garageShutterOpen={garageShutterOpen} />
                 </motion.div>
               ) : (
                 <motion.div key="elevation" className="h-full w-full bg-white p-8 flex flex-col"
