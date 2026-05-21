@@ -1,12 +1,13 @@
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, ContactShadows, Html } from '@react-three/drei';
-import { Suspense, useMemo, useRef, useEffect, useCallback } from 'react';
+import { Suspense, useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { Plan, resolveStairGeometry, ensureGarageDoors } from '@/lib/floorplan';
 import { Material, RoofType, AddOn } from '@/store/configurator';
 import { Furniture3D } from './Furniture3D';
 import { SceneLighting } from './SceneLighting';
 import { SkyEnvironment, EnhancedGround } from './SkyEnvironment';
+import { Eye, EyeOff } from 'lucide-react';
 import {
   createWoodFloorTexture, createWoodFloorNormal, createWoodFloorRoughness,
   createOakFloorTexture, createOakFloorNormal, createOakFloorRoughness,
@@ -492,6 +493,7 @@ export const ElevationCanvas = ({
 }: Props) => {
   const ensuredPlan = useMemo(() => ensureGarageDoors(plan), [plan]);
   const ensuredFirstFloorPlan = useMemo(() => firstFloorPlan ? ensureGarageDoors(firstFloorPlan) : undefined, [firstFloorPlan]);
+  const [showLabels, setShowLabels] = useState(true);
 
   const currentFloor = activeFloor ?? 2;
   const hideRoof = isDoubleStorey ? currentFloor !== 2 : false;
@@ -574,11 +576,11 @@ export const ElevationCanvas = ({
           {addons.includes('landscaping') && <GrassField planW={safeW} planD={safeD} />}
           
           {/* Ground Floor Model */}
-          <House plan={ensuredPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={currentFloor !== 2} plotW={plotW} plotD={plotD} isDoubleStorey={isDoubleStorey} />
+          <House plan={ensuredPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} isNight={isNight} hideRoof={currentFloor !== 2} plotW={plotW} plotD={plotD} isDoubleStorey={isDoubleStorey} showLabels={showLabels} />
           
           {/* Second Floor (Double Storey) */}
           {isDoubleStorey && ensuredFirstFloorPlan && currentFloor !== 0 && (
-            <SecondFloor plan={ensuredPlan} firstFloorPlan={ensuredFirstFloorPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} hideRoof={currentFloor !== 2} isNight={isNight} />
+            <SecondFloor plan={ensuredPlan} firstFloorPlan={ensuredFirstFloorPlan} roof={roof} material={material} activeRoom={activeRoom} addons={addons} hideRoof={currentFloor !== 2} isNight={isNight} showLabels={showLabels} />
           )}
           
           
@@ -618,6 +620,14 @@ export const ElevationCanvas = ({
           {activeRoom && activeRoom !== 'overview' ? 'Drag to rotate · Scroll to zoom · Free camera' : 'Drag to rotate · Scroll to zoom'}
         </div>
       )}
+      <button
+        onClick={() => setShowLabels(prev => !prev)}
+        className="absolute right-4 top-4 z-10 flex items-center gap-2 rounded-xl border border-white/10 bg-black/40 backdrop-blur-md px-3.5 py-2 text-[10px] font-display font-semibold uppercase tracking-[0.2em] pointer-events-auto cursor-pointer transition-all duration-300 hover:bg-white/15 active:scale-95 text-white shadow-lg"
+        style={{ fontFamily: 'inherit' }}
+      >
+        {showLabels ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+        {showLabels ? 'Hide Labels' : 'Show Labels'}
+      </button>
     </div>
   );
 };
@@ -893,8 +903,8 @@ const Balcony3D = ({ room, W, D, offsetX = 0, offsetZ = 0, isNight, floorY = 0 }
 };
 
 /* ─── Main House Component ─── */
-const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hideRoof = false, plotW, plotD, isDoubleStorey = false }: {
-  plan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons: AddOn[]; isNight?: boolean; hideRoof?: boolean; plotW: number; plotD: number; isDoubleStorey?: boolean;
+const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hideRoof = false, plotW, plotD, isDoubleStorey = false, showLabels = true }: {
+  plan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons: AddOn[]; isNight?: boolean; hideRoof?: boolean; plotW: number; plotD: number; isDoubleStorey?: boolean; showLabels?: boolean;
 }) => {
   const roofType = isDoubleStorey ? 'flat' : roof;
   const colors = MATERIAL_COLORS[material];
@@ -1049,9 +1059,11 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
       if (door.doorCategory === 'main') {
         let pos;
         if (wall.type === 'h') {
-          pos = { x: round2(door.absPos - W/2), z: round2(wall.coord - D/2), nx: 0, nz: wall.coord <= minZ + 0.5 ? -1 : 1, roomType: door.roomType };
+          const nz = door.wall === 'top' ? -1 : (door.wall === 'bottom' ? 1 : (wall.coord <= minZ + 0.5 ? -1 : 1));
+          pos = { x: round2(door.absPos - W/2), z: round2(wall.coord - D/2), nx: 0, nz, roomType: door.roomType };
         } else {
-          pos = { x: round2(wall.coord - W/2), z: round2(door.absPos - D/2), nx: wall.coord <= minX + 0.5 ? -1 : 1, nz: 0, roomType: door.roomType };
+          const nx = door.wall === 'left' ? -1 : (door.wall === 'right' ? 1 : (wall.coord <= minX + 0.5 ? -1 : 1));
+          pos = { x: round2(wall.coord - W/2), z: round2(door.absPos - D/2), nx, nz: 0, roomType: door.roomType };
         }
         mainDoorCandidates.push(pos);
       }
@@ -1401,7 +1413,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
       })()}
 
       {!hideRoof && (plan.rooms || []).filter(r => r.type === 'garage').map(r => (
-        <GarageRoof key={`groof-${r.id}`} garage={r} planW={W} planH={D} wallH={10} colors={colors} wallTextures={wallTextures} />
+        <GarageRoof key={`groof-${r.id}`} garage={r} planW={W} planH={D} wallH={10.8} colors={colors} wallTextures={wallTextures} />
       ))}
 
       {/* Rooftop Equipment */}
@@ -1409,7 +1421,7 @@ const House = ({ plan, roof, material, activeRoom, addons, isNight = false, hide
       {addons.includes('water_tank') && !hideRoof && !isDoubleStorey && <WaterTank maxX={maxX - W/2} maxZ={maxZ - D/2} wallH={wallH} roofType={roofType} />}
 
       {/* Room Labels */}
-      {(plan.rooms || []).map(r => {
+      {showLabels && (plan.rooms || []).map(r => {
         if (r.type === 'garden' || r.type === 'carport' || r.type === 'balcony') return null;
         const isActive = activeRoom === r.type;
         const finalHideRoof = isDoubleStorey ? hideRoof : false;
@@ -3318,8 +3330,8 @@ const FenceAround = ({ planW, planD, gates, isNight }: { planW: number; planD: n
 };
 
 /* ─── Second Floor (Double Storey) ─── */
-const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons = [], hideRoof, isNight }: {
-  plan: Plan; firstFloorPlan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons?: AddOn[]; hideRoof?: boolean; isNight?: boolean;
+const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons = [], hideRoof, isNight, showLabels = true }: {
+  plan: Plan; firstFloorPlan: Plan; roof: RoofType; material: Material; activeRoom?: string | null; addons?: AddOn[]; hideRoof?: boolean; isNight?: boolean; showLabels?: boolean;
 }) => {
   const colors = MATERIAL_COLORS[material];
   const W = plan.width;
@@ -3674,7 +3686,7 @@ const SecondFloor = ({ plan, firstFloorPlan, roof, material, activeRoom, addons 
         {addons.includes('water_tank') && !hideRoof && <WaterTank maxX={upperMaxX} maxZ={upperMaxZ} wallH={wallH} roofType={roof} />}
 
         {/* Room labels */}
-        {(firstFloorPlan?.rooms || []).map(r => (
+        {showLabels && (firstFloorPlan?.rooms || []).map(r => (
           <Html key={`label2-${r.id}`} position={[r.x + r.w/2, 3, r.y + r.h/2]} center zIndexRange={[100, 0]}>
             <div className="pointer-events-none px-3 py-1 rounded-sm bg-white/90 border border-black/10 shadow-lg text-[10px] font-display font-bold tracking-widest whitespace-nowrap">
               {r.label}
