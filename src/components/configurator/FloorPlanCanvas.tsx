@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Stage, Layer, Rect, Text, Line, Group, Arc, Circle, Transformer, Path } from 'react-konva';
 import { Plan, Room, FurnitureItem, DoorInfo, WindowInfo, regenerateFurniture, resolveStairGeometry, applySmartRotations } from '@/lib/floorplan';
 import { useConfig } from '@/store/configurator';
 import { RotateCw, Plus, Trash2, Maximize } from 'lucide-react';
 import Konva from 'konva';
+
+export interface FloorPlanCanvasHandle {
+  getStage: () => Konva.Stage | null;
+}
 
 interface Props {
   plan: Plan;
@@ -38,12 +42,16 @@ const CADCar2D = ({ w, h }: { w: number; h: number }) => {
 };
 
 
-export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZoomHelper = false, floorLevel, isSelectedAll = false, onSelectedAllChange, onChange }: Props) => {
+export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan, advanced = false, minimal = false, hideZoomHelper = false, floorLevel, isSelectedAll = false, onSelectedAllChange, onChange }, ref) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const config = useConfig();
   const [size, setSize] = useState({ w: 600, h: 400 });
   const [localPlan, setLocalPlan] = useState(plan || { width: 0, height: 0, rooms: [] });
+
+  useImperativeHandle(ref, () => ({
+    getStage: () => stageRef.current,
+  }));
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
@@ -1367,7 +1375,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
       )}
     </div>
   );
-};
+});
 
 /* ─── Room Shape ─── */
 const RoomShape = ({ room, scale, offsetX, offsetY, isSelected, onClick, onRotate, onMirror, draggable, onDragEnd, onContext, onFurnitureUpdate, showLabels = true, onPointerDown, onTransformEnd, innerRef, isWallMode, setWallPopup, onWallToggle, floorLevel }: any) => {

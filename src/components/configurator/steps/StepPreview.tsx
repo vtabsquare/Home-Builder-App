@@ -10,8 +10,10 @@ import { Plan, splitPlanToFloors, Room, generateEmptyPlan, regenerateFurniture, 
 import { fetchElevationImagesByVariant, fetchElevationVariantFamily, normalizeParsedVariantAddons, resolveElevationVariant } from '@/lib/elevationVariants';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash, Copy, ClipboardPaste, Upload, Plus, Image as ImageIcon, Move } from 'lucide-react';
+import { Home, BedDouble, Bath, CookingPot, Sofa, Trees, Fence, Eye, ChevronLeft, ChevronRight, X, Check, Save, History, Layers, PenTool, Building2, ArrowUpDown, Trash, Copy, ClipboardPaste, Upload, Plus, Image as ImageIcon, Move, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import jsPDF from 'jspdf';
+import { FloorPlanCanvasHandle } from '../FloorPlanCanvas';
 
 interface Props {
   plan: Plan;
@@ -72,6 +74,42 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   const [showVariantRecovery, setShowVariantRecovery] = useState(false);
   const [currentElevationVariantId, setCurrentElevationVariantId] = useState<string | null>(null);
   const tabScrollRef = useRef<HTMLDivElement>(null);
+  const floorPlanRef = useRef<FloorPlanCanvasHandle>(null);
+
+  const exportAsPDF = () => {
+    const stage = floorPlanRef.current?.getStage();
+    if (!stage) {
+      toast({ title: 'Export failed', description: 'Floor plan not available.', variant: 'destructive' });
+      return;
+    }
+    const dataUrl = stage.toDataURL({ pixelRatio: 2 });
+    const pdf = new jsPDF('landscape', 'px', [stage.width(), stage.height()]);
+    pdf.addImage(dataUrl, 'PNG', 0, 0, stage.width(), stage.height());
+    pdf.save('floor-plan.pdf');
+    toast({ title: 'Export successful', description: 'Downloaded as PDF.' });
+  };
+
+  const exportAsSVG = () => {
+    const stage = floorPlanRef.current?.getStage();
+    if (!stage) {
+      toast({ title: 'Export failed', description: 'Floor plan not available.', variant: 'destructive' });
+      return;
+    }
+    const dataUrl = stage.toDataURL({ pixelRatio: 2 });
+    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${stage.width()}" height="${stage.height()}">
+      <image href="${dataUrl}" width="${stage.width()}" height="${stage.height()}" />
+    </svg>`;
+    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'floor-plan.svg';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast({ title: 'Export successful', description: 'Downloaded as SVG.' });
+  };
 
   const currentPresetKey = useMemo(
     () => getBuiltInPresetKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }, presetId),
@@ -613,6 +651,22 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   >
                     {advanced ? 'Advanced' : 'Advanced Mode'}
                   </button>
+                  <div className="flex items-center gap-1 border-l border-border pl-3 md:pl-4">
+                    <button
+                      onClick={exportAsPDF}
+                      className="flex items-center justify-center h-10 md:h-11 rounded-xl border border-border bg-white text-muted-foreground px-4 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section hover:text-foreground transition-all active:scale-95"
+                      title="Export as PDF"
+                    >
+                      <Download size={14} className="mr-2" /> PDF
+                    </button>
+                    <button
+                      onClick={exportAsSVG}
+                      className="flex items-center justify-center h-10 md:h-11 rounded-xl border border-border bg-white text-muted-foreground px-4 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section hover:text-foreground transition-all active:scale-95"
+                      title="Export as SVG"
+                    >
+                      <Download size={14} className="mr-2" /> SVG
+                    </button>
+                  </div>
                 </>
               )}
               {view === '3d' && !advancedEditorMode && (
@@ -949,6 +1003,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
                   <FloorPlanCanvas 
+                    ref={floorPlanRef}
                     plan={stagedPlan || getHighlightedPlan()} 
                     advanced={advanced} 
                     hideZoomHelper={true} 
