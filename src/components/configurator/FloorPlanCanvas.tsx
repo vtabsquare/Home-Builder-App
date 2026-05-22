@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Stage, Layer, Rect, Text, Line, Group, Arc, Circle, Transformer, Path } from 'react-konva';
-import { Plan, Room, FurnitureItem, DoorInfo, WindowInfo, regenerateFurniture, resolveStairGeometry } from '@/lib/floorplan';
+import { Plan, Room, FurnitureItem, DoorInfo, WindowInfo, regenerateFurniture, resolveStairGeometry, applySmartRotations } from '@/lib/floorplan';
 import { useConfig } from '@/store/configurator';
 import { RotateCw, Plus, Trash2, Maximize } from 'lucide-react';
 import Konva from 'konva';
@@ -268,7 +268,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
         if (r.id !== roomId) return r;
         const furniture = [...(r.furniture || [])];
         furniture[furnitureIndex] = { ...furniture[furnitureIndex], x: clampedX, y: clampedY };
-        return { ...r, furniture };
+        return { ...r, furniture: applySmartRotations(furniture, r.w, r.h) };
       }),
     };
 
@@ -312,7 +312,7 @@ export const FloorPlanCanvas = ({ plan, advanced = false, minimal = false, hideZ
         if (r.id !== roomId) return r;
         const furniture = [...(r.furniture || [])];
         furniture[furnitureIndex] = { ...furniture[furnitureIndex], x: clampedX, y: clampedY, w: newW, h: newH };
-        return { ...r, furniture };
+        return { ...r, furniture: applySmartRotations(furniture, r.w, r.h) };
       }),
     };
 

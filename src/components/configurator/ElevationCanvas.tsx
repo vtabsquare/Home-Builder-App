@@ -2,7 +2,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, ContactShadows, Html } from '@react-three/drei';
 import { Suspense, useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import * as THREE from 'three';
-import { Plan, resolveStairGeometry, ensureGarageDoors } from '@/lib/floorplan';
+import { Plan, resolveStairGeometry, ensureGarageDoors, applySmartRotations } from '@/lib/floorplan';
 import { Material, RoofType, AddOn } from '@/store/configurator';
 import { Furniture3D } from './Furniture3D';
 import { SceneLighting } from './SceneLighting';
@@ -515,7 +515,16 @@ export const ElevationCanvas = ({
   plan, roof, material, addons = [], activeRoom, isDoubleStorey = false, 
   activeFloor, firstFloorPlan, hideHelpers = false, isNight = false, interiorMode = false, garageShutterOpen = false 
 }: Props) => {
-  const ensuredPlan = useMemo(() => ensureGarageDoors(plan), [plan]);
+  const ensuredPlan = useMemo(() => {
+    const p = ensureGarageDoors(plan);
+    p.rooms = p.rooms.map(room => {
+      if (room.furniture) {
+        return { ...room, furniture: applySmartRotations(room.furniture, room.w, room.h) };
+      }
+      return room;
+    });
+    return p;
+  }, [plan]);
   const ensuredFirstFloorPlan = useMemo(() => firstFloorPlan ? ensureGarageDoors(firstFloorPlan) : undefined, [firstFloorPlan]);
   const [showLabels, setShowLabels] = useState(true);
 

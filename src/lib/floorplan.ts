@@ -154,9 +154,62 @@ export function regenerateFurniture(room: Room, kitchenType: string = 'open'): F
     case 'generator':
       return [{ type: 'generator', x: room.w / 2 - 2, y: room.h / 2 - 1.5, w: 4, h: 3, rotation: 0 }];
     default:
-      return room.furniture;
+      items = room.furniture;
+      break;
   }
+  return applySmartRotations(items, room.w, room.h);
 }
+
+export function applySmartRotations(items: FurnitureItem[], w: number, h: number): FurnitureItem[] {
+  const roomCenter = { x: w / 2, y: h / 2 };
+
+  const getCenter = (item: FurnitureItem) => ({
+    x: item.x + item.w / 2,
+    y: item.y + item.h / 2
+  });
+
+  const getAngle = (from: {x:number, y:number}, to: {x:number, y:number}) => {
+    let angleDeg = Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI;
+    return (90 - angleDeg + 360) % 360;
+  };
+
+  const snapTo90 = (angle: number) => Math.round(angle / 90) * 90 % 360;
+
+  return items.map(item => {
+    let target = roomCenter;
+    let snap = true;
+
+    if (item.type === 'sofa') {
+      const tv = items.find(i => i.type === 'tv');
+      if (tv) target = getCenter(tv);
+    } else if (item.type === 'tv') {
+      const sofa = items.find(i => i.type === 'sofa' || i.type === 'bed');
+      if (sofa) target = getCenter(sofa);
+    } else if (item.type === 'coffee_table') {
+      const tv = items.find(i => i.type === 'tv');
+      if (tv) target = getCenter(tv);
+    } else if (item.type === 'chair') {
+      const desk = items.find(i => i.type === 'desk' || i.type === 'dining_table');
+      if (desk) target = getCenter(desk);
+      snap = false;
+    } else if (item.type === 'bed' || item.type === 'wardrobe' || item.type === 'sink' || item.type === 'toilet' || item.type === 'shower' || item.type === 'stove' || item.type === 'fridge' || item.type === 'counter') {
+      target = roomCenter;
+    } else if (item.type === 'island' || item.type === 'dining_table') {
+      return item; // keep original rotation
+    } else {
+      target = roomCenter;
+    }
+
+    const from = getCenter(item);
+    let rotation = getAngle(from, target);
+    if (snap) {
+      rotation = snapTo90(rotation);
+    }
+
+    return { ...item, rotation };
+  });
+}
+
 
 function gardenFurniture(w: number, h: number): FurnitureItem[] {
   const items: FurnitureItem[] = [];
@@ -190,17 +243,17 @@ function dressingFurniture(w: number, h: number, orient: number = 0): FurnitureI
     items.push({ type: 'wardrobe', x: G, y: h - G - wardrobeDepth, w: wardrobeLong, h: wardrobeDepth, rotation: 0 });
     items.push({ type: 'desk', x: w - G - vanityW, y: (h - vanityH) / 2, w: vanityW, h: vanityH, rotation: 0 });
   } else if (orient === 1) {
-    items.push({ type: 'wardrobe', x: w - G - wardrobeDepth, y: G, w: wardrobeDepth, h: wardrobeLong, rotation: 0 });
-    items.push({ type: 'wardrobe', x: G, y: G, w: wardrobeDepth, h: wardrobeLong, rotation: 0 });
-    items.push({ type: 'desk', x: (w - vanityH) / 2, y: h - G - vanityW, w: vanityH, h: vanityW, rotation: 0 });
+    items.push({ type: 'wardrobe', x: w - G - wardrobeDepth/2 - wardrobeLong/2, y: G + wardrobeLong/2 - wardrobeDepth/2, w: wardrobeLong, h: wardrobeDepth, rotation: 90 });
+    items.push({ type: 'wardrobe', x: G + wardrobeLong/2 - wardrobeDepth/2, y: G + wardrobeLong/2 - wardrobeDepth/2, w: wardrobeLong, h: wardrobeDepth, rotation: 90 });
+    items.push({ type: 'desk', x: (w - vanityH)/2 + vanityH/2 - vanityW/2, y: h - G - vanityW/2 - vanityH/2, w: vanityW, h: vanityH, rotation: 90 });
   } else if (orient === 2) {
-    items.push({ type: 'wardrobe', x: w - G - wardrobeLong, y: h - G - wardrobeDepth, w: wardrobeLong, h: wardrobeDepth, rotation: 0 });
-    items.push({ type: 'wardrobe', x: w - G - wardrobeLong, y: G, w: wardrobeLong, h: wardrobeDepth, rotation: 0 });
-    items.push({ type: 'desk', x: G, y: (h - vanityH) / 2, w: vanityW, h: vanityH, rotation: 0 });
+    items.push({ type: 'wardrobe', x: w - G - wardrobeLong, y: h - G - wardrobeDepth, w: wardrobeLong, h: wardrobeDepth, rotation: 180 });
+    items.push({ type: 'wardrobe', x: w - G - wardrobeLong, y: G, w: wardrobeLong, h: wardrobeDepth, rotation: 180 });
+    items.push({ type: 'desk', x: G, y: (h - vanityH) / 2, w: vanityW, h: vanityH, rotation: 180 });
   } else {
-    items.push({ type: 'wardrobe', x: G, y: h - G - wardrobeLong, w: wardrobeDepth, h: wardrobeLong, rotation: 0 });
-    items.push({ type: 'wardrobe', x: w - G - wardrobeDepth, y: h - G - wardrobeLong, w: wardrobeDepth, h: wardrobeLong, rotation: 0 });
-    items.push({ type: 'desk', x: (w - vanityH) / 2, y: G, w: vanityH, h: vanityW, rotation: 0 });
+    items.push({ type: 'wardrobe', x: G + wardrobeLong/2 - wardrobeDepth/2, y: h - G - wardrobeLong/2 - wardrobeDepth/2, w: wardrobeLong, h: wardrobeDepth, rotation: 270 });
+    items.push({ type: 'wardrobe', x: w - G - wardrobeDepth/2 - wardrobeLong/2, y: h - G - wardrobeLong/2 - wardrobeDepth/2, w: wardrobeLong, h: wardrobeDepth, rotation: 270 });
+    items.push({ type: 'desk', x: (w - vanityH)/2 + vanityH/2 - vanityW/2, y: G + vanityH/2 - vanityW/2, w: vanityW, h: vanityH, rotation: 270 });
   }
 
   return items;
@@ -268,11 +321,23 @@ function kitchenFurniture(w: number, h: number, kitchenType: string, orient: num
     items.push({ type: 'fridge', x: w - 2.5 - G, y: G + 0.1, w: 2.2, h: 2.2, rotation: 0 });
     items.push({ type: 'island', x: (w - 6) / 2, y: h * 0.4, w: 6, h: 3, rotation: 0 });
   } else if (kitchenType === 'galley') {
-    // GALLEY: Two parallel vertical counters
-    items.push({ type: 'counter', x: G, y: G, w: 2, h: h - 2*G, rotation: 0 });
-    items.push({ type: 'counter', x: w - 2 - G, y: G, w: 2, h: h - 2*G, rotation: 0 });
-    items.push({ type: 'stove', x: G + 0.1, y: h * 0.3, w: 1.6, h: 2.5, rotation: 0 });
-    items.push({ type: 'fridge', x: w - G - 2.1, y: h * 0.6, w: 2.2, h: 2.2, rotation: 0 });
+    // GALLEY: Two parallel vertical counters (on left and right walls)
+    // Left counter (originally w: 2, h: h - 2*G at x: G, y: G)
+    // newW: h - 2*G, newH: 2
+    // cx: G + 1, cy: G + (h - 2*G)/2 = h/2
+    items.push({ type: 'counter', x: G + 1 - (h - 2*G)/2, y: h/2 - 1, w: h - 2*G, h: 2, rotation: 270 });
+    
+    // Right counter (originally w: 2, h: h - 2*G at x: w - 2 - G, y: G)
+    // cx: w - G - 1, cy: h/2
+    items.push({ type: 'counter', x: w - G - 1 - (h - 2*G)/2, y: h/2 - 1, w: h - 2*G, h: 2, rotation: 90 });
+    
+    // Left stove (originally w: 1.6, h: 2.5 at x: G + 0.1, y: h * 0.3)
+    // cx: G + 0.9, cy: h * 0.3 + 1.25
+    items.push({ type: 'stove', x: G + 0.9 - 1.25, y: h * 0.3 + 1.25 - 0.8, w: 2.5, h: 1.6, rotation: 270 });
+    
+    // Right fridge (originally w: 2.2, h: 2.2 at x: w - G - 2.1, y: h * 0.6)
+    // No w/h change, so x, y remain same, just rotate it.
+    items.push({ type: 'fridge', x: w - G - 2.1, y: h * 0.6, w: 2.2, h: 2.2, rotation: 90 });
   } else {
     // STANDARD (based on orientation)
     const cW = w - 2 * G - 2.2;
@@ -284,17 +349,29 @@ function kitchenFurniture(w: number, h: number, kitchenType: string, orient: num
       items.push({ type: 'stove',   x: G + cW * 0.4, y: G + 0.1, w: 2.5, h: 1.6, rotation: 0 });
       items.push({ type: 'fridge',  x: w - 2.2 - G, y: G + 0.1, w: 2.2, h: 2.2, rotation: 0 });
     } else if (orient === 1) {
-      items.push({ type: 'counter', x: w - G - cD, y: G, w: cD, h: cH, rotation: 0 });
-      items.push({ type: 'stove',   x: w - G - 1.6 - 0.1, y: G + cH * 0.4, w: 1.6, h: 2.5, rotation: 0 });
-      items.push({ type: 'fridge',  x: w - G - 2.2 - 0.1, y: h - G - 2.2, w: 2.2, h: 2.2, rotation: 0 });
+      // Right wall
+      // Counter: originally x: w - G - cD, y: G, w: cD, h: cH
+      // cx: w - G - cD/2, cy: G + cH/2. newW: cH, newH: cD.
+      items.push({ type: 'counter', x: w - G - cD/2 - cH/2, y: G + cH/2 - cD/2, w: cH, h: cD, rotation: 90 });
+      // Stove: originally x: w - G - 1.7, y: G + cH * 0.4, w: 1.6, h: 2.5
+      // cx: w - G - 0.9, cy: G + cH * 0.4 + 1.25. newW: 2.5, newH: 1.6.
+      items.push({ type: 'stove',   x: w - G - 0.9 - 1.25, y: G + cH * 0.4 + 1.25 - 0.8, w: 2.5, h: 1.6, rotation: 90 });
+      // Fridge: w=2.2, h=2.2 (square).
+      items.push({ type: 'fridge',  x: w - G - 2.2 - 0.1, y: h - G - 2.2, w: 2.2, h: 2.2, rotation: 90 });
     } else if (orient === 2) {
-      items.push({ type: 'counter', x: G, y: h - G - cD, w: cW, h: cD, rotation: 0 });
-      items.push({ type: 'stove',   x: G + cW * 0.4, y: h - G - 1.6 - 0.1, w: 2.5, h: 1.6, rotation: 0 });
-      items.push({ type: 'fridge',  x: w - 2.2 - G, y: h - G - 2.2 - 0.1, w: 2.2, h: 2.2, rotation: 0 });
+      items.push({ type: 'counter', x: G, y: h - G - cD, w: cW, h: cD, rotation: 180 });
+      items.push({ type: 'stove',   x: G + cW * 0.4, y: h - G - 1.6 - 0.1, w: 2.5, h: 1.6, rotation: 180 });
+      items.push({ type: 'fridge',  x: w - 2.2 - G, y: h - G - 2.2 - 0.1, w: 2.2, h: 2.2, rotation: 180 });
     } else if (orient === 3) {
-      items.push({ type: 'counter', x: G, y: G, w: cD, h: cH, rotation: 0 });
-      items.push({ type: 'stove',   x: G + 0.1, y: G + cH * 0.4, w: 1.6, h: 2.5, rotation: 0 });
-      items.push({ type: 'fridge',  x: G + 0.1, y: h - G - 2.2, w: 2.2, h: 2.2, rotation: 0 });
+      // Left wall
+      // Counter: originally x: G, y: G, w: cD, h: cH
+      // cx: G + cD/2, cy: G + cH/2. newW: cH, newH: cD.
+      items.push({ type: 'counter', x: G + cD/2 - cH/2, y: G + cH/2 - cD/2, w: cH, h: cD, rotation: 270 });
+      // Stove: originally x: G + 0.1, y: G + cH * 0.4, w: 1.6, h: 2.5
+      // cx: G + 0.9, cy: G + cH * 0.4 + 1.25. newW: 2.5, newH: 1.6.
+      items.push({ type: 'stove',   x: G + 0.9 - 1.25, y: G + cH * 0.4 + 1.25 - 0.8, w: 2.5, h: 1.6, rotation: 270 });
+      // Fridge: square.
+      items.push({ type: 'fridge',  x: G + 0.1, y: h - G - 2.2, w: 2.2, h: 2.2, rotation: 270 });
     }
   }
   return items;
@@ -1154,7 +1231,13 @@ export function generatePlan(c: ConfigState): Plan {
       plan = starterPresetA(c);
   }
 
-  return ensureGarageDoors(applyDynamicChanges(plan, c));
+  const finalPlan = ensureGarageDoors(applyDynamicChanges(plan, c));
+  finalPlan.rooms.forEach(room => {
+    if (room.furniture) {
+      room.furniture = applySmartRotations(room.furniture, room.w, room.h);
+    }
+  });
+  return finalPlan;
 }
 
 const ADDON_ROOM_PREFIXES = ['addon-'];
