@@ -407,6 +407,70 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
               className="space-y-10"
             >
 
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={c.name}
+                    onChange={(e) => useConfig.getState().setLead({ ...c, name: e.target.value })}
+                    placeholder="John Doe"
+                    className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
+                  />
+                  {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={c.email}
+                    onChange={(e) => useConfig.getState().setLead({ ...c, email: e.target.value })}
+                    placeholder="you@example.com"
+                    className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
+                  />
+                  {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={c.phone}
+                    onChange={(e) => useConfig.getState().setLead({ ...c, phone: e.target.value })}
+                    placeholder="+1 (555) 000-0000"
+                    className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
+                  />
+                  {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
+                    Project Timeline
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {TIMELINES.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => useConfig.getState().setLead({ ...c, timeline: t })}
+                        className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all border ${
+                          c.timeline === t
+                            ? 'bg-clay border-clay text-white shadow-md'
+                            : 'bg-surface border-border text-muted-foreground hover:border-foreground/20'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  {errors.timeline && <p className="text-red-500 text-xs mt-1">{errors.timeline}</p>}
+                </div>
+              </div>
+
               <div className="pt-6">
                 <button
                   onClick={submit}
