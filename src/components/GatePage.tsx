@@ -3,7 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { ArrowRight, Mail, Send, ShieldCheck, Smartphone } from 'lucide-react';
+import { ArrowRight, Mail, Send, ShieldCheck, Smartphone, User, Phone, Clock } from 'lucide-react';
+import { useConfig } from '@/store/configurator';
+
+const TIMELINES = ['0–3 months', '3–6 months', '6–12 months', '12+ months'];
 
 const BREVO_API_KEY = import.meta.env.VITE_BREVO_API_KEY;
 const BREVO_SENDER_EMAIL = import.meta.env.VITE_BREVO_SENDER_EMAIL;
@@ -51,8 +54,12 @@ interface GatePageProps {
 
 export const GatePage = ({ onProceed }: GatePageProps) => {
   const isMobile = useIsMobile();
-  const [step, setStep] = useState<'email' | 'otp'>('email');
+  const { setLead } = useConfig();
+  const [step, setStep] = useState<'details' | 'otp'>('details');
   const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [timeline, setTimeline] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);
@@ -83,8 +90,20 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
 
   const sendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      toast.error('Please enter your full name');
+      return;
+    }
+    if (!phone.trim() || phone.trim().length < 6) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
     if (!email.trim()) {
       toast.error('Please enter your email address');
+      return;
+    }
+    if (!timeline) {
+      toast.error('Please select a project timeline');
       return;
     }
 
@@ -172,7 +191,7 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
         return;
       }
 
-      // Store device/session info
+      // Store device/session info and visitor details
       const info = getDeviceInfo();
       try {
         await supabase.rpc('store_visitor_session', {
@@ -183,10 +202,21 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
           p_screen_width: info.screenWidth,
           p_screen_height: info.screenHeight,
           p_user_agent: info.userAgent,
+          p_full_name: fullName.trim(),
+          p_phone: phone.trim(),
+          p_project_timeline: timeline || null,
         });
       } catch {
         // Non-critical — continue even if session store fails
       }
+
+      // Sync to configurator store so proposal page is pre-filled
+      setLead({
+        name: fullName.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        timeline,
+      });
 
       // Play success animation then proceed
       setVerified(true);
@@ -415,7 +445,7 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="relative z-10 w-full max-w-md mx-4"
+              className="relative z-10 w-full max-w-lg mx-4"
             >
               {/* Header */}
               <div className="text-center mb-8">
@@ -441,7 +471,7 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
                   transition={{ delay: 0.3, duration: 0.5 }}
                   className="text-white/35 text-sm mt-2"
                 >
-                  {step === 'email' ? 'Enter your email to get started' : 'Enter the code sent to your email'}
+                  {step === 'details' ? 'Enter your details to get started' : 'Enter the code sent to your email'}
                 </motion.p>
               </div>
 
@@ -453,16 +483,56 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
                 className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] rounded-2xl p-8 shadow-2xl"
               >
                 <AnimatePresence mode="wait">
-                  {step === 'email' ? (
+                  {step === 'details' ? (
                     <motion.form
-                      key="email-step"
+                      key="details-step"
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 10 }}
                       transition={{ duration: 0.3 }}
                       onSubmit={sendOtp}
-                      className="space-y-5"
+                      className="space-y-4"
                     >
+                      {/* Name & Phone row */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
+                            Full Name
+                          </label>
+                          <div className="relative">
+                            <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
+                            <input
+                              id="gate-name-desktop"
+                              type="text"
+                              value={fullName}
+                              onChange={(e) => setFullName(e.target.value)}
+                              placeholder="e.g., Alex Morgan"
+                              autoComplete="name"
+                              autoFocus
+                              className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
+                            Phone Number
+                          </label>
+                          <div className="relative">
+                            <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
+                            <input
+                              id="gate-phone-desktop"
+                              type="tel"
+                              value={phone}
+                              onChange={(e) => setPhone(e.target.value)}
+                              placeholder="+1 (555) 000-0000"
+                              autoComplete="tel"
+                              className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Email full-width */}
                       <div>
                         <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
                           Email Address
@@ -476,16 +546,38 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="you@example.com"
                             autoComplete="email"
-                            autoFocus
                             className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
                           />
+                        </div>
+                      </div>
+
+                      {/* Project Timeline */}
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-3 block text-center">
+                          Project Timeline
+                        </label>
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {TIMELINES.map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => setTimeline(t)}
+                              className={`rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 border ${
+                                timeline === t
+                                  ? 'bg-[#b8956a] border-[#b8956a] text-white shadow-lg shadow-[#b8956a]/20 scale-105'
+                                  : 'bg-white/[0.04] border-white/[0.08] text-white/40 hover:border-white/20 hover:text-white/60'
+                              }`}
+                            >
+                              {t}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
                       <button
                         id="gate-send-otp-desktop"
                         type="submit"
-                        disabled={loading || !email.trim()}
+                        disabled={loading || !email.trim() || !fullName.trim() || !phone.trim() || !timeline}
                         className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl bg-gradient-to-r from-[#b8956a] to-[#a07850] text-white text-sm font-semibold hover:brightness-110 active:scale-[0.98] transition-all duration-300 disabled:opacity-50 shadow-lg shadow-[#b8956a]/20"
                       >
                         {loading ? (
@@ -567,10 +659,10 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
                       <div className="flex items-center justify-between pt-1">
                         <button
                           type="button"
-                          onClick={() => { setStep('email'); setOtp(''); }}
+                          onClick={() => { setStep('details'); setOtp(''); }}
                           className="text-[11px] text-white/25 hover:text-white/40 transition-colors"
                         >
-                          ← Change email
+                          ← Change details
                         </button>
                         <button
                           type="button"
@@ -641,7 +733,7 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
             transition={{ delay: 0.3, duration: 0.5 }}
             className="text-white/35 text-sm mt-2"
           >
-            {step === 'email' ? 'Enter your email to get started' : 'Enter the code sent to your email'}
+            {step === 'details' ? 'Enter your details to get started' : 'Enter the code sent to your email'}
           </motion.p>
         </div>
 
@@ -653,9 +745,9 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
           className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] rounded-2xl p-6 shadow-2xl"
         >
           <AnimatePresence mode="wait">
-            {step === 'email' ? (
+            {step === 'details' ? (
               <motion.form
-                key="email-step"
+                key="details-step"
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
@@ -663,6 +755,42 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
                 onSubmit={sendOtp}
                 className="space-y-4"
               >
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
+                    Full Name
+                  </label>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
+                    <input
+                      id="gate-name"
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="e.g., Alex Morgan"
+                      autoComplete="name"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
+                    Phone Number
+                  </label>
+                  <div className="relative">
+                    <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
+                    <input
+                      id="gate-phone"
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+1 (555) 000-0000"
+                      autoComplete="tel"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
                     Email Address
@@ -681,10 +809,32 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
                   </div>
                 </div>
 
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-3 block text-center">
+                    Project Timeline
+                  </label>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {TIMELINES.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setTimeline(t)}
+                        className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 border ${
+                          timeline === t
+                            ? 'bg-[#b8956a] border-[#b8956a] text-white shadow-lg shadow-[#b8956a]/20 scale-105'
+                            : 'bg-white/[0.04] border-white/[0.08] text-white/40 hover:border-white/20 hover:text-white/60'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <button
                   id="gate-send-otp"
                   type="submit"
-                  disabled={loading || !email.trim()}
+                  disabled={loading || !email.trim() || !fullName.trim() || !phone.trim() || !timeline}
                   className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-gradient-to-r from-[#b8956a] to-[#a07850] text-white text-sm font-semibold hover:brightness-110 active:scale-[0.98] transition-all duration-300 disabled:opacity-50 shadow-lg shadow-[#b8956a]/20"
                 >
                   {loading ? (
@@ -758,10 +908,10 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
                 <div className="flex items-center justify-between pt-1">
                   <button
                     type="button"
-                    onClick={() => { setStep('email'); setOtp(''); }}
+                    onClick={() => { setStep('details'); setOtp(''); }}
                     className="text-[11px] text-white/25 hover:text-white/40 transition-colors"
                   >
-                    ← Change email
+                    ← Change details
                   </button>
                   <button
                     type="button"

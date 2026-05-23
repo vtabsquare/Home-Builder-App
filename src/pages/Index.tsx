@@ -68,6 +68,18 @@ const IndexInner = () => {
     }
   }, [homeType, isDoubleStorey, customPlan, customFirstFloorPlan, setCustomPlan, setCustomFirstFloorPlan]);
 
+  // Prevent body scroll when overlays are active to avoid double scrollbars
+  useEffect(() => {
+    if (showLanding || showGate) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showLanding, showGate]);
+
   // SEO
   useEffect(() => {
     document.title = 'GBTI Smart Home Builder · Design your dream home in minutes';

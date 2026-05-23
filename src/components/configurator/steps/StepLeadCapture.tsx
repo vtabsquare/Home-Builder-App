@@ -353,57 +353,6 @@ export const StepLeadCapture = ({ cost }: Props) => {
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
               className="space-y-10"
             >
-              <div className="grid gap-6 md:grid-cols-2">
-                <Field label="Full Name" error={errors.name}>
-                  <input
-                    value={c.name}
-                    onChange={(e) => c.setLead({ name: e.target.value })}
-                    placeholder="e.g., Alex Morgan"
-                    className="w-full bg-transparent outline-none font-display text-xl placeholder:text-muted-foreground/30 text-foreground"
-                  />
-                </Field>
-
-                <Field label="Phone Number" error={errors.phone}>
-                  <input
-                    value={c.phone}
-                    onChange={(e) => c.setLead({ phone: e.target.value })}
-                    placeholder="+1 (555) 000-0000"
-                    className="w-full bg-transparent outline-none font-display text-xl placeholder:text-muted-foreground/30 text-foreground"
-                  />
-                </Field>
-
-                <Field label="Email Address" error={errors.email} className="md:col-span-2">
-                  <input
-                    type="email"
-                    value={c.email}
-                    onChange={(e) => c.setLead({ email: e.target.value })}
-                    placeholder="alex@example.com"
-                    className="w-full bg-transparent outline-none font-display text-xl placeholder:text-muted-foreground/30 text-foreground"
-                  />
-                </Field>
-              </div>
-
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.3em] font-bold text-muted-foreground/40 mb-5 text-center">Project Timeline</div>
-                <div className="flex flex-wrap justify-center gap-4">
-                  {TIMELINES.map((t) => {
-                    const isActive = c.timeline === t;
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => c.setLead({ timeline: t })}
-                        className={`rounded-full px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 border ${isActive
-                          ? 'bg-clay border-clay text-white shadow-elev scale-105'
-                          : 'bg-surface border-border text-muted-foreground hover:border-muted-foreground/20 hover:text-foreground'
-                          }`}
-                      >
-                        {t}
-                      </button>
-                    );
-                  })}
-                </div>
-                {errors.timeline && <div className="mt-4 text-center text-[10px] font-bold text-destructive uppercase tracking-[0.1em]">{errors.timeline}</div>}
-              </div>
 
               <div className="pt-6">
                 <button
@@ -431,11 +380,5 @@ export const StepLeadCapture = ({ cost }: Props) => {
   );
 };
 
-const Field = ({ label, error, className = '', children }: { label: string; error?: string; className?: string; children: React.ReactNode }) => (
-  <div className={`rounded-xl border px-6 py-4 transition-all duration-500 ${error ? 'border-destructive/30 bg-destructive/5' : 'bg-surface border-border focus-within:border-muted-foreground/40 focus-within:shadow-soft'} ${className}`}>
-    <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mb-2">{label}</div>
-    {children}
-    {error && <div className="mt-2 text-[10px] font-bold text-destructive uppercase tracking-[0.1em]">{error}</div>}
-  </div>
-);
+
 
