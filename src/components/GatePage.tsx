@@ -51,10 +51,11 @@ function getDeviceInfo() {
 
 interface GatePageProps {
   onProceed: () => void;
+  onSkip?: () => void;
   mode?: 'qr' | 'auth';
 }
 
-export const GatePage = ({ onProceed, mode = 'qr' }: GatePageProps) => {
+export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
   const isMobile = useIsMobile();
   const { setLead } = useConfig();
   const [step, setStep] = useState<'details' | 'otp'>('details');
@@ -86,7 +87,7 @@ export const GatePage = ({ onProceed, mode = 'qr' }: GatePageProps) => {
   const handleSkip = () => {
     setIsDismantling(true);
     setTimeout(() => {
-      onProceed();
+      (onSkip || onProceed)();
     }, 700);
   };
 

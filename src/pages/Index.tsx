@@ -133,7 +133,7 @@ const IndexInner = () => {
             transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-0 z-[60]"
           >
-            <GatePage onProceed={() => setFlowStep('journey')} mode="qr" />
+            <GatePage onProceed={() => setFlowStep('journey')} onSkip={() => setFlowStep('landing')} mode="qr" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -197,10 +197,16 @@ const IndexInner = () => {
       >
         <div className="cinematic-vignette" />
         
-        <ProgressHeader onReset={() => {
-          reset();
-          setFlowStep(isMobile ? 'journey' : 'qr');
-        }} />
+        <ProgressHeader
+          onReset={() => {
+            reset();
+            setFlowStep(isMobile ? 'journey' : 'qr');
+          }}
+          onLogoClick={() => {
+            reset();
+            setFlowStep('landing');
+          }}
+        />
 
       <main className="flex-1 relative">
         <div className="mx-auto max-w-[1440px] px-4 sm:px-6 md:px-8 py-4 md:py-6 lg:py-8">

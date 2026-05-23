@@ -154,9 +154,11 @@ const AdminDashboard = () => {
       >
         {/* Logo */}
         <div className="p-5 border-b border-white/10 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-clay flex items-center justify-center text-white font-display font-bold text-sm flex-shrink-0">
-            G
-          </div>
+          <img
+            src="/gbti-logo.jpeg"
+            alt="GBTI Logo"
+            className="w-9 h-9 rounded-lg object-contain bg-white p-0.5 flex-shrink-0"
+          />
           <AnimatePresence>
             {!sidebarCollapsed && (
               <motion.div

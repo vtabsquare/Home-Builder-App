@@ -7,9 +7,10 @@ const STEPS = ['Home Type', 'Customize', 'Preview', 'Lead'];
 
 interface Props {
   onReset?: () => void;
+  onLogoClick?: () => void;
 }
 
-export const ProgressHeader = ({ onReset }: Props) => {
+export const ProgressHeader = ({ onReset, onLogoClick }: Props) => {
   const { step, setStep } = useConfig();
   const [showQR, setShowQR] = useState(false);
 
@@ -17,15 +18,20 @@ export const ProgressHeader = ({ onReset }: Props) => {
     <>
       <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur-md border-b border-border">
         <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 md:px-8 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-display font-bold text-[10px] md:text-xs">
-              G
-            </div>
-            <div>
+          <button
+            onClick={onLogoClick}
+            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+          >
+            <img
+              src="/gbti-logo.jpeg"
+              alt="GBTI Logo"
+              className="h-8 w-auto md:h-9 object-contain rounded bg-white p-0.5"
+            />
+            <div className="text-left">
               <div className="font-display text-xs md:text-sm font-bold leading-tight tracking-tight uppercase">GBTI</div>
               <div className="text-[8px] md:text-[9px] uppercase tracking-[0.2em] md:tracking-[0.3em] text-muted-foreground/60 leading-tight">Architectural Configurator</div>
             </div>
-          </div>
+          </button>
 
           <ol className="hidden md:flex items-center gap-1">
             {STEPS.map((label, i) => {
