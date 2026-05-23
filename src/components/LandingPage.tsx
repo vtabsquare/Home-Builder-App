@@ -1,6 +1,7 @@
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { ArrowRight, Sun, Cpu, Layers, Waves, Layout, Sparkles } from 'lucide-react';
 import { useState } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { GBTILogoMark } from './GBTILogo';
 
 interface LandingPageProps {
@@ -117,6 +118,7 @@ const HUD_NODES = [
 export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
   const [isBuilding, setIsBuilding] = useState(false);
   const [activeHud, setActiveHud] = useState<number | null>(null);
+  const isMobile = useIsMobile();
 
   // Mouse reactive parallax effect using Framer Motion
   const mouseX = useMotionValue(0);
@@ -141,6 +143,7 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
   // Magnetic CTA Button states
   const [btnOffset, setBtnOffset] = useState({ x: 0, y: 0 });
   const handleBtnMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (isMobile) return; // Disable magnetic effect on touch devices
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left - rect.width / 2;
     const y = e.clientY - rect.top - rect.height / 2;
@@ -170,11 +173,11 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
 
   return (
     <div 
-      className="fixed inset-0 z-50 w-full min-h-[100dvh] lg:h-screen overflow-y-auto lg:overflow-hidden bg-[#09090b] text-zinc-100 flex flex-col lg:flex-row font-sans select-none"
+      className="fixed inset-0 z-50 w-full h-screen bg-[#09090b] text-zinc-100 flex flex-col lg:flex-row font-sans select-none"
       onMouseMove={handleMouseMove}
     >
       {/* Left Frosted Glass Side Panel */}
-      <div className="w-full lg:w-[480px] xl:w-[520px] shrink-0 h-auto lg:h-full bg-[#09090b] border-b lg:border-b-0 lg:border-r border-white/5 relative z-20 flex flex-col lg:justify-between gap-10 lg:gap-0 p-6 sm:p-8 lg:p-12 xl:p-14 lg:overflow-y-auto scrollbar-hide">
+      <div className="w-full lg:w-[480px] xl:w-[520px] shrink-0 h-full bg-[#09090b] border-b lg:border-b-0 lg:border-r border-white/5 relative z-20 flex flex-col justify-between p-6 sm:p-8 lg:p-12 xl:p-14 overflow-y-auto scrollbar-hide">
         
         {/* Brand & Sub-brand */}
         <div className="flex items-center gap-3">
@@ -262,10 +265,10 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
             <motion.button
               onClick={handleStart}
               disabled={isBuilding}
-              onMouseMove={handleBtnMouseMove}
-              onMouseLeave={handleBtnMouseLeave}
-              animate={{ x: btnOffset.x, y: btnOffset.y }}
-              transition={{ type: "spring", stiffness: 150, damping: 15 }}
+              onMouseMove={!isMobile ? handleBtnMouseMove : undefined}
+              onMouseLeave={!isMobile ? handleBtnMouseLeave : undefined}
+              animate={!isMobile ? { x: btnOffset.x, y: btnOffset.y } : undefined}
+              transition={!isMobile ? { type: "spring", stiffness: 150, damping: 15 } : undefined}
               className="group relative inline-flex w-full h-14 items-center justify-center gap-3 overflow-hidden rounded-xl bg-white text-xs font-bold text-zinc-950 transition-all duration-500 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] active:scale-[0.98] disabled:scale-100 disabled:opacity-90 mt-2 border border-white/15"
             >
               {isBuilding ? (
@@ -309,7 +312,7 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
       </div>
 
       {/* Right Side Visual Area (Fully displays the house render without sidebar crop) */}
-      <div className="flex-1 min-h-[45vh] lg:min-h-0 lg:h-full relative overflow-hidden bg-[#0c0c0e] z-10 border-t lg:border-t-0 border-white/5">
+      <div className="flex-1 h-[45vh] lg:h-full relative overflow-hidden bg-[#0c0c0e] z-10 border-t lg:border-t-0 border-white/5">
         
         {/* Ambient Vignette Overlay (Local to Right Panel) */}
         <div className="absolute inset-0 z-20 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_45%,rgba(0,0,0,0.5)_100%)]" />

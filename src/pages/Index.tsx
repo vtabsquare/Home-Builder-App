@@ -193,7 +193,7 @@ const IndexInner = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: flowStep === 'configurator' ? 1 : 0 }}
         transition={{ duration: 1, delay: 0.4 }}
-        className="min-h-screen flex flex-col cinematic-bg"
+        className={`min-h-screen flex flex-col cinematic-bg ${flowStep !== 'configurator' ? 'pointer-events-none' : ''}`}
       >
         <div className="cinematic-vignette" />
         
