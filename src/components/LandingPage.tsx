@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
+import { GBTILogoMark } from './GBTILogo';
 
 interface LandingPageProps {
   onStart: () => void;
@@ -94,23 +95,32 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
       <div className="w-full lg:w-[45%] flex flex-col justify-between px-8 py-12 lg:px-16 lg:py-20 relative z-10">
         
         {/* Brand & Sub-brand */}
-        <div>
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="text-[10px] font-bold tracking-[0.3em] uppercase text-zinc-400 mb-2"
-          >
-            GBTI Smart Home Builder
-          </motion.div>
+        <div className="flex items-center gap-3">
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
-            className="text-xs font-semibold tracking-[0.2em] uppercase text-zinc-700"
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            Interactive Architectural Experience
+            <GBTILogoMark size={30} />
           </motion.div>
+          <div>
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="text-[10px] font-bold tracking-[0.3em] uppercase text-zinc-400 mb-0.5"
+            >
+              GBTI Smart Home Builder
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
+              className="text-xs font-semibold tracking-[0.2em] uppercase text-zinc-700"
+            >
+              Interactive Architectural Experience
+            </motion.div>
+          </div>
         </div>
 
         {/* Center Text */}

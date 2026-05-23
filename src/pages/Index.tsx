@@ -14,15 +14,18 @@ import { StepPreview } from '@/components/configurator/steps/StepPreview';
 import { StepLeadCapture } from '@/components/configurator/steps/StepLeadCapture';
 import { LandingPage } from '@/components/LandingPage';
 import { GatePage } from '@/components/GatePage';
+import { StartJourneyPage } from '@/components/StartJourneyPage';
 import { useInactivityReset } from '@/hooks/useInactivityReset';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Maximize2, Minimize2, Sparkles } from 'lucide-react';
 
 const IndexInner = () => {
   const config = useConfig();
   const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts, presetOverrides } = config;
 
-  const [showGate, setShowGate] = useState(true);
-  const [showLanding, setShowLanding] = useState(true);
+  const isMobile = useIsMobile();
+  type AppFlowStep = 'qr' | 'journey' | 'auth' | 'landing' | 'configurator';
+  const [flowStep, setFlowStep] = useState<AppFlowStep>(isMobile ? 'journey' : 'qr');
   const pricing = usePricing();
 
   const cost = useMemo(() => computeCostDynamic(config, pricing), [config, pricing]);
@@ -70,7 +73,7 @@ const IndexInner = () => {
 
   // Prevent body scroll when overlays are active to avoid double scrollbars
   useEffect(() => {
-    if (showLanding || showGate) {
+    if (flowStep !== 'configurator') {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -78,7 +81,7 @@ const IndexInner = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showLanding, showGate]);
+  }, [flowStep]);
 
   // SEO
   useEffect(() => {
@@ -96,8 +99,7 @@ const IndexInner = () => {
 
   useInactivityReset(() => {
     reset();
-    setShowGate(true);
-    setShowLanding(true);
+    setFlowStep(isMobile ? 'journey' : 'qr');
   }, 60000, kioskMode);
 
   const toggleFullscreen = async () => {
@@ -115,7 +117,7 @@ const IndexInner = () => {
       case 0: return <StepHomeType key="0" />;
       case 1: return <StepFeatures key="1" />;
       case 2: return <StepPreview key="2" plan={plan} onChange={setCustomPlan} onResetPlan={() => setCustomPlan(null)} />;
-      case 3: return <StepLeadCapture key="3" cost={cost} />;
+      case 3: return <StepLeadCapture key="3" cost={cost} onReset={() => { reset(); setFlowStep(isMobile ? 'journey' : 'qr'); }} />;
       default: return null;
     }
   };
@@ -123,35 +125,63 @@ const IndexInner = () => {
   return (
     <>
       <AnimatePresence>
-        {showGate && (
+        {flowStep === 'qr' && (
           <motion.div
-            key="gate"
+            key="gate-qr"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.08, filter: "blur(20px)" }}
             transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-0 z-[60]"
           >
-            <GatePage onProceed={() => setShowGate(false)} />
+            <GatePage onProceed={() => setFlowStep('journey')} mode="qr" />
           </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {showLanding && (
+        {flowStep === 'journey' && (
+          <motion.div
+            key="journey"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.05, filter: "blur(14px)" }}
+            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed inset-0 z-[55]"
+          >
+            <StartJourneyPage onProceed={() => setFlowStep('auth')} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {flowStep === 'auth' && (
+          <motion.div
+            key="gate-auth"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.08, filter: "blur(20px)" }}
+            transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed inset-0 z-[50]"
+          >
+            <GatePage onProceed={() => setFlowStep('landing')} mode="auth" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {(flowStep === 'qr' || flowStep === 'journey' || flowStep === 'auth' || flowStep === 'landing') && (
           <motion.div
             key="landing"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.02, filter: "blur(10px)" }}
             transition={{ duration: 0.8, ease: "easeInOut" }}
-            className="fixed inset-0 z-50"
+            className="fixed inset-0 z-[40]"
           >
             <LandingPage 
               onStart={() => {
-                setShowLanding(false);
+                setFlowStep('configurator');
                 config.setStep(0);
               }}
               onExplore={() => {
-                setShowLanding(false);
+                setFlowStep('configurator');
                 config.setStep(2);
               }}
             />
@@ -161,7 +191,7 @@ const IndexInner = () => {
 
       <motion.div 
         initial={{ opacity: 0 }}
-        animate={{ opacity: showLanding ? 0 : 1 }}
+        animate={{ opacity: flowStep === 'configurator' ? 1 : 0 }}
         transition={{ duration: 1, delay: 0.4 }}
         className="min-h-screen flex flex-col cinematic-bg"
       >
@@ -169,7 +199,7 @@ const IndexInner = () => {
         
         <ProgressHeader onReset={() => {
           reset();
-          setShowLanding(true);
+          setFlowStep(isMobile ? 'journey' : 'qr');
         }} />
 
       <main className="flex-1 relative">

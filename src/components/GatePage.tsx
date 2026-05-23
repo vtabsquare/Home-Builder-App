@@ -4,6 +4,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { ArrowRight, Mail, Send, ShieldCheck, Smartphone, User, Phone, Clock } from 'lucide-react';
+import { GBTILogoMark } from './GBTILogo';
 import { useConfig } from '@/store/configurator';
 
 const TIMELINES = ['0–3 months', '3–6 months', '6–12 months', '12+ months'];
@@ -50,9 +51,10 @@ function getDeviceInfo() {
 
 interface GatePageProps {
   onProceed: () => void;
+  mode?: 'qr' | 'auth';
 }
 
-export const GatePage = ({ onProceed }: GatePageProps) => {
+export const GatePage = ({ onProceed, mode = 'qr' }: GatePageProps) => {
   const isMobile = useIsMobile();
   const { setLead } = useConfig();
   const [step, setStep] = useState<'details' | 'otp'>('details');
@@ -63,22 +65,22 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
+  const [showAuth, setShowAuth] = useState(mode === 'auth');
   const [isDismantling, setIsDismantling] = useState(false);
   const [qrUrl, setQrUrl] = useState('');
 
   // Generate QR code URL pointing to current page
   useEffect(() => {
-    const url = window.location.href;
+    const url = 'https://gbti-homebuilder.vtabsquare.com/';
     setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(url)}&bgcolor=0a0a0a&color=ffffff&format=svg`);
   }, []);
 
   const handleContinue = () => {
     setIsDismantling(true);
     setTimeout(() => {
-      setShowAuth(true);
+      onProceed();
       setIsDismantling(false);
-    }, 700); // reduced from 1000 to 700 to match faster animation
+    }, 700);
   };
 
   const handleSkip = () => {
@@ -453,9 +455,9 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.1, duration: 0.5 }}
-                  className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#b8956a] to-[#a07850] flex items-center justify-center text-white font-display font-bold text-2xl mx-auto mb-4 shadow-lg shadow-[#b8956a]/20"
+                  className="mx-auto mb-4 flex items-center justify-center"
                 >
-                  G
+                  <GBTILogoMark size={40} />
                 </motion.div>
                 <motion.h1
                   initial={{ opacity: 0, y: 8 }}
@@ -695,6 +697,8 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
   }
 
   // ── Mobile View: Email + OTP ──────────────────────────────
+  if (mode === 'qr') return null; // Don't render QR view on mobile, Index handles flow
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0a0a] overflow-hidden">
       {/* Background accents */}
@@ -715,9 +719,9 @@ export const GatePage = ({ onProceed }: GatePageProps) => {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.5 }}
-            className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#b8956a] to-[#a07850] flex items-center justify-center text-white font-display font-bold text-xl mx-auto mb-4 shadow-lg shadow-[#b8956a]/20"
+            className="mx-auto mb-4 flex items-center justify-center"
           >
-            G
+            <GBTILogoMark size={34} />
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 8 }}

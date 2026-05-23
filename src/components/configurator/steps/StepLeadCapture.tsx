@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { z } from 'zod';
 import { getBuiltInPresetKey, getElevationLookupKeys, useConfig } from '@/store/configurator';
 import type { ConfigActions, ConfigState } from '@/store/configurator';
@@ -26,6 +26,7 @@ const schema = z.object({
 
 interface Props {
   cost: CostBreakdown;
+  onReset?: () => void;
 }
 
 const generateLeadId = () => {
@@ -169,11 +170,43 @@ const sendBrevoFromFrontend = async ({
   }
 };
 
-export const StepLeadCapture = ({ cost }: Props) => {
+export const StepLeadCapture = ({ cost, onReset }: Props) => {
   const c = useConfig();
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+
+  // ── 10-second auto-reset countdown ──────────────────────
+  const COUNTDOWN_SECONDS = 10;
+  const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const handleFullReset = useCallback(() => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    if (onReset) {
+      onReset();
+    } else {
+      useConfig.getState().reset();
+    }
+  }, [onReset]);
+
+  useEffect(() => {
+    if (!done) return;
+    setCountdown(COUNTDOWN_SECONDS);
+    countdownRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          handleFullReset();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [done, handleFullReset]);
 
   const submit = async () => {
     const parsed = schema.safeParse({ name: c.name, phone: c.phone, email: c.email, timeline: c.timeline });
@@ -339,11 +372,31 @@ export const StepLeadCapture = ({ cost }: Props) => {
               </p>
 
               <button
-                onClick={() => useConfig.getState().reset()}
+                onClick={handleFullReset}
                 className="mt-12 inline-flex items-center gap-3 rounded-full bg-foreground text-background px-10 py-4 text-[10px] font-bold uppercase tracking-[0.3em] transition-all hover:scale-105 active:scale-95"
               >
                 New Configuration <ArrowRight size={14} />
               </button>
+
+              {/* Auto-reset countdown bar */}
+              <div className="mt-8 max-w-xs mx-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">
+                    Returning to start
+                  </span>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 num">
+                    {countdown}s
+                  </span>
+                </div>
+                <div className="w-full h-1 rounded-full bg-border/60 overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full bg-clay"
+                    initial={{ width: '100%' }}
+                    animate={{ width: '0%' }}
+                    transition={{ duration: COUNTDOWN_SECONDS, ease: 'linear' }}
+                  />
+                </div>
+              </div>
             </motion.div>
           ) : (
             <motion.div
