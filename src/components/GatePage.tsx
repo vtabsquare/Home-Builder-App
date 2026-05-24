@@ -283,8 +283,8 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
     );
   }
 
-  // ── Desktop View: QR Code + Continue ──────────────────────
-  if (!isMobile) {
+  // ── QR View: QR Code + Continue ──────────────────────
+  if (mode === 'qr') {
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0a0a] overflow-hidden">
         {/* Background accents */}
@@ -331,7 +331,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.6 }}
-                  className="font-display text-5xl md:text-6xl font-bold text-white tracking-tight mb-3 leading-[1.1]"
+                  className="font-display text-4xl md:text-6xl font-bold text-white tracking-tight mb-3 leading-[1.1]"
                 >
                   Build Your Own
                 </motion.h1>
@@ -339,7 +339,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4, duration: 0.5 }}
-                  className="text-white/35 text-sm mb-10 max-w-sm mx-auto"
+                  className="text-white/35 text-xs md:text-sm mb-10 max-w-sm mx-auto"
                 >
                   Scan the QR code to continue on your mobile device, or proceed directly below
                 </motion.p>
@@ -378,11 +378,11 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                       <img
                         src={qrUrl}
                         alt="Scan to continue on mobile"
-                        className="w-[220px] h-[220px] md:w-[260px] md:h-[260px]"
+                        className="w-[200px] h-[200px] md:w-[260px] md:h-[260px]"
                         style={{ imageRendering: 'pixelated' }}
                       />
                     ) : (
-                      <div className="w-[220px] h-[220px] md:w-[260px] md:h-[260px] flex items-center justify-center">
+                      <div className="w-[200px] h-[200px] md:w-[260px] md:h-[260px] flex items-center justify-center">
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{ repeat: Infinity, ease: 'linear', duration: 1 }}
@@ -698,8 +698,6 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
   }
 
   // ── Mobile View: Email + OTP ──────────────────────────────
-  if (mode === 'qr') return null; // Don't render QR view on mobile, Index handles flow
-
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0a0a] overflow-hidden">
       {/* Background accents */}

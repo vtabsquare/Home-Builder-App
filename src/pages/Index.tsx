@@ -16,16 +16,14 @@ import { LandingPage } from '@/components/LandingPage';
 import { GatePage } from '@/components/GatePage';
 import { StartJourneyPage } from '@/components/StartJourneyPage';
 import { useInactivityReset } from '@/hooks/useInactivityReset';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { Maximize2, Minimize2, Sparkles } from 'lucide-react';
 
 const IndexInner = () => {
   const config = useConfig();
   const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts, presetOverrides } = config;
 
-  const isMobile = useIsMobile();
   type AppFlowStep = 'qr' | 'journey' | 'auth' | 'landing' | 'configurator';
-  const [flowStep, setFlowStep] = useState<AppFlowStep>(isMobile ? 'journey' : 'qr');
+  const [flowStep, setFlowStep] = useState<AppFlowStep>('qr');
   const pricing = usePricing();
 
   const cost = useMemo(() => computeCostDynamic(config, pricing), [config, pricing]);
@@ -99,7 +97,7 @@ const IndexInner = () => {
 
   useInactivityReset(() => {
     reset();
-    setFlowStep(isMobile ? 'journey' : 'qr');
+    setFlowStep('qr');
   }, 60000, kioskMode);
 
   const toggleFullscreen = async () => {
@@ -117,7 +115,7 @@ const IndexInner = () => {
       case 0: return <StepHomeType key="0" />;
       case 1: return <StepFeatures key="1" />;
       case 2: return <StepPreview key="2" plan={plan} onChange={setCustomPlan} onResetPlan={() => setCustomPlan(null)} />;
-      case 3: return <StepLeadCapture key="3" cost={cost} onReset={() => { reset(); setFlowStep(isMobile ? 'journey' : 'qr'); }} />;
+      case 3: return <StepLeadCapture key="3" cost={cost} onReset={() => { reset(); setFlowStep('qr'); }} />;
       default: return null;
     }
   };
@@ -167,7 +165,7 @@ const IndexInner = () => {
       </AnimatePresence>
 
       <AnimatePresence>
-        {(flowStep === 'qr' || flowStep === 'journey' || flowStep === 'auth' || flowStep === 'landing') && (
+        {flowStep === 'landing' && (
           <motion.div
             key="landing"
             initial={{ opacity: 1 }}
@@ -200,7 +198,7 @@ const IndexInner = () => {
         <ProgressHeader
           onReset={() => {
             reset();
-            setFlowStep(isMobile ? 'journey' : 'qr');
+            setFlowStep('qr');
           }}
           onLogoClick={() => {
             reset();
