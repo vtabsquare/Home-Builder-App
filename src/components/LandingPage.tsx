@@ -154,10 +154,14 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
   };
 
   const handleStart = () => {
+    if (isBuilding) return;
     setIsBuilding(true);
+    // On mobile we want immediate navigation to avoid the impression that the
+    // button is unresponsive; desktop keeps the cinematic 1.6s build sequence.
+    const delay = isMobile ? 250 : 1600;
     setTimeout(() => {
       onStart();
-    }, 1600);
+    }, delay);
   };
 
   const renderIcon = (iconName: string, size = 16) => {
@@ -173,8 +177,9 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
 
   return (
     <div 
-      className="fixed inset-0 z-50 w-full min-h-[100dvh] lg:h-screen overflow-y-auto lg:overflow-hidden bg-[#09090b] text-zinc-100 flex flex-col lg:flex-row font-sans select-none"
-      onMouseMove={handleMouseMove}
+      className="fixed inset-0 z-50 w-full min-h-[100dvh] lg:h-screen overflow-y-auto lg:overflow-hidden bg-[#09090b] text-zinc-100 flex flex-col lg:flex-row font-sans lg:select-none"
+      onMouseMove={isMobile ? undefined : handleMouseMove}
+      style={{ touchAction: 'manipulation' }}
     >
       {/* Left Frosted Glass Side Panel */}
       <div className="w-full lg:w-[480px] xl:w-[520px] shrink-0 h-auto lg:h-full bg-[#09090b] border-b lg:border-b-0 lg:border-r border-white/5 relative z-20 flex flex-col lg:justify-between gap-10 lg:gap-0 p-6 sm:p-8 lg:py-12 lg:pr-12 lg:pl-[74px] xl:py-14 xl:pr-14 xl:pl-[80px] lg:overflow-y-auto scrollbar-hide">
