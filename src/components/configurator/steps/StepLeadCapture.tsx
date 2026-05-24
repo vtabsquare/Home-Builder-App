@@ -352,28 +352,28 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="py-12 text-center"
+              className="py-6 sm:py-12 text-center"
             >
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="inline-flex items-center justify-center h-24 w-24 rounded-full bg-soft-section border border-clay/20 text-clay mb-10"
+                className="inline-flex items-center justify-center h-16 w-16 sm:h-24 sm:w-24 rounded-full bg-soft-section border border-clay/20 text-clay mb-10"
               >
                 <CheckCircle2 size={40} strokeWidth={1} />
               </motion.div>
 
-              <h3 className="font-display text-4xl md:text-5xl font-normal tracking-tight text-foreground mb-6">
+              <h3 className="font-display text-2xl sm:text-3xl md:text-5xl font-normal tracking-tight text-foreground mb-6">
                 Proposal secured.
               </h3>
 
-              <p className="text-muted-foreground max-w-md mx-auto text-lg leading-relaxed font-light">
+              <p className="text-muted-foreground max-w-md mx-auto text-base sm:text-lg leading-relaxed font-light">
                 Thank you, <span className="text-foreground font-medium">{c.name.split(' ')[0]}</span>. Your architectural configuration has been received. Our studio will contact you within 24 hours.
               </p>
 
               <button
                 onClick={handleFullReset}
-                className="mt-12 inline-flex items-center gap-3 rounded-full bg-foreground text-background px-10 py-4 text-[10px] font-bold uppercase tracking-[0.3em] transition-all hover:scale-105 active:scale-95"
+                className="mt-12 inline-flex items-center gap-3 rounded-full bg-foreground text-background px-6 py-3 sm:px-10 sm:py-4 text-[10px] font-bold uppercase tracking-[0.3em] transition-all hover:scale-105 active:scale-95"
               >
                 New Configuration <ArrowRight size={14} />
               </button>
@@ -475,7 +475,7 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
                 <button
                   onClick={submit}
                   disabled={submitting}
-                  className="w-full flex items-center justify-center gap-3 rounded-full bg-foreground text-background py-6 font-display font-normal text-xl shadow-elev hover:brightness-110 disabled:opacity-30 transition-all duration-500"
+                  className="w-full flex items-center justify-center gap-3 rounded-full bg-foreground text-background py-4 sm:py-6 font-display font-normal text-base sm:text-xl shadow-elev hover:brightness-110 disabled:opacity-30 transition-all duration-500"
                 >
                   {submitting ? (
                     <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, ease: "linear", duration: 1 }} className="w-6 h-6 border-2 border-background/20 border-t-background rounded-full" />

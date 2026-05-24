@@ -458,7 +458,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                   transition={{ delay: 0.1, duration: 0.5 }}
                   className="mx-auto mb-4 flex items-center justify-center"
                 >
-                  <GBTILogoMark size={40} />
+                  <GBTILogoMark size={100} />
                 </motion.div>
                 <motion.h1
                   initial={{ opacity: 0, y: 8 }}
@@ -634,7 +634,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                           placeholder="000000"
                           maxLength={6}
                           autoFocus
-                          className="w-full text-center text-2xl font-display font-bold tracking-[0.5em] px-4 py-4 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white placeholder:text-white/15 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                          className="w-full text-center text-2xl font-display font-bold tracking-[0.3em] md:tracking-[0.5em] px-4 py-4 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white placeholder:text-white/15 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
                         />
                       </div>
 
@@ -722,7 +722,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
             transition={{ delay: 0.1, duration: 0.5 }}
             className="mx-auto mb-4 flex items-center justify-center"
           >
-            <GBTILogoMark size={34} />
+            <GBTILogoMark size={90} />
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 8 }}
@@ -885,7 +885,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                     placeholder="000000"
                     maxLength={6}
                     autoFocus
-                    className="w-full text-center text-2xl font-display font-bold tracking-[0.5em] px-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white placeholder:text-white/15 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                    className="w-full text-center text-2xl font-display font-bold tracking-[0.3em] md:tracking-[0.5em] px-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white placeholder:text-white/15 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
                   />
                 </div>
 

@@ -72,7 +72,7 @@ export const StepFeatures = () => {
                 <button
                   key={k.id}
                   onClick={() => setKitchen(k.id)}
-                  className={`group relative overflow-hidden rounded-xl p-6 text-left transition-all duration-500 border ${
+                  className={`group relative overflow-hidden rounded-xl p-4 sm:p-6 text-left transition-all duration-500 border ${
                     active 
                       ? 'bg-surface shadow-elev border-clay/30 scale-[1.02]' 
                       : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'
@@ -107,7 +107,7 @@ export const StepFeatures = () => {
                   key={id}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => toggleAddon(id)}
-                  className={`group relative overflow-hidden flex items-center gap-5 rounded-xl p-5 text-left transition-all duration-500 border ${
+                  className={`group relative overflow-hidden flex items-center gap-3 sm:gap-5 rounded-xl p-4 sm:p-5 text-left transition-all duration-500 border ${
                     active 
                       ? 'bg-surface shadow-elev border-clay/30' 
                       : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'
@@ -136,7 +136,7 @@ export const StepFeatures = () => {
 const Stepper = ({
   label, value, onChange, min, max, price, hint, note,
 }: { label: string; value: number; onChange: (n: number) => void; min: number; max: number; price?: number; hint?: string; note?: string }) => (
-  <div className="relative rounded-xl bg-surface border border-border p-6 shadow-soft transition-all hover:shadow-soft group">
+  <div className="relative rounded-xl bg-surface border border-border p-4 sm:p-6 shadow-soft transition-all hover:shadow-soft group">
     <div className="flex items-baseline justify-between mb-5">
       <span className="font-display text-lg tracking-tight text-foreground/80 font-normal">{label}</span>
       <div className="flex items-center gap-3">

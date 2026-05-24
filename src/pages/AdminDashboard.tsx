@@ -155,9 +155,9 @@ const AdminDashboard = () => {
         {/* Logo */}
         <div className="p-5 border-b border-white/10 flex items-center gap-3">
           <img
-            src="/gbti-logo.jpeg"
+            src="/gbti-logo.png"
             alt="GBTI Logo"
-            className="w-9 h-9 rounded-lg object-contain bg-white p-0.5 flex-shrink-0"
+            className={`w-auto object-contain flex-shrink-0 transition-all ${sidebarCollapsed ? 'h-6 max-w-[32px]' : 'h-8 max-w-[140px]'}`}
           />
           <AnimatePresence>
             {!sidebarCollapsed && (

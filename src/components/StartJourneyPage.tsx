@@ -126,18 +126,8 @@ export const StartJourneyPage = ({ onProceed }: StartJourneyPageProps) => {
                   }}
                   transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                 />
-                <GBTILogoMark size={72} animate={logoReady} />
+                <GBTILogoMark size={140} animate={logoReady} />
               </div>
-            </motion.div>
-
-            {/* GBTI wordmark */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.6 }}
-              className="font-display text-2xl font-bold tracking-tight text-white/90 mb-10"
-            >
-              GBTI
             </motion.div>
 
             {/* Thin separator */}

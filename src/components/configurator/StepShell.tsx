@@ -30,7 +30,7 @@ export const StepShell = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      className="flex h-full flex-col relative z-10 pb-32"
+      className="flex h-full flex-col relative z-10 pb-24 md:pb-32"
     >
       <div className="mb-8 md:mb-12">
         <motion.div 
@@ -69,7 +69,7 @@ export const StepShell = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="fixed bottom-6 md:bottom-12 left-0 right-0 z-[200] px-4 pointer-events-none"
+          className="fixed bottom-6 md:bottom-12 pb-[env(safe-area-inset-bottom)] left-0 right-0 z-[200] px-4 pointer-events-none"
         >
           <div className="mx-auto max-w-[1440px] w-full relative flex items-center justify-center min-h-[56px] pointer-events-none gap-4">
             {/* Left-aligned Back button */}
@@ -121,7 +121,7 @@ export const SelectableCard = ({
 }) => (
   <button
     onClick={onClick}
-    className={`group relative w-full overflow-hidden rounded-2xl p-6 text-left transition-all duration-500 border ${
+    className={`group relative w-full overflow-hidden rounded-2xl p-4 md:p-6 text-left transition-all duration-500 border ${
       selected
         ? 'bg-surface shadow-elev border-clay/30 scale-[1.01]'
         : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'

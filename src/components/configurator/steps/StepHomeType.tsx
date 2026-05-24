@@ -104,9 +104,9 @@ export const StepHomeType = () => {
             animate={{ opacity: 1, height: 'auto', y: 0 }}
             exit={{ opacity: 0, height: 0, y: -10 }}
             transition={{ duration: 0.25, ease: 'easeInOut' }}
-            className="overflow-hidden mb-12"
+            className="overflow-hidden mb-6 sm:mb-12"
           >
-            <div className="p-6 rounded-2xl bg-soft-section/40 border border-border/40 shadow-inner">
+            <div className="p-4 sm:p-6 rounded-2xl bg-soft-section/40 border border-border/40 shadow-inner">
               <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-muted-foreground/60 mb-6 text-center font-display">
                 Select Land Footprint
               </div>
@@ -127,13 +127,13 @@ export const StepHomeType = () => {
                       }`}
                     >
                       <div>
-                        <div className={`text-[8px] uppercase tracking-[0.2em] font-bold ${active ? 'text-clay' : 'text-muted-foreground/40'}`}>
+                        <div className={`text-[10px] uppercase tracking-[0.2em] font-bold ${active ? 'text-clay' : 'text-muted-foreground/40'}`}>
                           {tag}
                         </div>
                         <h4 className="font-display text-lg font-normal tracking-tight text-foreground mt-1">
                           {pkg.label}
                         </h4>
-                        <div className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground/60 font-bold mt-1">
+                        <div className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/60 font-bold mt-1">
                           {pkg.baseArea} SQ FT
                         </div>
                         <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed font-light line-clamp-2">
@@ -159,7 +159,7 @@ export const StepHomeType = () => {
                   }`}
                 >
                   <div>
-                    <div className={`text-[8px] uppercase tracking-[0.2em] font-bold ${landSize === 'custom' ? 'text-clay' : 'text-muted-foreground/40'}`}>
+                    <div className={`text-[10px] uppercase tracking-[0.2em] font-bold ${landSize === 'custom' ? 'text-clay' : 'text-muted-foreground/40'}`}>
                       Tailored Size
                     </div>
                     <h4 className="font-display text-lg font-normal tracking-tight text-foreground mt-1">
@@ -200,7 +200,7 @@ export const StepHomeType = () => {
       </AnimatePresence>
 
       {/* Main Home Type cards */}
-      <div className="grid gap-6 md:gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 md:gap-8 sm:grid-cols-2 lg:grid-cols-3">
         {TYPES.map(({ id, tag, desc }, i) => {
           const d = HOME_TYPE_META[id];
           const active = homeType === id;
@@ -215,7 +215,7 @@ export const StepHomeType = () => {
               <SelectableCard selected={active} onClick={() => setHomeType(id)} className="h-full flex flex-col justify-between">
                 <div>
                   <div className={`text-[10px] uppercase tracking-[0.3em] font-bold mb-3 ${active ? 'text-clay' : 'text-muted-foreground/40'}`}>{tag}</div>
-                  <h3 className="font-display text-3xl font-normal tracking-tight text-foreground">{d.label}</h3>
+                  <h3 className="font-display text-xl sm:text-2xl md:text-3xl font-normal tracking-tight text-foreground">{d.label}</h3>
                   <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 num">
                     {d.areaRange[0]}–{d.areaRange[1]} SQ FT · {d.bedrooms} BED
                   </div>

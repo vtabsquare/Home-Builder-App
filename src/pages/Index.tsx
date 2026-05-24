@@ -212,7 +212,7 @@ const IndexInner = () => {
         <div className="mx-auto max-w-[1440px] px-4 sm:px-6 md:px-8 py-4 md:py-6 lg:py-8">
           <div className={`grid gap-8 lg:gap-10 ${[2].includes(step) ? 'max-w-6xl mx-auto w-full' : 'lg:grid-cols-[1fr_400px]'}`}>
             {/* Step content */}
-            <div className="min-h-[60vh]">
+            <div className="min-h-[40vh] md:min-h-[60vh]">
               <AnimatePresence mode="wait">
                 {renderStep()}
               </AnimatePresence>

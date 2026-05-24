@@ -21,7 +21,7 @@ export const CostPanel = ({ cost, compact }: Props) => {
             initial={{ opacity: 0.4, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="font-display text-4xl num leading-none text-foreground tracking-tight font-normal"
+            className="font-display text-2xl sm:text-3xl md:text-4xl num leading-none text-foreground tracking-tight font-normal"
           >
             {formatMoney(cost.total)}
           </motion.div>

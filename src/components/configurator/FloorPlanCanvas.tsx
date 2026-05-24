@@ -345,14 +345,14 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
         if (!room || !item) return null;
 
         return (
-          <div className="absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
+          <div className="absolute left-1/2 top-4 z-10 flex w-[95%] max-w-fit overflow-x-auto whitespace-nowrap scrollbar-hide -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
             <span className="px-3 text-xs font-bold uppercase tracking-wider text-ink">
               {item.type.replace(/_/g, ' ')}
             </span>
             <div className="h-6 w-px bg-border" />
             <button
               onClick={() => handleDeleteFurniture(selectedFurniture.roomId, selectedFurniture.furnitureIndex)}
-              className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-red-600 hover:bg-red-50 transition-all active:scale-95"
+              className="flex shrink-0 h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-red-600 hover:bg-red-50 transition-all active:scale-95"
               title="Delete Asset"
             >
               <Trash2 size={14} className="text-red-500" />
@@ -362,10 +362,10 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
         );
       })()}
       {advanced && selectedRoomId && !selectedFurniture && (
-        <div className="absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
+        <div className="absolute left-1/2 top-4 z-10 flex w-[95%] max-w-fit overflow-x-auto whitespace-nowrap scrollbar-hide -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
           <button
             onClick={() => handleRotateRoom(selectedRoomId)}
-            className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-ink hover:bg-surface transition-all active:scale-95"
+            className="flex shrink-0 h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-ink hover:bg-surface transition-all active:scale-95"
             title="Rotate Room 90°"
           >
             <RotateCw size={14} className="text-clay" />
@@ -374,7 +374,7 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
           <div className="h-6 w-px bg-border" />
           <button
             onClick={() => handleAddDoor(selectedRoomId)}
-            className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-ink hover:bg-surface transition-all active:scale-95"
+            className="flex shrink-0 h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-ink hover:bg-surface transition-all active:scale-95"
             title="Add Door to Room"
           >
             <Plus size={14} className="text-clay" />
@@ -383,7 +383,7 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
           <div className="h-6 w-px bg-border" />
           <button
             onClick={() => handleAddWindow(selectedRoomId)}
-            className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-ink hover:bg-surface transition-all active:scale-95"
+            className="flex shrink-0 h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-ink hover:bg-surface transition-all active:scale-95"
             title="Add Window to Room"
           >
             <Plus size={14} className="text-clay" />
@@ -392,7 +392,7 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
           <div className="h-6 w-px bg-border" />
           <button
             onClick={() => handleRemoveAllWindows(selectedRoomId)}
-            className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-red-500 hover:bg-red-50 transition-all active:scale-95"
+            className="flex shrink-0 h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-red-500 hover:bg-red-50 transition-all active:scale-95"
             title="Remove all windows from this room"
           >
             <Trash2 size={14} className="text-red-400" />
@@ -404,7 +404,7 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
               setIsWallMode(!isWallMode);
               setWallPopup(null);
             }}
-            className={`flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider transition-all active:scale-95 ${
+            className={`flex shrink-0 h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider transition-all active:scale-95 ${
               isWallMode ? 'bg-clay text-white shadow-inner' : 'text-ink hover:bg-surface'
             }`}
             title="Toggle Wall Removal Mode - Click a wall to add/remove it"
@@ -418,7 +418,7 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
           <div className="h-6 w-px bg-border" />
           <button
             onClick={() => handleDeleteRoom(selectedRoomId)}
-            className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-red-600 hover:bg-red-50 transition-all active:scale-95"
+            className="flex shrink-0 h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-red-600 hover:bg-red-50 transition-all active:scale-95"
             title="Delete Room"
           >
             <Trash2 size={14} className="text-red-500" />
@@ -1257,11 +1257,11 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
 
       <div className="absolute bottom-3 right-3 flex flex-col gap-1.5">
         <button onClick={() => setStageScale(Math.min(6, stageScale * 1.25))}
-          className="flex h-8 w-8 items-center justify-center rounded-lg glass-panel text-sm font-bold shadow-sm hover:bg-white/90 transition-colors">+</button>
+          className="flex h-10 w-10 items-center justify-center rounded-lg glass-panel text-sm font-bold shadow-sm hover:bg-white/90 transition-colors">+</button>
         <button onClick={() => setStageScale(Math.max(0.5, stageScale / 1.25))}
-          className="flex h-8 w-8 items-center justify-center rounded-lg glass-panel text-sm font-bold shadow-sm hover:bg-white/90 transition-colors">−</button>
+          className="flex h-10 w-10 items-center justify-center rounded-lg glass-panel text-sm font-bold shadow-sm hover:bg-white/90 transition-colors">−</button>
         <button onClick={() => { setStageScale(1); setStagePos({ x: 0, y: 0 }); }}
-          className="flex h-8 w-8 items-center justify-center rounded-lg glass-panel text-[9px] font-bold shadow-sm hover:bg-white/90 transition-colors">FIT</button>
+          className="flex h-10 w-10 items-center justify-center rounded-lg glass-panel text-[9px] font-bold shadow-sm hover:bg-white/90 transition-colors">FIT</button>
       </div>
 
       {!minimal && !hideZoomHelper && (

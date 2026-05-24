@@ -378,14 +378,14 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-white/80 backdrop-blur-sm">
+      <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide items-center gap-2 px-3 py-2 border-b border-border bg-white/80 backdrop-blur-sm">
         <button
           onClick={() => {
             setIsSelectedAll(!isSelectedAll);
             setSelectedRoomId(null);
             setWallPopup(null);
           }}
-          className={`flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider border transition-all active:scale-95 shadow-sm ${
+          className={`flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider border transition-all active:scale-95 shadow-sm ${
             isSelectedAll
               ? 'bg-clay text-white border-transparent'
               : 'bg-white border-border hover:bg-surface hover:border-clay/40 text-foreground'
@@ -406,7 +406,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
             <button
               key={`${block.type}-${idx}`}
               onClick={() => addRoom(idx)}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider border border-border hover:bg-surface hover:border-clay/40 transition-all active:scale-95 shadow-sm"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider border border-border hover:bg-surface hover:border-clay/40 transition-all active:scale-95 shadow-sm"
               style={{ borderLeftColor: block.color, borderLeftWidth: 3 }}
             >
               <Icon size={12} />
@@ -418,7 +418,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
 
       {/* Action bar for selected room */}
       {selectedRoom && (
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-blue-50/50">
+        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide items-center gap-2 px-3 py-2 border-b border-border bg-blue-50/50">
           <span className="text-[10px] font-bold uppercase tracking-widest text-ink">
             {selectedRoom.label}
           </span>
@@ -428,7 +428,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
           <div className="flex-1" />
           <button
             onClick={() => rotateRoom(selectedRoomId!)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase bg-white border border-border hover:bg-surface transition-all active:scale-95"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase bg-white border border-border hover:bg-surface transition-all active:scale-95"
           >
             <RotateCw size={12} /> Rotate
           </button>
@@ -437,7 +437,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
               setIsWallMode(!isWallMode);
               setWallPopup(null);
             }}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase border transition-all active:scale-95 ${
+            className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase border transition-all active:scale-95 ${
               isWallMode ? 'bg-clay text-white border-transparent' : 'bg-white border-border hover:bg-surface'
             }`}
           >
@@ -445,7 +445,7 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
           </button>
           <button
             onClick={() => deleteRoom(selectedRoomId!)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition-all active:scale-95"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition-all active:scale-95"
           >
             <Trash2 size={12} /> Delete
           </button>
@@ -1095,11 +1095,11 @@ export const CustomEditorCanvas = ({ homeType, onChange, onSave, initialPlan, fl
         {/* Zoom controls */}
         <div className="absolute bottom-3 right-3 flex flex-col gap-1.5">
           <button onClick={() => setStageScale(Math.min(6, stageScale * 1.25))}
-            className="flex h-8 w-8 items-center justify-center rounded-lg glass-panel text-sm font-bold shadow-sm hover:bg-white/90 transition-colors">+</button>
+            className="flex h-10 w-10 items-center justify-center rounded-lg glass-panel text-sm font-bold shadow-sm hover:bg-white/90 transition-colors">+</button>
           <button onClick={() => setStageScale(Math.max(0.5, stageScale / 1.25))}
-            className="flex h-8 w-8 items-center justify-center rounded-lg glass-panel text-sm font-bold shadow-sm hover:bg-white/90 transition-colors">−</button>
+            className="flex h-10 w-10 items-center justify-center rounded-lg glass-panel text-sm font-bold shadow-sm hover:bg-white/90 transition-colors">−</button>
           <button onClick={() => { setStageScale(1); setStagePos({ x: 0, y: 0 }); }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg glass-panel text-[9px] font-bold shadow-sm hover:bg-white/90 transition-colors">FIT</button>
+            className="flex h-10 w-10 items-center justify-center rounded-lg glass-panel text-[9px] font-bold shadow-sm hover:bg-white/90 transition-colors">FIT</button>
         </div>
 
         {/* Status bar */}

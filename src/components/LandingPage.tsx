@@ -177,31 +177,33 @@ export const LandingPage = ({ onStart, onExplore }: LandingPageProps) => {
       onMouseMove={handleMouseMove}
     >
       {/* Left Frosted Glass Side Panel */}
-      <div className="w-full lg:w-[480px] xl:w-[520px] shrink-0 h-auto lg:h-full bg-[#09090b] border-b lg:border-b-0 lg:border-r border-white/5 relative z-20 flex flex-col lg:justify-between gap-10 lg:gap-0 p-6 sm:p-8 lg:p-12 xl:p-14 lg:overflow-y-auto scrollbar-hide">
+      <div className="w-full lg:w-[480px] xl:w-[520px] shrink-0 h-auto lg:h-full bg-[#09090b] border-b lg:border-b-0 lg:border-r border-white/5 relative z-20 flex flex-col lg:justify-between gap-10 lg:gap-0 p-6 sm:p-8 lg:py-12 lg:pr-12 lg:pl-[74px] xl:py-14 xl:pr-14 xl:pl-[80px] lg:overflow-y-auto scrollbar-hide">
         
         {/* Brand & Sub-brand */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-[14px] lg:-ml-[60px]">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            <GBTILogoMark size={36} />
+            <GBTILogoMark size={24} />
           </motion.div>
-          <div>
+          <div className="h-6 w-px bg-white" style={{ opacity: 0.15 }}></div>
+          <div className="flex flex-col justify-center">
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
-              className="text-[10px] font-bold tracking-[0.3em] uppercase text-zinc-300 mb-0.5"
+              className="text-[11px] font-bold tracking-[0.3em] uppercase text-zinc-100 leading-none mb-[3px]"
             >
-              GBTI Smart Home Builder
+              Smart Home Builder
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
-              className="text-[8px] font-semibold tracking-[0.2em] uppercase text-zinc-500"
+              className="font-semibold uppercase text-zinc-400 leading-none"
+              style={{ fontSize: '10px', letterSpacing: '0.28em', opacity: 0.45 }}
             >
               Interactive Architectural Experience
             </motion.div>

@@ -651,7 +651,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   >
                     {advanced ? 'Advanced' : 'Advanced Mode'}
                   </button>
-                  <div className="flex items-center gap-1 border-l border-border pl-3 md:pl-4">
+                  <div className="flex items-center gap-1 sm:border-l sm:border-border sm:pl-3 md:pl-4">
                     <button
                       onClick={exportAsPDF}
                       className="flex items-center justify-center h-10 md:h-11 rounded-xl border border-border bg-white text-muted-foreground px-4 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section hover:text-foreground transition-all active:scale-95"
@@ -1099,12 +1099,12 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   <ElevationCanvas plan={isDoubleStorey ? groundFloorPlan : currentPlan} roof={roof} material={material} addons={addons} activeRoom={activeTab} isDoubleStorey={isDoubleStorey} firstFloorPlan={firstFloorDisplayPlan} hideHelpers={true} activeFloor={activeFloor} interiorMode={!isDoubleStorey && singleStoreyViewMode === 'interior'} garageShutterOpen={garageShutterOpen} />
                 </motion.div>
               ) : (
-                <motion.div key="elevation" className="h-full w-full bg-white p-8 flex flex-col"
+                <motion.div key="elevation" className="h-full w-full bg-white p-4 sm:p-8 flex flex-col"
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
                   
                   {/* Elevation Header with Upload */}
-                  <div className="flex items-center justify-between mb-8">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                     <div>
                       <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground">Elevation Gallery</h3>
                       <p className="text-[10px] text-muted-foreground/60 uppercase tracking-[0.1em] mt-1">Manage architectural visuals for this preset</p>
@@ -1188,7 +1188,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       }
 
                       return (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
                           {images.map((img, idx) => (
                             <div key={idx} className="group relative aspect-[4/3] rounded-2xl overflow-hidden border border-border bg-soft-section shadow-soft transition-all hover:shadow-elev">
                               <img src={img} alt={`Elevation ${idx + 1}`} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
@@ -1232,7 +1232,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             
             {/* Staged indicator */}
             {stagedPlan && !advancedEditorMode && (
-              <div className="pointer-events-none absolute left-8 top-8 flex items-center gap-3 rounded-xl bg-clay/5 border border-clay/20 px-4 py-2.5 shadow-lg backdrop-blur-md">
+              <div className="pointer-events-none absolute left-4 top-4 sm:left-8 sm:top-8 flex items-center gap-3 rounded-xl bg-clay/5 border border-clay/20 px-4 py-2.5 shadow-lg backdrop-blur-md">
                 <div className="h-1.5 w-1.5 rounded-full bg-clay animate-pulse" /> 
                 <span className="text-[10px] font-bold text-clay uppercase tracking-[0.2em]">Unsaved Drafting Changes</span>
               </div>
@@ -1256,7 +1256,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              className="absolute bottom-28 left-1/2 -translate-x-1/2 rounded-full border border-border bg-white/90 backdrop-blur-md px-10 py-4 shadow-elev"
+              className="absolute bottom-20 sm:bottom-28 left-1/2 -translate-x-1/2 rounded-full border border-border bg-white/90 backdrop-blur-md px-6 py-2 sm:px-10 sm:py-4 shadow-elev"
             >
               <span className="font-display text-lg md:text-2xl font-normal tracking-tight text-foreground whitespace-nowrap">
                 {currentTabLabel}
@@ -1269,7 +1269,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             <div className="absolute bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 w-[95%] md:w-[90%] max-w-[640px]">
               <div className="relative flex items-center gap-3">
                 <button onClick={() => scrollTabs('left')}
-                  className="shrink-0 flex h-12 w-12 items-center justify-center rounded-full bg-white/90 backdrop-blur-md border border-border shadow-lg hover:bg-white transition-all hover:scale-105 active:scale-95">
+                  className="shrink-0 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-white/90 backdrop-blur-md border border-border shadow-lg hover:bg-white transition-all hover:scale-105 active:scale-95">
                   <ChevronLeft size={20} className="text-muted-foreground hover:text-foreground" />
                 </button>
 
@@ -1297,7 +1297,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 </div>
 
                 <button onClick={() => scrollTabs('right')}
-                  className="shrink-0 flex h-12 w-12 items-center justify-center rounded-full bg-white/90 backdrop-blur-md border border-border shadow-lg hover:bg-white transition-all hover:scale-105 active:scale-95">
+                  className="shrink-0 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-white/90 backdrop-blur-md border border-border shadow-lg hover:bg-white transition-all hover:scale-105 active:scale-95">
                   <ChevronRight size={20} className="text-muted-foreground hover:text-foreground" />
                 </button>
               </div>

@@ -87,6 +87,12 @@
   }
 }
 
+@media (max-width: 768px) {
+  body {
+    background-attachment: scroll;
+  }
+}
+
 @layer utilities {
   .scrollbar-minimal::-webkit-scrollbar {
     width: 4px;
