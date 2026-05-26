@@ -9,6 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
+import { useQuotationEngine } from '@/hooks/useQuotationEngine';
+import { QuoteSummary } from '@/components/financing/QuoteSummary';
 
 type ConfigStore = ConfigState & ConfigActions;
 
@@ -176,6 +178,8 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
+  const { mortgageEngine, finalQuote } = useQuotationEngine(cost.total, cost.landCost);
+
   // ── 10-second auto-reset countdown ──────────────────────
   const COUNTDOWN_SECONDS = 10;
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
@@ -341,10 +345,10 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
     <StepShell
       eyebrow="Step 05 · Finalization"
       title="Request your proposal."
-      subtitle="Connect with our design team to receive a comprehensive architectural breakdown and structural overview."
+      subtitle="Review your financing options and connect with our design team."
       onPrev={() => useConfig.getState().prev()}
     >
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <AnimatePresence mode="wait">
           {done ? (
             <motion.div
@@ -406,8 +410,16 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
               className="space-y-10"
             >
+              
+              <QuoteSummary quote={finalQuote} mortgageEngine={mortgageEngine} />
+              
+              <div className="pt-8 mt-12 border-t border-border">
+                <h3 className="font-display text-2xl font-normal tracking-tight text-foreground mb-6 text-center">
+                  Get in touch
+                </h3>
+              </div>
 
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
                     Full Name
