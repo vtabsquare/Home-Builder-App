@@ -17,22 +17,22 @@ export function QuoteSummary({ quote, mortgageEngine }: QuoteSummaryProps) {
       
       {/* Top Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-5 bg-black/40 border-white/10 backdrop-blur-md">
-          <p className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-1">Total Property Price</p>
-          <h2 className="text-3xl font-light text-white tracking-tight">{formatMoneyDynamic(quote.totalPropertyPrice)}</h2>
-          <p className="text-xs text-white/40 mt-2">Base + Addons + Land</p>
+        <Card className="p-5 bg-white border-gray-200 shadow-sm rounded-3xl">
+          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Property Price</p>
+          <h2 className="text-3xl font-light text-gray-900 tracking-tight">{formatMoneyDynamic(quote.totalPropertyPrice)}</h2>
+          <p className="text-xs text-gray-400 mt-2">Base + Addons + Land</p>
         </Card>
         
-        <Card className="p-5 bg-black/40 border-white/10 backdrop-blur-md">
-          <p className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-1">Monthly Repayment</p>
-          <h2 className="text-3xl font-semibold text-emerald-400 tracking-tight">{formatMoneyDynamic(quote.monthlyEMI)}</h2>
-          <p className="text-xs text-white/40 mt-2">{quote.tenureYears} Years @ {quote.interestRate.toFixed(2)}% APR</p>
+        <Card className="p-5 bg-white border-gray-200 shadow-sm rounded-3xl">
+          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Monthly Repayment</p>
+          <h2 className="text-3xl font-semibold text-emerald-600 tracking-tight">{formatMoneyDynamic(quote.monthlyEMI)}</h2>
+          <p className="text-xs text-gray-400 mt-2">{quote.tenureYears} Years @ {quote.interestRate.toFixed(2)}% APR</p>
         </Card>
 
-        <Card className="p-5 bg-gradient-to-br from-[#b8956a]/20 to-[#a07850]/5 border-[#b8956a]/30 backdrop-blur-md">
+        <Card className="p-5 bg-[#faf8f5] border-[#b8956a]/20 shadow-sm rounded-3xl">
           <p className="text-sm font-semibold text-[#b8956a] uppercase tracking-wider mb-1">Cash Required Now</p>
-          <h2 className="text-3xl font-semibold text-white tracking-tight">{formatMoneyDynamic(quote.cashRequiredNow)}</h2>
-          <p className="text-xs text-white/50 mt-2">Down Payment + Closing Fees</p>
+          <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">{formatMoneyDynamic(quote.cashRequiredNow)}</h2>
+          <p className="text-xs text-gray-500 mt-2">Down Payment + Closing Fees</p>
         </Card>
       </div>
 

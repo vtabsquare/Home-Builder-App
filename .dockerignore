@@ -1,0 +1,6 @@
+# Exclude local build artifacts and dependencies from the Docker build context
+node_modules
+dist
+.git
+.env*
+.vite

@@ -13,15 +13,15 @@ export function AmortizationTable({ schedule }: { schedule: AmortizationRow[] })
   const years = schedule[schedule.length - 1].month / 12;
 
   return (
-    <div className="bg-black/40 border border-white/10 rounded-xl overflow-hidden backdrop-blur-md">
-      <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
-        <h3 className="font-semibold text-white">Amortization Schedule</h3>
-        <span className="text-xs text-white/50">{years} Years ({schedule.length} Months)</span>
+    <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-sm">
+      <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <h3 className="font-semibold text-gray-900">Amortization Schedule</h3>
+        <span className="text-xs text-gray-500">{years} Years ({schedule.length} Months)</span>
       </div>
       
       <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left text-white/80">
-          <thead className="text-xs text-white/50 uppercase bg-white/5">
+        <table className="w-full text-sm text-left text-gray-700">
+          <thead className="text-xs text-gray-500 uppercase bg-gray-50/50">
             <tr>
               <th className="px-4 py-3">Month</th>
               <th className="px-4 py-3">Payment</th>
@@ -32,12 +32,12 @@ export function AmortizationTable({ schedule }: { schedule: AmortizationRow[] })
           </thead>
           <tbody>
             {displaySchedule.map((row) => (
-              <tr key={row.month} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                <td className="px-4 py-3 text-white/60">{row.month}</td>
+              <tr key={row.month} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 text-gray-600">{row.month}</td>
                 <td className="px-4 py-3 font-mono">{formatMoneyDynamic(row.payment)}</td>
-                <td className="px-4 py-3 font-mono text-emerald-400">{formatMoneyDynamic(row.principalPaid)}</td>
-                <td className="px-4 py-3 font-mono text-rose-400">{formatMoneyDynamic(row.interestPaid)}</td>
-                <td className="px-4 py-3 font-mono text-white">{formatMoneyDynamic(row.remainingBalance)}</td>
+                <td className="px-4 py-3 font-mono text-emerald-600">{formatMoneyDynamic(row.principalPaid)}</td>
+                <td className="px-4 py-3 font-mono text-rose-600">{formatMoneyDynamic(row.interestPaid)}</td>
+                <td className="px-4 py-3 font-mono text-gray-900">{formatMoneyDynamic(row.remainingBalance)}</td>
               </tr>
             ))}
           </tbody>
@@ -47,7 +47,7 @@ export function AmortizationTable({ schedule }: { schedule: AmortizationRow[] })
       {schedule.length > 12 && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full p-3 flex items-center justify-center gap-2 text-xs font-semibold text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+          className="w-full p-3 flex items-center justify-center gap-2 text-xs font-semibold text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors"
         >
           {expanded ? (
             <>Hide Full Schedule <ChevronUp size={14} /></>
