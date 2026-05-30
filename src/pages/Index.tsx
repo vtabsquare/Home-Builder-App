@@ -22,8 +22,8 @@ const IndexInner = () => {
   const config = useConfig();
   const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts, presetOverrides } = config;
 
-  type AppFlowStep = 'qr' | 'journey' | 'auth' | 'landing' | 'configurator';
-  const [flowStep, setFlowStep] = useState<AppFlowStep>('qr');
+  type AppFlowStep = 'journey' | 'auth' | 'landing' | 'configurator';
+  const [flowStep, setFlowStep] = useState<AppFlowStep>('journey');
   const pricing = usePricing();
 
   const cost = useMemo(() => computeCostDynamic(config, pricing), [config, pricing]);
@@ -97,7 +97,7 @@ const IndexInner = () => {
 
   useInactivityReset(() => {
     reset();
-    setFlowStep('qr');
+    setFlowStep('journey');
   }, 60000, kioskMode);
 
   const toggleFullscreen = async () => {
@@ -115,26 +115,13 @@ const IndexInner = () => {
       case 0: return <StepHomeType key="0" />;
       case 1: return <StepFeatures key="1" />;
       case 2: return <StepPreview key="2" plan={plan} onChange={setCustomPlan} onResetPlan={() => setCustomPlan(null)} />;
-      case 3: return <StepLeadCapture key="3" cost={cost} onReset={() => { reset(); setFlowStep('qr'); }} />;
+      case 3: return <StepLeadCapture key="3" cost={cost} onReset={() => { reset(); setFlowStep('journey'); }} />;
       default: return null;
     }
   };
 
   return (
     <>
-      <AnimatePresence>
-        {flowStep === 'qr' && (
-          <motion.div
-            key="gate-qr"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 1.08, filter: "blur(20px)" }}
-            transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 z-[60]"
-          >
-            <GatePage onProceed={() => setFlowStep('journey')} onSkip={() => setFlowStep('landing')} mode="qr" />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {flowStep === 'journey' && (
@@ -145,7 +132,7 @@ const IndexInner = () => {
             transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-0 z-[55]"
           >
-            <StartJourneyPage onProceed={() => setFlowStep('auth')} />
+            <StartJourneyPage onProceed={() => setFlowStep('auth')} onSkip={() => setFlowStep('landing')} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -198,7 +185,7 @@ const IndexInner = () => {
         <ProgressHeader
           onReset={() => {
             reset();
-            setFlowStep('qr');
+            setFlowStep('journey');
           }}
           onLogoClick={() => {
             reset();

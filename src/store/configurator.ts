@@ -126,6 +126,10 @@ export interface ConfigState {
   elevationImages: Record<string, string[]>;
   // Garage shutter state
   garageShutterOpen: boolean;
+  // Finance
+  downPaymentPercent: number;
+  interestRate: number;
+  tenureYears: number;
 }
 
 export interface ConfigActions {
@@ -164,6 +168,9 @@ export interface ConfigActions {
   addElevationImage: (presetKey: string, imageDataUrl: string) => void;
   removeElevationImage: (presetKey: string, index: number) => void;
   setGarageShutterOpen: (v: boolean) => void;
+  setDownPaymentPercent: (v: number) => void;
+  setInterestRate: (v: number) => void;
+  setTenureYears: (v: number) => void;
   reset: () => void;
 }
 
@@ -209,6 +216,9 @@ const initial: ConfigState = {
   presetOverrides: {},
   elevationImages: {},
   garageShutterOpen: false,
+  downPaymentPercent: 10,
+  interestRate: 6.5,
+  tenureYears: 25,
 };
 
 export const useConfig = create<ConfigState & ConfigActions>()(
@@ -454,6 +464,9 @@ export const useConfig = create<ConfigState & ConfigActions>()(
         },
       })),
       setGarageShutterOpen: (v) => set({ garageShutterOpen: v }),
+      setDownPaymentPercent: (v) => set({ downPaymentPercent: v }),
+      setInterestRate: (v) => set({ interestRate: v }),
+      setTenureYears: (v) => set({ tenureYears: v }),
       reset: () => set((state) => ({
         ...initial,
         savedPresets: state.savedPresets,

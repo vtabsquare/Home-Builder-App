@@ -30,17 +30,15 @@ export function usePricing(): PricingConfig {
 /** Utility: build ADDON_META dynamically from current pricing */
 export function useAddonMeta() {
   const p = usePricing();
-  const ADDON_LABELS: Record<AddOn, string> = {
-    solar: 'Solar Panels',
-    carport: 'Carport',
-    water_tank: 'Water Tank',
-    smart_home: 'Generator',
-    fence: 'Perimeter Fence',
-    landscaping: 'Landscaping',
+  const ADDON_LABELS: Record<AddOn, { label: string; cost: number }> = {
+    solar: { label: 'Solar Panels', cost: p.addon_costs.solar },
+    carport: { label: 'Carport', cost: p.addon_costs.carport },
+    water_tank: { label: 'Water Tank', cost: p.addon_costs.water_tank },
+    smart_home: { label: 'Generator', cost: p.addon_costs.smart_home },
+    fence: { label: 'Perimeter Fence/Bridge', cost: p.addon_costs.fence },
+    landscaping: { label: 'Furniture', cost: p.addon_costs.landscaping },
   };
-  return Object.fromEntries(
-    (Object.keys(ADDON_LABELS) as AddOn[]).map((k) => [k, { label: ADDON_LABELS[k], cost: p.addon_costs[k] }])
-  ) as Record<AddOn, { label: string; cost: number }>;
+  return ADDON_LABELS;
 }
 
 export function useKitchenMeta() {

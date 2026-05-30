@@ -7,11 +7,7 @@ import { ArrowRight, Mail, Send, ShieldCheck, Smartphone, User, Phone, Clock } f
 import { GBTILogoMark } from './GBTILogo';
 import { useConfig } from '@/store/configurator';
 
-const TIMELINES = ['0–3 months', '3–6 months', '6–12 months', '12+ months'];
-
-const BREVO_API_KEY = import.meta.env.VITE_BREVO_API_KEY;
-const BREVO_SENDER_EMAIL = import.meta.env.VITE_BREVO_SENDER_EMAIL;
-const BREVO_SENDER_NAME = import.meta.env.VITE_BREVO_SENDER_NAME || 'GBTI Architectural Team';
+// Auth constants removed
 
 // ── Device info helpers ─────────────────────────────────────
 
@@ -58,12 +54,9 @@ interface GatePageProps {
 export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
   const isMobile = useIsMobile();
   const { setLead } = useConfig();
-  const [step, setStep] = useState<'details' | 'otp'>('details');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [timeline, setTimeline] = useState('');
-  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);
   const [showAuth, setShowAuth] = useState(mode === 'auth');
@@ -91,7 +84,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
     }, 700);
   };
 
-  const sendOtp = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || fullName.trim().length < 2) {
       toast.error('Please enter your full name');
@@ -101,135 +94,45 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
       toast.error('Please enter a valid phone number');
       return;
     }
-    if (!email.trim()) {
-      toast.error('Please enter your email address');
-      return;
-    }
-    if (!timeline) {
-      toast.error('Please select a project timeline');
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Please enter a valid email address');
       return;
     }
 
     setLoading(true);
+
+    // Store device/session info and visitor details
+    const info = getDeviceInfo();
     try {
-      const { data, error } = await supabase.rpc('send_visitor_otp', {
+      await supabase.rpc('store_visitor_session', {
         p_email: email.trim(),
+        p_device_type: info.deviceType,
+        p_browser: info.browser,
+        p_os: info.os,
+        p_screen_width: info.screenWidth,
+        p_screen_height: info.screenHeight,
+        p_user_agent: info.userAgent,
+        p_full_name: fullName.trim(),
+        p_phone: phone.trim(),
+        p_project_timeline: null,
       });
-
-      if (error) {
-        toast.error('Failed to send OTP: ' + error.message);
-        setLoading(false);
-        return;
-      }
-
-      // Send OTP via Brevo
-      if (BREVO_API_KEY && BREVO_SENDER_EMAIL && data) {
-        try {
-          await fetch('https://api.brevo.com/v3/smtp/email', {
-            method: 'POST',
-            headers: {
-              accept: 'application/json',
-              'api-key': BREVO_API_KEY,
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify({
-              sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
-              to: [{ email: email.trim() }],
-              replyTo: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
-              subject: 'GBTI Smart Home Builder — Verification Code',
-              htmlContent: `
-                <div style="font-family:Arial,sans-serif;color:#111;line-height:1.6;max-width:560px;margin:0 auto;padding:32px;">
-                  <div style="text-align:center;margin-bottom:24px;">
-                    <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#b8956a,#a07850);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:20px;">G</div>
-                  </div>
-                  <h2 style="text-align:center;margin:0 0 8px;color:#111;font-size:20px;">Verification Code</h2>
-                  <p style="text-align:center;color:#6b7280;margin:0 0 24px;font-size:14px;">Enter this code to access the GBTI Smart Home Builder</p>
-                  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;text-align:center;margin:0 0 24px;">
-                    <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#111;">${data}</span>
-                  </div>
-                  <p style="text-align:center;color:#9ca3af;font-size:12px;margin:0;">This code expires in 10 minutes.</p>
-                  <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;"/>
-                  <p style="text-align:center;font-size:11px;color:#9ca3af;">GBTI Architectural Team</p>
-                </div>
-              `,
-              textContent: `Your GBTI verification code is: ${data}\n\nThis code expires in 10 minutes.\n\n-- GBTI Architectural Team`,
-            }),
-          });
-        } catch {
-          console.error('Brevo email send failed');
-        }
-      }
-
-      toast.success('Verification code sent! Check your email.');
-      setStep('otp');
     } catch {
-      toast.error('Something went wrong. Please try again.');
-    }
-    setLoading(false);
-  };
-
-  const verifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otp.trim() || otp.length !== 6) {
-      toast.error('Please enter the 6-digit code');
-      return;
+      // Non-critical — continue even if session store fails
     }
 
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.rpc('verify_visitor_otp', {
-        p_email: email.trim(),
-        p_otp: otp.trim(),
-      });
+    // Sync to configurator store so proposal page is pre-filled
+    setLead({
+      name: fullName.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      timeline: '',
+    });
 
-      if (error) {
-        toast.error('Verification failed: ' + error.message);
-        setLoading(false);
-        return;
-      }
-
-      if (!data) {
-        toast.error('Invalid or expired code. Please try again.');
-        setLoading(false);
-        return;
-      }
-
-      // Store device/session info and visitor details
-      const info = getDeviceInfo();
-      try {
-        await supabase.rpc('store_visitor_session', {
-          p_email: email.trim(),
-          p_device_type: info.deviceType,
-          p_browser: info.browser,
-          p_os: info.os,
-          p_screen_width: info.screenWidth,
-          p_screen_height: info.screenHeight,
-          p_user_agent: info.userAgent,
-          p_full_name: fullName.trim(),
-          p_phone: phone.trim(),
-          p_project_timeline: timeline || null,
-        });
-      } catch {
-        // Non-critical — continue even if session store fails
-      }
-
-      // Sync to configurator store so proposal page is pre-filled
-      setLead({
-        name: fullName.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        timeline,
-      });
-
-      // Play success animation then proceed
-      setVerified(true);
-      setTimeout(() => {
-        onProceed();
-      }, 2000);
-    } catch {
-      toast.error('Something went wrong. Please try again.');
-    }
-    setLoading(false);
+    // Play success animation then proceed
+    setVerified(true);
+    setTimeout(() => {
+      onProceed();
+    }, 2000);
   };
 
   // ── Success / Verified State ──────────────────────────────
@@ -474,7 +377,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                   transition={{ delay: 0.3, duration: 0.5 }}
                   className="text-white/35 text-sm mt-2"
                 >
-                  {step === 'details' ? 'Enter your details to get started' : 'Enter the code sent to your email'}
+                  Enter your details to get started
                 </motion.p>
               </div>
 
@@ -486,198 +389,101 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                 className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] rounded-2xl p-8 shadow-2xl"
               >
                 <AnimatePresence mode="wait">
-                  {step === 'details' ? (
-                    <motion.form
-                      key="details-step"
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 10 }}
-                      transition={{ duration: 0.3 }}
-                      onSubmit={sendOtp}
-                      className="space-y-4"
-                    >
-                      {/* Name & Phone row */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
-                            Full Name
-                          </label>
-                          <div className="relative">
-                            <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
-                            <input
-                              id="gate-name-desktop"
-                              type="text"
-                              value={fullName}
-                              onChange={(e) => setFullName(e.target.value)}
-                              placeholder="e.g., Alex Morgan"
-                              autoComplete="name"
-                              autoFocus
-                              className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
-                            Phone Number
-                          </label>
-                          <div className="relative">
-                            <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
-                            <input
-                              id="gate-phone-desktop"
-                              type="tel"
-                              value={phone}
-                              onChange={(e) => setPhone(e.target.value)}
-                              placeholder="+1 (555) 000-0000"
-                              autoComplete="tel"
-                              className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Email full-width */}
+                  <motion.form
+                    key="details-step"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    transition={{ duration: 0.3 }}
+                    onSubmit={handleSubmit}
+                    className="space-y-4"
+                  >
+                    {/* Name & Phone row */}
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
-                          Email Address
+                          Full Name
                         </label>
                         <div className="relative">
-                          <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
+                          <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
                           <input
-                            id="gate-email-desktop"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@example.com"
-                            autoComplete="email"
+                            id="gate-name-desktop"
+                            type="text"
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            placeholder="e.g., Alex Morgan"
+                            autoComplete="name"
+                            autoFocus
                             className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
                           />
                         </div>
                       </div>
-
-                      {/* Project Timeline */}
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-3 block text-center">
-                          Project Timeline
-                        </label>
-                        <div className="flex flex-wrap justify-center gap-2">
-                          {TIMELINES.map((t) => (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() => setTimeline(t)}
-                              className={`rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 border ${
-                                timeline === t
-                                  ? 'bg-[#b8956a] border-[#b8956a] text-white shadow-lg shadow-[#b8956a]/20 scale-105'
-                                  : 'bg-white/[0.04] border-white/[0.08] text-white/40 hover:border-white/20 hover:text-white/60'
-                              }`}
-                            >
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <button
-                        id="gate-send-otp-desktop"
-                        type="submit"
-                        disabled={loading || !email.trim() || !fullName.trim() || !phone.trim() || !timeline}
-                        className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl bg-gradient-to-r from-[#b8956a] to-[#a07850] text-white text-sm font-semibold hover:brightness-110 active:scale-[0.98] transition-all duration-300 disabled:opacity-50 shadow-lg shadow-[#b8956a]/20"
-                      >
-                        {loading ? (
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ repeat: Infinity, ease: 'linear', duration: 1 }}
-                            className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full"
-                          />
-                        ) : (
-                          <>
-                            <Send size={15} />
-                            Send Verification Code
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowAuth(false)}
-                        className="w-full text-center text-[11px] text-white/25 hover:text-white/40 transition-colors pt-1"
-                      >
-                        ← Back to QR code
-                      </button>
-                    </motion.form>
-                  ) : (
-                    <motion.form
-                      key="otp-step"
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      transition={{ duration: 0.3 }}
-                      onSubmit={verifyOtp}
-                      className="space-y-5"
-                    >
-                      {/* Email display */}
-                      <div className="bg-white/[0.04] rounded-lg px-4 py-3 flex items-center gap-3">
-                        <Mail size={14} className="text-white/30 flex-shrink-0" />
-                        <span className="text-white/50 text-sm truncate">{email}</span>
-                      </div>
-
-                      {/* OTP Input */}
                       <div>
                         <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
-                          6-Digit Code
+                          Phone Number
                         </label>
+                        <div className="relative">
+                          <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
+                          <input
+                            id="gate-phone-desktop"
+                            type="tel"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            placeholder="+1 (555) 000-0000"
+                            autoComplete="tel"
+                            className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Email full-width */}
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
+                        Email Address
+                      </label>
+                      <div className="relative">
+                        <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
                         <input
-                          id="gate-otp-desktop"
-                          type="text"
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          placeholder="000000"
-                          maxLength={6}
-                          autoFocus
-                          className="w-full text-center text-2xl font-display font-bold tracking-[0.3em] md:tracking-[0.5em] px-4 py-4 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white placeholder:text-white/15 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                          id="gate-email-desktop"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          autoComplete="email"
+                          className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
                         />
                       </div>
+                    </div>
 
-                      <button
-                        id="gate-verify-otp-desktop"
-                        type="submit"
-                        disabled={loading || otp.length !== 6}
-                        className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl bg-gradient-to-r from-[#b8956a] to-[#a07850] text-white text-sm font-semibold hover:brightness-110 active:scale-[0.98] transition-all duration-300 disabled:opacity-50 shadow-lg shadow-[#b8956a]/20"
-                      >
-                        {loading ? (
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ repeat: Infinity, ease: 'linear', duration: 1 }}
-                            className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full"
-                          />
-                        ) : (
-                          <>
-                            <ShieldCheck size={15} />
-                            Verify & Continue
-                          </>
-                        )}
-                      </button>
+                    <button
+                      id="gate-submit-desktop"
+                      type="submit"
+                      disabled={loading || !email.trim() || !fullName.trim() || !phone.trim()}
+                      className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl bg-gradient-to-r from-[#b8956a] to-[#a07850] text-white text-sm font-semibold hover:brightness-110 active:scale-[0.98] transition-all duration-300 disabled:opacity-50 shadow-lg shadow-[#b8956a]/20 mt-2"
+                    >
+                      {loading ? (
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ repeat: Infinity, ease: 'linear', duration: 1 }}
+                          className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full"
+                        />
+                      ) : (
+                        <>
+                          <Send size={15} />
+                          Continue
+                        </>
+                      )}
+                    </button>
 
-                      {/* Resend / Change email */}
-                      <div className="flex items-center justify-between pt-1">
-                        <button
-                          type="button"
-                          onClick={() => { setStep('details'); setOtp(''); }}
-                          className="text-[11px] text-white/25 hover:text-white/40 transition-colors"
-                        >
-                          ← Change details
-                        </button>
-                        <button
-                          type="button"
-                          onClick={sendOtp as any}
-                          disabled={loading}
-                          className="text-[11px] text-[#b8956a]/60 hover:text-[#b8956a] transition-colors disabled:opacity-50"
-                        >
-                          Resend code
-                        </button>
-                      </div>
-                    </motion.form>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setShowAuth(false)}
+                      className="w-full text-center text-[11px] text-white/25 hover:text-white/40 transition-colors pt-1"
+                    >
+                      ← Back to QR code
+                    </button>
+                  </motion.form>
                 </AnimatePresence>
               </motion.div>
 
@@ -736,7 +542,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
             transition={{ delay: 0.3, duration: 0.5 }}
             className="text-white/35 text-sm mt-2"
           >
-            {step === 'details' ? 'Enter your details to get started' : 'Enter the code sent to your email'}
+            Enter your details to get started
           </motion.p>
         </div>
 
@@ -747,187 +553,89 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
           transition={{ delay: 0.25, duration: 0.5 }}
           className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] rounded-2xl p-6 shadow-2xl"
         >
-          <AnimatePresence mode="wait">
-            {step === 'details' ? (
-              <motion.form
-                key="details-step"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                transition={{ duration: 0.3 }}
-                onSubmit={sendOtp}
-                className="space-y-4"
-              >
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
-                    Full Name
-                  </label>
-                  <div className="relative">
-                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
-                    <input
-                      id="gate-name"
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g., Alex Morgan"
-                      autoComplete="name"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
-                    Phone Number
-                  </label>
-                  <div className="relative">
-                    <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
-                    <input
-                      id="gate-phone"
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+1 (555) 000-0000"
-                      autoComplete="tel"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
-                    <input
-                      id="gate-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      autoComplete="email"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-3 block text-center">
-                    Project Timeline
-                  </label>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {TIMELINES.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setTimeline(t)}
-                        className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 border ${
-                          timeline === t
-                            ? 'bg-[#b8956a] border-[#b8956a] text-white shadow-lg shadow-[#b8956a]/20 scale-105'
-                            : 'bg-white/[0.04] border-white/[0.08] text-white/40 hover:border-white/20 hover:text-white/60'
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  id="gate-send-otp"
-                  type="submit"
-                  disabled={loading || !email.trim() || !fullName.trim() || !phone.trim() || !timeline}
-                  className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-gradient-to-r from-[#b8956a] to-[#a07850] text-white text-sm font-semibold hover:brightness-110 active:scale-[0.98] transition-all duration-300 disabled:opacity-50 shadow-lg shadow-[#b8956a]/20"
-                >
-                  {loading ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, ease: 'linear', duration: 1 }}
-                      className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full"
-                    />
-                  ) : (
-                    <>
-                      <Send size={15} />
-                      Send Verification Code
-                    </>
-                  )}
-                </button>
-              </motion.form>
-            ) : (
-              <motion.form
-                key="otp-step"
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                transition={{ duration: 0.3 }}
-                onSubmit={verifyOtp}
-                className="space-y-4"
-              >
-                {/* Email display */}
-                <div className="bg-white/[0.04] rounded-lg px-3 py-2.5 flex items-center gap-2.5">
-                  <Mail size={13} className="text-white/30 flex-shrink-0" />
-                  <span className="text-white/50 text-xs truncate">{email}</span>
-                </div>
-
-                {/* OTP Input */}
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
-                    6-Digit Code
-                  </label>
+            <motion.form
+              key="details-step"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 10 }}
+              transition={{ duration: 0.3 }}
+              onSubmit={handleSubmit}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
                   <input
-                    id="gate-otp"
+                    id="gate-name"
                     type="text"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="000000"
-                    maxLength={6}
-                    autoFocus
-                    className="w-full text-center text-2xl font-display font-bold tracking-[0.3em] md:tracking-[0.5em] px-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white placeholder:text-white/15 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="e.g., Alex Morgan"
+                    autoComplete="name"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
                   />
                 </div>
+              </div>
 
-                <button
-                  id="gate-verify-otp"
-                  type="submit"
-                  disabled={loading || otp.length !== 6}
-                  className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-gradient-to-r from-[#b8956a] to-[#a07850] text-white text-sm font-semibold hover:brightness-110 active:scale-[0.98] transition-all duration-300 disabled:opacity-50 shadow-lg shadow-[#b8956a]/20"
-                >
-                  {loading ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, ease: 'linear', duration: 1 }}
-                      className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full"
-                    />
-                  ) : (
-                    <>
-                      <ShieldCheck size={15} />
-                      Verify & Continue
-                    </>
-                  )}
-                </button>
-
-                {/* Resend / Change email */}
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    type="button"
-                    onClick={() => { setStep('details'); setOtp(''); }}
-                    className="text-[11px] text-white/25 hover:text-white/40 transition-colors"
-                  >
-                    ← Change details
-                  </button>
-                  <button
-                    type="button"
-                    onClick={sendOtp as any}
-                    disabled={loading}
-                    className="text-[11px] text-[#b8956a]/60 hover:text-[#b8956a] transition-colors disabled:opacity-50"
-                  >
-                    Resend code
-                  </button>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
+                  Phone Number
+                </label>
+                <div className="relative">
+                  <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
+                  <input
+                    id="gate-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+1 (555) 000-0000"
+                    autoComplete="tel"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                  />
                 </div>
-              </motion.form>
-            )}
-          </AnimatePresence>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
+                  <input
+                    id="gate-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
+                  />
+                </div>
+              </div>
+
+              <button
+                id="gate-submit"
+                type="submit"
+                disabled={loading || !email.trim() || !fullName.trim() || !phone.trim()}
+                className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-gradient-to-r from-[#b8956a] to-[#a07850] text-white text-sm font-semibold hover:brightness-110 active:scale-[0.98] transition-all duration-300 disabled:opacity-50 shadow-lg shadow-[#b8956a]/20 mt-2"
+              >
+                {loading ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, ease: 'linear', duration: 1 }}
+                    className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full"
+                  />
+                ) : (
+                  <>
+                    <Send size={15} />
+                    Continue
+                  </>
+                )}
+              </button>
+            </motion.form>
         </motion.div>
 
         {/* Footer */}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateEMI, generateAmortizationSchedule, AmortizationRow } from '@/utils/finance';
+import { useConfig } from '@/store/configurator';
 
 export interface MortgageSettings {
   default_interest_rate: number;
@@ -27,10 +28,13 @@ const DEFAULT_SETTINGS: MortgageSettings = {
 export function useMortgageCalculator(totalPropertyPrice: number) {
   const [settings, setSettings] = useState<MortgageSettings>(DEFAULT_SETTINGS);
   
-  // User adjustable states
-  const [interestRate, setInterestRate] = useState<number>(DEFAULT_SETTINGS.default_interest_rate);
-  const [tenureYears, setTenureYears] = useState<number>(DEFAULT_SETTINGS.default_tenure);
-  const [downPaymentPercent, setDownPaymentPercent] = useState<number>(DEFAULT_SETTINGS.min_down_payment_percent);
+  // User adjustable states mapped to global config store
+  const interestRate = useConfig(s => s.interestRate);
+  const setInterestRate = useConfig(s => s.setInterestRate);
+  const tenureYears = useConfig(s => s.tenureYears);
+  const setTenureYears = useConfig(s => s.setTenureYears);
+  const downPaymentPercent = useConfig(s => s.downPaymentPercent);
+  const setDownPaymentPercent = useConfig(s => s.setDownPaymentPercent);
 
   // Fetch admin settings on mount
   useEffect(() => {
@@ -44,9 +48,17 @@ export function useMortgageCalculator(totalPropertyPrice: number) {
         
         if (!error && data) {
           setSettings(data);
-          setInterestRate(data.default_interest_rate);
-          setTenureYears(data.default_tenure);
-          setDownPaymentPercent(data.min_down_payment_percent);
+          // Only update global state if they are currently at their hardcoded defaults
+          const currentStore = useConfig.getState();
+          if (currentStore.interestRate === 6.5) {
+            setInterestRate(data.default_interest_rate);
+          }
+          if (currentStore.tenureYears === 25) {
+            setTenureYears(data.default_tenure);
+          }
+          if (currentStore.downPaymentPercent === 10) {
+            setDownPaymentPercent(data.min_down_payment_percent);
+          }
         }
       } catch (e) {
         console.error('Failed to fetch mortgage settings:', e);

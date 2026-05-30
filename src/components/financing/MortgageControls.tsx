@@ -58,18 +58,7 @@ export function MortgageControls({
             {interestRate.toFixed(2)}%
           </span>
         </div>
-        <Slider
-          min={settings.min_interest_rate}
-          max={settings.max_interest_rate}
-          step={0.1}
-          value={[interestRate]}
-          onValueChange={(val) => setInterestRate(val[0])}
-          className="py-2"
-        />
-        <div className="flex justify-between text-xs text-gray-400">
-          <span>Min {settings.min_interest_rate}%</span>
-          <span>Max {settings.max_interest_rate}%</span>
-        </div>
+        <div className="text-xs text-gray-400">Fixed rate set by administration</div>
       </div>
 
       <div className="space-y-4">

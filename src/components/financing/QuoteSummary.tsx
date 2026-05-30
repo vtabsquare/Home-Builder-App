@@ -3,8 +3,6 @@ import { FinalQuote } from '@/utils/quotation';
 import { formatMoneyDynamic } from '@/hooks/useDynamicPricing';
 import { Card } from '@/components/ui/card';
 import { MortgageControls } from './MortgageControls';
-import { AmortizationTable } from './AmortizationTable';
-import { FeeBreakdown } from './FeeBreakdown';
 
 interface QuoteSummaryProps {
   quote: FinalQuote;
@@ -36,26 +34,17 @@ export function QuoteSummary({ quote, mortgageEngine }: QuoteSummaryProps) {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: Controls and Fees */}
-        <div className="space-y-6">
-          <MortgageControls 
-            settings={mortgageEngine.settings}
-            totalCost={quote.totalPropertyPrice}
-            downPaymentPercent={mortgageEngine.downPaymentPercent}
-            setDownPaymentPercent={mortgageEngine.setDownPaymentPercent}
-            interestRate={mortgageEngine.interestRate}
-            setInterestRate={mortgageEngine.setInterestRate}
-            tenureYears={mortgageEngine.tenureYears}
-            setTenureYears={mortgageEngine.setTenureYears}
-          />
-          <FeeBreakdown fees={quote.fees} />
-        </div>
-
-        {/* Right Column: Amortization Schedule */}
-        <div className="space-y-6">
-          <AmortizationTable schedule={mortgageEngine.amortizationSchedule} />
-        </div>
+      <div className="max-w-2xl mx-auto">
+        <MortgageControls 
+          settings={mortgageEngine.settings}
+          totalCost={quote.totalPropertyPrice}
+          downPaymentPercent={mortgageEngine.downPaymentPercent}
+          setDownPaymentPercent={mortgageEngine.setDownPaymentPercent}
+          interestRate={mortgageEngine.interestRate}
+          setInterestRate={mortgageEngine.setInterestRate}
+          tenureYears={mortgageEngine.tenureYears}
+          setTenureYears={mortgageEngine.setTenureYears}
+        />
       </div>
 
     </div>

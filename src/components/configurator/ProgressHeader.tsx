@@ -4,7 +4,7 @@ import { Check, QrCode, X } from 'lucide-react';
 import { useState } from 'react';
 import { GBTILogoMark } from '../GBTILogo';
 
-const STEPS = ['Home Type', 'Customize', 'Preview', 'Lead'];
+const STEPS = ['Home Type', 'Customize', 'Preview', 'Loan details'];
 
 interface Props {
   onReset?: () => void;

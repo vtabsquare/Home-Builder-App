@@ -12,6 +12,7 @@ import type { AddOn, ConfigState, HomeType, KitchenType } from '@/store/configur
 export interface PricingConfig {
   sqft_rate: number;
   land_sqft_rate: number;
+  flat_land_cost: number;
   bedroom_cost: number;
   bathroom_cost: number;
   home_types: Record<HomeType, { baseCost: number; baseArea: number }>;
@@ -22,6 +23,7 @@ export interface PricingConfig {
 const DEFAULTS: PricingConfig = {
   sqft_rate: 145,
   land_sqft_rate: 75,
+  flat_land_cost: 50000,
   bedroom_cost: 9500,
   bathroom_cost: 6800,
   home_types: {
@@ -45,8 +47,8 @@ const ADDON_LABELS: Record<AddOn, string> = {
   carport: 'Carport',
   water_tank: 'Water Tank',
   smart_home: 'Smart Home Package',
-  fence: 'Perimeter Fence',
-  landscaping: 'Landscaping',
+  fence: 'Perimeter Fence/Bridge',
+  landscaping: 'Furniture',
 };
 
 export const LAND_PACKAGES_STATIC: Record<'small' | 'medium' | 'large', { label: string; range: [number, number]; baseArea: number; description: string }> = {
@@ -68,6 +70,7 @@ export interface CostBreakdown {
   loanAmount: number;
   emi: number;
   items: { label: string; amount: number }[];
+  downPaymentPercent: number;
 }
 
 // ── Merge admin-saved pricing with defaults ─────────────────────────────────
@@ -77,6 +80,7 @@ function mergePricing(saved: any): PricingConfig {
   return {
     sqft_rate: saved.sqft_rate ?? DEFAULTS.sqft_rate,
     land_sqft_rate: saved.land_sqft_rate ?? DEFAULTS.land_sqft_rate,
+    flat_land_cost: saved.flat_land_cost ?? DEFAULTS.flat_land_cost,
     bedroom_cost: saved.bedroom_cost ?? DEFAULTS.bedroom_cost,
     bathroom_cost: saved.bathroom_cost ?? DEFAULTS.bathroom_cost,
     home_types: {
@@ -101,7 +105,8 @@ function computeArea(c: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms'>
 }
 
 export function computeCostDynamic(c: ConfigState, p: PricingConfig, opts: { interestRate?: number; tenureYears?: number } = {}): CostBreakdown {
-  const { interestRate = 0.065, tenureYears = 25 } = opts;
+  const interestRate = c.interestRate / 100;
+  const tenureYears = c.tenureYears;
   const area = computeArea(c, p);
   const includedArea = p.home_types[c.homeType].baseArea;
   const extraArea = Math.max(0, area - includedArea);
@@ -115,12 +120,10 @@ export function computeCostDynamic(c: ConfigState, p: PricingConfig, opts: { int
   const bathroomCost = c.bathrooms * p.bathroom_cost;
   const kitchenCost = p.kitchen_costs[c.kitchen];
   const addonsCost = c.addons.reduce((sum, a) => sum + (p.addon_costs[a] || 0), 0);
-  const landCost = c.land === 'need' && c.landSize
-    ? (c.landSize === 'custom' ? c.customLandArea * p.land_sqft_rate : dynamicLandAreas[c.landSize] * p.land_sqft_rate)
-    : 0;
+  const landCost = c.land === 'need' ? p.flat_land_cost : 0;
 
   const total = Math.round(baseStructure + bedroomCost + bathroomCost + kitchenCost + addonsCost + landCost);
-  const downPayment = Math.round(total * 0.1);
+  const downPayment = Math.round(total * (c.downPaymentPercent / 100));
   const loanAmount = total - downPayment;
 
   const r = interestRate / 12;
@@ -136,7 +139,7 @@ export function computeCostDynamic(c: ConfigState, p: PricingConfig, opts: { int
   ];
   if (landCost) items.push({ label: 'Land package', amount: landCost });
 
-  return { area, baseStructure, bedroomCost, bathroomCost, kitchenCost, addonsCost, landCost, total, downPayment, loanAmount, emi, items };
+  return { area, baseStructure, bedroomCost, bathroomCost, kitchenCost, addonsCost, landCost, total, downPayment, loanAmount, emi, items, downPaymentPercent: c.downPaymentPercent };
 }
 
 // ── React Hook ──────────────────────────────────────────────────────────────

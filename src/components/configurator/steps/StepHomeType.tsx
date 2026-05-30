@@ -56,9 +56,7 @@ export const StepHomeType = () => {
     }
   }, [land, setLand]);
 
-  const canProceed =
-    land === 'own' ||
-    (land === 'need' && landSize !== null && (landSize !== 'custom' || customLandArea > 0));
+  const canProceed = land !== null;
 
   return (
     <StepShell
@@ -96,108 +94,7 @@ export const StepHomeType = () => {
         </button>
       </div>
 
-      {/* Collapsible Plot Size footprints grid */}
-      <AnimatePresence initial={false}>
-        {land === 'need' && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, y: -10 }}
-            animate={{ opacity: 1, height: 'auto', y: 0 }}
-            exit={{ opacity: 0, height: 0, y: -10 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
-            className="overflow-hidden mb-6 sm:mb-12"
-          >
-            <div className="p-4 sm:p-6 rounded-2xl bg-soft-section/40 border border-border/40 shadow-inner">
-              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-muted-foreground/60 mb-6 text-center font-display">
-                Select Land Footprint
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {PACKAGE_IDS.map(({ id, tag }) => {
-                  const pkg = LAND_PACKAGES[id];
-                  const price = pkg.baseArea * LAND_SQFT_RATE;
-                  const active = landSize === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setLandSize(id)}
-                      className={`flex flex-col justify-between p-4 rounded-xl border text-left transition-all duration-300 ${
-                        active
-                          ? 'bg-surface border-clay/40 shadow-soft scale-[1.01]'
-                          : 'bg-surface/40 border-border hover:border-muted-foreground/20 hover:bg-surface'
-                      }`}
-                    >
-                      <div>
-                        <div className={`text-[10px] uppercase tracking-[0.2em] font-bold ${active ? 'text-clay' : 'text-muted-foreground/40'}`}>
-                          {tag}
-                        </div>
-                        <h4 className="font-display text-lg font-normal tracking-tight text-foreground mt-1">
-                          {pkg.label}
-                        </h4>
-                        <div className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/60 font-bold mt-1">
-                          {pkg.baseArea} SQ FT
-                        </div>
-                        <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed font-light line-clamp-2">
-                          {pkg.description}
-                        </p>
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between w-full">
-                        <span className="font-display text-sm font-normal tracking-tight text-foreground">
-                          {formatMoney(price)}
-                        </span>
-                        <MiniHouse active={active} />
-                      </div>
-                    </button>
-                  );
-                })}
-
-                <div
-                  onClick={() => setLandSize('custom')}
-                  className={`flex flex-col justify-between p-4 rounded-xl border text-left transition-all duration-300 cursor-pointer ${
-                    landSize === 'custom'
-                      ? 'bg-surface border-clay/40 shadow-soft scale-[1.01]'
-                      : 'bg-surface/40 border-border hover:border-muted-foreground/20 hover:bg-surface'
-                  }`}
-                >
-                  <div>
-                    <div className={`text-[10px] uppercase tracking-[0.2em] font-bold ${landSize === 'custom' ? 'text-clay' : 'text-muted-foreground/40'}`}>
-                      Tailored Size
-                    </div>
-                    <h4 className="font-display text-lg font-normal tracking-tight text-foreground mt-1">
-                      Custom
-                    </h4>
-                    <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed font-light">
-                      Enter your custom lot size:
-                    </p>
-                    <div className="mt-2 relative" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="number"
-                        min={1}
-                        placeholder="e.g. 2500"
-                        value={customLandArea || ''}
-                        onFocus={() => setLandSize('custom')}
-                        onChange={(e) => {
-                          setLandSize('custom');
-                          setCustomLandArea(Math.max(0, Number(e.target.value)));
-                        }}
-                        className="w-full rounded-lg border border-border bg-soft-section/50 px-3 py-2 text-xs font-medium outline-none focus:ring-1 focus:ring-clay/30 focus:border-clay/30 transition-all pr-12 num text-foreground"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] uppercase tracking-[0.1em] text-muted-foreground/40 font-bold pointer-events-none">
-                        SQ FT
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between w-full">
-                    <span className="font-display text-sm font-normal tracking-tight text-foreground">
-                      {formatMoney((customLandArea || 0) * LAND_SQFT_RATE)}
-                    </span>
-                    <MiniHouse active={landSize === 'custom'} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Collapsible Plot Size footprints grid (REMOVED) */}
 
       {/* Main Home Type cards */}
       <div className="grid gap-4 sm:gap-6 md:gap-8 sm:grid-cols-2 lg:grid-cols-3">

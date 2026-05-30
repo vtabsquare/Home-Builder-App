@@ -26,7 +26,7 @@ interface Lead {
 
 interface PricingConfig {
   sqft_rate: number;
-  land_sqft_rate: number;
+  flat_land_cost: number;
   bedroom_cost: number;
   bathroom_cost: number;
   home_types: {
@@ -51,7 +51,7 @@ interface PricingConfig {
 
 const DEFAULT_PRICING: PricingConfig = {
   sqft_rate: 145,
-  land_sqft_rate: 75,
+  flat_land_cost: 50000,
   bedroom_cost: 9500,
   bathroom_cost: 6800,
   home_types: {
@@ -206,7 +206,7 @@ const AdminDashboard = () => {
         {/* Back to app */}
         <div className="p-3 border-t border-white/10">
           <a
-            href="http://localhost:8080"
+            href={import.meta.env.VITE_MAIN_APP_URL || "http://localhost:8080"}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:text-white/80 hover:bg-white/5 transition-all text-sm"
@@ -856,7 +856,7 @@ const PricingTab = ({ pricing, onSave }: { pricing: PricingConfig; onSave: (p: P
         {/* Base Rates */}
         <PricingCard title="Base Rates" icon={<DollarSign size={16} />}>
           <PriceInput label="Construction Rate (per sqft)" value={local.sqft_rate} onChange={(v) => updateField('sqft_rate', v)} prefix="$" />
-          <PriceInput label="Land Rate (per sqft)" value={local.land_sqft_rate} onChange={(v) => updateField('land_sqft_rate', v)} prefix="$" />
+          <PriceInput label="Flat Land Cost" value={local.flat_land_cost || 0} onChange={(v) => updateField('flat_land_cost', v)} prefix="$" />
           <PriceInput label="Bedroom Cost (per unit)" value={local.bedroom_cost} onChange={(v) => updateField('bedroom_cost', v)} prefix="$" />
           <PriceInput label="Bathroom Cost (per unit)" value={local.bathroom_cost} onChange={(v) => updateField('bathroom_cost', v)} prefix="$" />
         </PricingCard>
@@ -884,8 +884,8 @@ const PricingTab = ({ pricing, onSave }: { pricing: PricingConfig; onSave: (p: P
           <PriceInput label="Carport" value={local.addon_costs.carport} onChange={(v) => updateField('addon_costs.carport', v)} prefix="$" />
           <PriceInput label="Water Tank" value={local.addon_costs.water_tank} onChange={(v) => updateField('addon_costs.water_tank', v)} prefix="$" />
           <PriceInput label="Smart Home Package" value={local.addon_costs.smart_home} onChange={(v) => updateField('addon_costs.smart_home', v)} prefix="$" />
-          <PriceInput label="Perimeter Fence" value={local.addon_costs.fence} onChange={(v) => updateField('addon_costs.fence', v)} prefix="$" />
-          <PriceInput label="Landscaping" value={local.addon_costs.landscaping} onChange={(v) => updateField('addon_costs.landscaping', v)} prefix="$" />
+          <PriceInput label="Perimeter Fence/Bridge" value={local.addon_costs.fence} onChange={(v) => updateField('addon_costs.fence', v)} prefix="$" />
+          <PriceInput label="Furniture" value={local.addon_costs.landscaping} onChange={(v) => updateField('addon_costs.landscaping', v)} prefix="$" />
         </PricingCard>
       </div>
     </TabWrapper>

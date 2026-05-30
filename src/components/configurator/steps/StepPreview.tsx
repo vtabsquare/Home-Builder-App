@@ -676,14 +676,6 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       <Pill key={r.id} active={roof === r.id} onClick={() => setRoof(r.id)}>{r.label}</Pill>
                     ))}
                   </Group>
-                  <Group label="Material">
-                    {MATERIALS.map((m) => (
-                      <Pill key={m.id} active={material === m.id} onClick={() => setMaterial(m.id)}>
-                        <span className="inline-block h-2.5 w-2.5 rounded-full mr-1.5 md:mr-2 align-middle shadow-inner" style={{ background: m.swatch }} />
-                        {m.label}
-                      </Pill>
-                    ))}
-                  </Group>
                 </div>
               )}
             </div>
