@@ -408,98 +408,97 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="space-y-10"
+              className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] gap-8 xl:gap-10 items-start"
             >
-              
               <QuoteSummary quote={finalQuote} mortgageEngine={mortgageEngine} />
-              
-              <div className="pt-8 mt-12 border-t border-border">
-                <h3 className="font-display text-2xl font-normal tracking-tight text-foreground mb-6 text-center">
+
+              <div className="rounded-3xl border border-border bg-surface/70 p-6 sm:p-8 shadow-soft">
+                <h3 className="font-display text-2xl font-normal tracking-tight text-foreground mb-6">
                   Get in touch
                 </h3>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    value={c.name}
-                    onChange={(e) => useConfig.getState().setLead({ ...c, name: e.target.value })}
-                    placeholder="John Doe"
-                    className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
-                  />
-                  {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={c.email}
-                    onChange={(e) => useConfig.getState().setLead({ ...c, email: e.target.value })}
-                    placeholder="you@example.com"
-                    className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
-                  />
-                  {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={c.phone}
-                    onChange={(e) => useConfig.getState().setLead({ ...c, phone: e.target.value })}
-                    placeholder="+1 (555) 000-0000"
-                    className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
-                  />
-                  {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
-                    Project Timeline
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {TIMELINES.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => useConfig.getState().setLead({ ...c, timeline: t })}
-                        className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all border ${
-                          c.timeline === t
-                            ? 'bg-clay border-clay text-white shadow-md'
-                            : 'bg-surface border-border text-muted-foreground hover:border-foreground/20'
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-6">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={c.name}
+                      onChange={(e) => useConfig.getState().setLead({ ...c, name: e.target.value })}
+                      placeholder="John Doe"
+                      className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
+                    />
+                    {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                   </div>
-                  {errors.timeline && <p className="text-red-500 text-xs mt-1">{errors.timeline}</p>}
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={c.email}
+                      onChange={(e) => useConfig.getState().setLead({ ...c, email: e.target.value })}
+                      placeholder="you@example.com"
+                      className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
+                    />
+                    {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={c.phone}
+                      onChange={(e) => useConfig.getState().setLead({ ...c, phone: e.target.value })}
+                      placeholder="+1 (555) 000-0000"
+                      className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
+                    />
+                    {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
+                      Project Timeline
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {TIMELINES.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => useConfig.getState().setLead({ ...c, timeline: t })}
+                          className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all border ${
+                            c.timeline === t
+                              ? 'bg-clay border-clay text-white shadow-md'
+                              : 'bg-surface border-border text-muted-foreground hover:border-foreground/20'
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                    {errors.timeline && <p className="text-red-500 text-xs mt-1">{errors.timeline}</p>}
+                  </div>
                 </div>
-              </div>
 
-              <div className="pt-6">
-                <button
-                  onClick={submit}
-                  disabled={submitting}
-                  className="w-full flex items-center justify-center gap-3 rounded-full bg-foreground text-background py-4 sm:py-6 font-display font-normal text-base sm:text-xl shadow-elev hover:brightness-110 disabled:opacity-30 transition-all duration-500"
-                >
-                  {submitting ? (
-                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, ease: "linear", duration: 1 }} className="w-6 h-6 border-2 border-background/20 border-t-background rounded-full" />
-                  ) : (
-                    <>
-                      Request Proposal · {formatMoney(cost.total)}
-                    </>
-                  )}
-                </button>
-                <p className="mt-8 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 max-w-sm mx-auto leading-loose">
-                  Your architectural configuration will be saved to our private design studio.
-                </p>
+                <div className="pt-6">
+                  <button
+                    onClick={submit}
+                    disabled={submitting}
+                    className="w-full flex items-center justify-center gap-3 rounded-full bg-foreground text-background py-4 sm:py-6 font-display font-normal text-base sm:text-xl shadow-elev hover:brightness-110 disabled:opacity-30 transition-all duration-500"
+                  >
+                    {submitting ? (
+                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, ease: "linear", duration: 1 }} className="w-6 h-6 border-2 border-background/20 border-t-background rounded-full" />
+                    ) : (
+                      <>
+                        Request Proposal · {formatMoney(cost.total)}
+                      </>
+                    )}
+                  </button>
+                  <p className="mt-8 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 max-w-sm mx-auto leading-loose">
+                    Your architectural configuration will be saved to our private design studio.
+                  </p>
+                </div>
               </div>
             </motion.div>
           )}
