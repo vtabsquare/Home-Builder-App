@@ -586,19 +586,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
               {(view === '2d' || view === 'elevation') && !advancedEditorMode && (
                 <div className="inline-flex rounded-xl bg-soft-section/50 p-1 border border-border/50 overflow-x-auto scrollbar-hide">
-                  {[0].map((id) => (
-                    <button
-                      key={id}
-                      onClick={() => setPresetId(id)}
-                      className={`rounded-lg px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-all duration-300 ${
-                        presetId === id
-                          ? 'bg-white text-foreground shadow-sm'
-                          : 'text-muted-foreground/60 hover:text-foreground'
-                      }`}
-                    >
-                      Preset A
-                    </button>
-                  ))}
+
                   {savedPresets.map((savedPresetObj, i) => (
                     <button
                       key={`saved-${i}`}
@@ -619,19 +607,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             <div className="flex flex-wrap items-center gap-3 md:gap-4">
               {view === '2d' && !advancedEditorMode && (
                 <>
-                  {canDoubleStorey && (
-                    <button
-                      onClick={() => setDoubleStorey(!isDoubleStorey)}
-                      className={`flex items-center gap-2 h-11 rounded-xl border border-clay/40 bg-soft-section text-clay px-5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all active:scale-95 ${
-                        isDoubleStorey
-                          ? 'border-clay/40 bg-soft-section text-clay'
-                          : 'border-border bg-white text-muted-foreground hover:bg-soft-section hover:text-foreground'
-                      }`}
-                    >
-                      <Building2 size={14} strokeWidth={1.5} />
-                      {isDoubleStorey ? '2 Storey ✓' : '2 Storey'}
-                    </button>
-                  )}
+
+                  {/*
                   <button
                     onClick={() => setAdvancedEditorMode(true)}
                     className="flex items-center gap-2 h-11 rounded-xl border border-primary/10 bg-primary/5 text-primary px-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary/10 transition-all active:scale-95"
@@ -651,6 +628,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   >
                     {advanced ? 'Advanced' : 'Advanced Mode'}
                   </button>
+                  */}
                   <div className="flex items-center gap-1 sm:border-l sm:border-border sm:pl-3 md:pl-4">
                     <button
                       onClick={exportAsPDF}
@@ -1102,6 +1080,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                       <p className="text-[10px] text-muted-foreground/60 uppercase tracking-[0.1em] mt-1">Manage architectural visuals for this preset</p>
                     </div>
                     
+                    {/*
                     <label className={`flex items-center gap-2 h-10 rounded-xl bg-primary text-white px-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:brightness-110 transition-all active:scale-95 cursor-pointer shadow-lg ${uploadingElevation ? 'opacity-70 pointer-events-none' : ''}`}>
                       <Upload size={14} />
                       {uploadingElevation ? 'Uploading...' : 'Upload Image'}
@@ -1119,6 +1098,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                         }}
                       />
                     </label>
+                    */}
                   </div>
 
                   {/* Gallery Grid */}
@@ -1241,7 +1221,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
             )}
 
           {/* Current room label overlay */}
-          {activeTab !== 'overview' && !advancedEditorMode && (
+          {activeTab !== 'overview' && !advancedEditorMode && view === '3d' && (
             <motion.div
               key={activeTab}
               initial={{ opacity: 0, y: 20 }}
@@ -1257,7 +1237,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
           )}
 
           {/* Room navigation tabs (only for non-editor views) */}
-          {!advancedEditorMode && (
+          {!advancedEditorMode && view === '3d' && (
             <div className="absolute bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 w-[95%] md:w-[90%] max-w-[640px]">
               <div className="relative flex items-center gap-3">
                 <button onClick={() => scrollTabs('left')}
@@ -1331,7 +1311,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
           )}
         </div>
         {/* Swipe hint for mobile */}
-        {!advancedEditorMode && (
+        {!advancedEditorMode && view === '3d' && (
           <p className="text-center text-[10px] font-bold text-muted-foreground/30 uppercase tracking-[0.3em] md:hidden mt-4">
             ← Swipe tabs to navigate rooms →
           </p>

@@ -15,6 +15,7 @@ import { StepLeadCapture } from '@/components/configurator/steps/StepLeadCapture
 import { LandingPage } from '@/components/LandingPage';
 import { GatePage } from '@/components/GatePage';
 import { StartJourneyPage } from '@/components/StartJourneyPage';
+import { ExternalViewerPage } from '@/components/ExternalViewerPage';
 import { useInactivityReset } from '@/hooks/useInactivityReset';
 import { Maximize2, Minimize2, Sparkles } from 'lucide-react';
 
@@ -22,7 +23,7 @@ const IndexInner = () => {
   const config = useConfig();
   const { step, kioskMode, setKioskMode, reset, customPlan, setCustomPlan, isDoubleStorey, customFirstFloorPlan, setCustomFirstFloorPlan, homeType, packageLayouts, presetOverrides } = config;
 
-  type AppFlowStep = 'journey' | 'auth' | 'landing' | 'configurator';
+  type AppFlowStep = 'journey' | 'auth' | 'landing' | 'configurator' | 'external_viewer';
   const [flowStep, setFlowStep] = useState<AppFlowStep>('journey');
   const pricing = usePricing();
 
@@ -168,6 +169,35 @@ const IndexInner = () => {
               onExplore={() => {
                 setFlowStep('configurator');
                 config.setStep(2);
+              }}
+              onTurnkeyBuild={() => {
+                config.setHomeType('turnkey');
+                setFlowStep('external_viewer');
+              }}
+              onYoungProfessionalBuild={() => {
+                config.setHomeType('young_professional');
+                setFlowStep('external_viewer');
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {flowStep === 'external_viewer' && (
+          <motion.div
+            key="external_viewer"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 0.8, ease: "easeInOut" }}
+            className="fixed inset-0 z-[60]"
+          >
+            <ExternalViewerPage 
+              url="https://kuula.co/share/collection/7MwTX?logo=1&info=0&fs=1&vr=1&sd=1&initload=0&thumbs=1"
+              onBack={() => setFlowStep('landing')}
+              onContinue={() => {
+                setFlowStep('configurator');
+                config.setStep(3); // Go straight to loan calculation
               }}
             />
           </motion.div>

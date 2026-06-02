@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 import { useQuotationEngine } from '@/hooks/useQuotationEngine';
 import { QuoteSummary } from '@/components/financing/QuoteSummary';
+import { formatMoneyDynamic } from '@/hooks/useDynamicPricing';
 
 type ConfigStore = ConfigState & ConfigActions;
 
@@ -23,7 +24,7 @@ const schema = z.object({
   name: z.string().trim().min(2, 'Enter your name').max(100),
   phone: z.string().trim().min(6, 'Enter a valid phone').max(30),
   email: z.string().trim().email('Enter a valid email').max(255),
-  timeline: z.string().min(1, 'Select a timeline'),
+  timeline: z.string().optional(),
 });
 
 interface Props {
@@ -215,13 +216,12 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
   const submit = async () => {
     const parsed = schema.safeParse({ name: c.name, phone: c.phone, email: c.email, timeline: c.timeline });
     if (!parsed.success) {
-      const fe: Partial<Record<string, string>> = {};
-      parsed.error.errors.forEach((e) => { fe[e.path[0] as string] = e.message; });
-      setErrors(fe);
+      toast.error('Missing contact details. Please start over.');
       return;
     }
     setErrors({});
     setSubmitting(true);
+    const timelineVal = c.timeline || 'Not specified';
     const presetKey = getBuiltInPresetKey(c, c.presetId);
     const elevationKeyOrder = getElevationLookupKeys(c, c.presetId);
     const elevationVariant = await resolveElevationVariant(c, c.presetId);
@@ -277,7 +277,7 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
         name: c.name.trim(),
         phone: c.phone.trim(),
         email: c.email.trim(),
-        timeline: c.timeline,
+        timeline: timelineVal,
         config,
         total_cost: cost.total,
       });
@@ -294,7 +294,7 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
           name: c.name.trim(),
           email: c.email.trim(),
           leadId,
-          timeline: c.timeline,
+          timeline: timelineVal,
           cost,
           c,
         });
@@ -305,7 +305,7 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
             name: c.name.trim(),
             email: c.email.trim(),
             phone: c.phone.trim(),
-            timeline: c.timeline,
+            timeline: timelineVal,
             estimate: {
               total: cost.total,
               area: cost.area,
@@ -408,97 +408,29 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] gap-8 xl:gap-10 items-start"
+              className="max-w-2xl mx-auto"
             >
               <QuoteSummary quote={finalQuote} mortgageEngine={mortgageEngine} />
-
-              <div className="rounded-3xl border border-border bg-surface/70 p-6 sm:p-8 shadow-soft">
-                <h3 className="font-display text-2xl font-normal tracking-tight text-foreground mb-6">
-                  Get in touch
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-6">
-                  <div>
-                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      value={c.name}
-                      onChange={(e) => useConfig.getState().setLead({ ...c, name: e.target.value })}
-                      placeholder="John Doe"
-                      className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
+              
+              <div className="mt-8 flex justify-center">
+                <button
+                  onClick={submit}
+                  disabled={submitting}
+                  className="w-full py-4 rounded-xl bg-[#b8956a] hover:bg-[#a07850] text-white font-semibold transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ repeat: Infinity, ease: 'linear', duration: 1 }}
+                      className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full"
                     />
-                    {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={c.email}
-                      onChange={(e) => useConfig.getState().setLead({ ...c, email: e.target.value })}
-                      placeholder="you@example.com"
-                      className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
-                    />
-                    {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      value={c.phone}
-                      onChange={(e) => useConfig.getState().setLead({ ...c, phone: e.target.value })}
-                      placeholder="+1 (555) 000-0000"
-                      className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-foreground text-sm outline-none focus:border-clay/50 transition-all"
-                    />
-                    {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2 block">
-                      Project Timeline
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {TIMELINES.map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => useConfig.getState().setLead({ ...c, timeline: t })}
-                          className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all border ${
-                            c.timeline === t
-                              ? 'bg-clay border-clay text-white shadow-md'
-                              : 'bg-surface border-border text-muted-foreground hover:border-foreground/20'
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                    {errors.timeline && <p className="text-red-500 text-xs mt-1">{errors.timeline}</p>}
-                  </div>
-                </div>
-
-                <div className="pt-6">
-                  <button
-                    onClick={submit}
-                    disabled={submitting}
-                    className="w-full flex items-center justify-center gap-3 rounded-full bg-foreground text-background py-4 sm:py-6 font-display font-normal text-base sm:text-xl shadow-elev hover:brightness-110 disabled:opacity-30 transition-all duration-500"
-                  >
-                    {submitting ? (
-                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, ease: "linear", duration: 1 }} className="w-6 h-6 border-2 border-background/20 border-t-background rounded-full" />
-                    ) : (
-                      <>
-                        Request Proposal · {formatMoney(cost.total)}
-                      </>
-                    )}
-                  </button>
-                  <p className="mt-8 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 max-w-sm mx-auto leading-loose">
-                    Your architectural configuration will be saved to our private design studio.
-                  </p>
-                </div>
+                  ) : (
+                    <>
+                      Request Proposal — {formatMoneyDynamic(finalQuote.totalPropertyPrice)}
+                      <ArrowRight size={18} />
+                    </>
+                  )}
+                </button>
               </div>
             </motion.div>
           )}

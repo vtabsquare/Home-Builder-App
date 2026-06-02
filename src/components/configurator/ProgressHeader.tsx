@@ -61,13 +61,7 @@ export const ProgressHeader = ({ onReset, onLogoClick }: Props) => {
               Step <span className="num">{step + 1}</span>/{STEPS.length}
             </div>
             
-            <button
-              onClick={() => setShowQR(true)}
-              className="flex items-center gap-2 rounded-full border border-border px-3 md:px-4 py-1.5 md:py-2 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground hover:bg-soft-section hover:text-foreground transition-all active:scale-[0.98]"
-            >
-              <QrCode size={14} />
-              <span className="hidden xs:inline">QR Code</span>
-            </button>
+
 
             {onReset && (
               <button

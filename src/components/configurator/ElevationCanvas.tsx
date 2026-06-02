@@ -526,7 +526,7 @@ export const ElevationCanvas = ({
     return p;
   }, [plan]);
   const ensuredFirstFloorPlan = useMemo(() => firstFloorPlan ? ensureGarageDoors(firstFloorPlan) : undefined, [firstFloorPlan]);
-  const [showLabels, setShowLabels] = useState(true);
+  const [showLabels, setShowLabels] = useState(false);
 
   const currentFloor = activeFloor ?? 2;
   const hideRoof = isDoubleStorey ? currentFloor !== 2 : interiorMode;

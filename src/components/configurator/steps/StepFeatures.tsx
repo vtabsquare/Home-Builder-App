@@ -20,7 +20,7 @@ const KITCHENS: { id: KitchenType; label: string; desc: string }[] = [
 ];
 
 export const StepFeatures = () => {
-  const { homeType, bedrooms, bathrooms, kitchen, addons, setBedrooms, setBathrooms, setKitchen, toggleAddon, next, prev } = useConfig();
+  const { homeType, bedrooms, bathrooms, kitchen, addons, isDoubleStorey, setDoubleStorey, setBedrooms, setBathrooms, setKitchen, toggleAddon, next, prev } = useConfig();
   const ADDON_META = useAddonMeta();
   const KITCHEN_META = useKitchenMeta();
   const { bedroomCost, bathroomCost } = useRoomPricingMeta();
@@ -36,6 +36,38 @@ export const StepFeatures = () => {
       onPrev={prev}
     >
       <div className="space-y-10">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
+          <div className="mb-4 flex items-baseline justify-between">
+            <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Floor Plan Layout</h3>
+            <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Base</span>
+          </div>
+          <div className="grid gap-4 md:gap-6 sm:grid-cols-2">
+            {[
+              { id: false, label: 'Bungalow', desc: 'Single-storey home design' },
+              { id: true, label: 'Multi-Storey', desc: 'Two or more floors' }
+            ].map((k) => {
+              const active = isDoubleStorey === k.id;
+              return (
+                <button
+                  key={k.label}
+                  onClick={() => setDoubleStorey(k.id)}
+                  className={`group relative overflow-hidden rounded-xl p-4 sm:p-6 text-left transition-all duration-500 border ${
+                    active 
+                      ? 'bg-surface shadow-elev border-clay/30 scale-[1.02]' 
+                      : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'
+                  }`}
+                >
+                  <div className="relative z-10 flex items-center justify-between mb-2">
+                    <span className={`font-display font-medium tracking-tight text-base ${active ? 'text-foreground' : 'text-foreground/80'}`}>{k.label}</span>
+                    {active && <div className="h-1.5 w-1.5 rounded-full bg-clay" />}
+                  </div>
+                  <p className="relative z-10 text-[11px] text-muted-foreground leading-relaxed font-light">{k.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+
         <div className="grid gap-6 md:gap-8 sm:grid-cols-2">
           <Stepper
             label="Bedrooms"

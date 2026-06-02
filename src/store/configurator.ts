@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type LandChoice = 'own' | 'need' | null;
 export type LandSize = 'small' | 'medium' | 'large' | 'custom' | null;
-export type HomeType = 'starter' | 'family' | 'premium';
+export type HomeType = 'starter' | 'family' | 'premium' | 'turnkey' | 'young_professional';
 export type KitchenType = 'standard' | 'open' | 'galley';
 export type AddOn = 'solar' | 'carport' | 'water_tank' | 'smart_home' | 'fence' | 'landscaping';
 export type RoofType = 'gable' | 'flat';
@@ -178,12 +178,16 @@ export const HOME_TYPE_DEFAULTS: Record<HomeType, { bedrooms: number; bathrooms:
   starter: { bedrooms: 2, bathrooms: 1, baseArea: 900, baseCost: 135000, label: 'Starter', areaRange: [800, 1000] },
   family: { bedrooms: 3, bathrooms: 2, baseArea: 1400, baseCost: 245000, label: 'Family', areaRange: [1200, 1600] },
   premium: { bedrooms: 4, bathrooms: 3, baseArea: 2100, baseCost: 410000, label: 'Premium', areaRange: [1800, 2400] },
+  turnkey: { bedrooms: 0, bathrooms: 0, baseArea: 0, baseCost: 350000, label: 'Turn Key', areaRange: [0, 0] },
+  young_professional: { bedrooms: 0, bathrooms: 0, baseArea: 0, baseCost: 180000, label: 'Young Professional', areaRange: [0, 0] },
 };
 
 export const HOME_TYPE_LIMITS: Record<HomeType, { bedrooms: { min: number; max: number }; bathrooms: { min: number; max: number } }> = {
   starter: { bedrooms: { min: 1, max: 2 }, bathrooms: { min: 1, max: 1 } },
   family: { bedrooms: { min: 2, max: 3 }, bathrooms: { min: 2, max: 3 } },
   premium: { bedrooms: { min: 3, max: 4 }, bathrooms: { min: 3, max: 4 } },
+  turnkey: { bedrooms: { min: 0, max: 0 }, bathrooms: { min: 0, max: 0 } },
+  young_professional: { bedrooms: { min: 0, max: 0 }, bathrooms: { min: 0, max: 0 } },
 };
 
 const initial: ConfigState = {
