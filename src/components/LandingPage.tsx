@@ -12,7 +12,7 @@ interface LandingPageProps {
 }
 
 const HouseBlueprintSVG = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-black">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#B89B72]">
     {/* Foundation / Floor line */}
     <motion.path
       d="M2 21H22"
@@ -106,20 +106,12 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
   return (
     <div 
       className="fixed inset-0 z-50 w-full min-h-[100dvh] overflow-hidden bg-[#F8F7F4] text-zinc-900 flex flex-col font-sans select-none relative"
-      onMouseMove={handleMouseMove}
       style={{ touchAction: 'manipulation' }}
     >
       {/* Full-Screen Parallax Blurred Background */}
       <div className="absolute inset-0 z-0 overflow-hidden w-full h-full pointer-events-none">
         <motion.div
-          style={{
-            x: translateX,
-            y: translateY,
-            rotateX: rotateX,
-            rotateY: rotateY,
-            transformPerspective: 1200
-          }}
-          className="w-[110%] h-[110%] -left-[5%] -top-[5%] absolute"
+          className="w-full h-full absolute inset-0"
         >
           <motion.img
             initial={{ scale: 1.05, opacity: 0 }}
@@ -133,11 +125,12 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
             }}
             src="/hero-render.png"
             alt="Luxury Architectural Home"
-            className="w-full h-full object-cover filter blur-[1px] brightness-[0.95] contrast-[1.0] object-center"
+            className="w-full h-full object-cover filter blur-[8px] brightness-[0.9] object-center"
           />
           
-          {/* Gradients and light overlays matching beige UI */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#F8F7F4]/90 via-[#F8F7F4]/30 to-[#F8F7F4]/10 pointer-events-none" />
+          {/* Gradients and light overlays matching dark UI */}
+          <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
           {/* Ambient Lighting Accents */}
           <div className="absolute top-[25%] right-[25%] w-[350px] h-[350px] bg-amber-500/[0.04] rounded-full filter blur-[100px] pointer-events-none animate-ambient-glow-pulse" />
@@ -177,21 +170,21 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
       <div className="relative z-20 w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
         
         {/* Brand & Sub-brand Header */}
-        <div className="flex flex-col items-center mb-8 gap-3">
+        <div className="absolute top-4 right-4 lg:top-8 lg:right-8 flex flex-col items-center gap-2 z-50">
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0, scale: 0.8, x: 20 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
-            className="mb-1"
+            className="bg-black/40 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/5 shadow-xl"
           >
-            <GBTILogoMark size={36} />
+            <GBTILogoMark size={56} />
           </motion.div>
-          <div className="text-center flex flex-col gap-1.5">
+          <div className="text-center flex flex-col gap-1">
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
-              className="text-xs sm:text-sm font-bold tracking-[0.3em] uppercase text-zinc-800 leading-none"
+              className="text-[10px] sm:text-xs font-bold tracking-[0.25em] uppercase text-white leading-none drop-shadow-md"
             >
               Smart Home Builder
             </motion.div>
@@ -199,85 +192,92 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-              className="font-semibold uppercase text-zinc-500 leading-none"
-              style={{ fontSize: '9px', letterSpacing: '0.28em', opacity: 0.7 }}
+              className="font-bold uppercase text-white leading-none drop-shadow-md"
+              style={{ fontSize: '7.5px', letterSpacing: '0.2em', opacity: 0.9 }}
             >
-              Interactive Architectural Experience
+              Powered by Beharry-Amber Technologies
             </motion.div>
           </div>
         </div>
 
-        {/* Vertical Options Rectangle */}
+        {/* Vertical Options Container */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-5xl p-6 sm:p-8 rounded-3xl border border-[#B89B72]/20 shadow-[0_20px_50px_rgba(184,155,114,0.1)] backdrop-blur-xl bg-[#F8F7F4]/70 flex flex-col gap-6 relative overflow-hidden"
+          className="w-full max-w-[95vw] lg:max-w-[1400px] p-2 sm:p-4 flex flex-col gap-8 relative"
         >
-          {/* Subtle top edge highlight */}
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#B89B72]/20 to-transparent" />
-
           <div className="text-center mb-2">
-            <h1 className="text-3xl sm:text-4xl font-display font-light leading-[1.1] tracking-tight text-zinc-900 mb-2">
+            <h1 className="text-3xl sm:text-4xl font-display font-light leading-[1.1] tracking-tight text-white mb-2">
               Design Your Home
             </h1>
             <p className="text-[11px] sm:text-xs text-[#B89B72] font-semibold tracking-widest uppercase">Select an architectural pathway</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 w-full">
             
             {/* 1. Turn Key Build */}
             <motion.button
-              disabled={true} // TODO: TEMPORARY - Remove disabled={true} and pointer-events-none tomorrow to enable clicks
               onClick={onTurnkeyBuild}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="group relative flex flex-col justify-between text-left w-full h-[260px] sm:h-[280px] p-5 rounded-2xl bg-white/80 border border-[#B89B72]/15 transition-all duration-300 shadow-sm hover:shadow-[0_12px_30px_rgba(184,155,114,0.12)] hover:bg-white hover:border-[#B89B72]/40 overflow-hidden pointer-events-none cursor-default"
+              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-black border border-[#B89B72]/15 transition-all duration-300 shadow-lg hover:shadow-[0_12px_30px_rgba(184,155,114,0.3)] hover:border-[#B89B72]/60 overflow-hidden"
             >
-              <div>
-                <div className="text-[#B89B72]/60 group-hover:text-[#B89B72] transition-colors duration-300 font-bold text-lg mb-3">01.</div>
-                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-zinc-800 mb-2 leading-tight group-hover:text-zinc-950 transition-colors">Turn Key<br/>Build</h3>
-                <p className="text-[10px] sm:text-xs text-zinc-500 font-light leading-relaxed group-hover:text-zinc-600 transition-colors">
+              <div className="absolute inset-0 z-0">
+                <img src="/turnkey.png" alt="Turn Key Build" className="w-full h-full object-cover opacity-50 group-hover:opacity-70 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+              </div>
+              <div className="relative z-10">
+                <div className="text-[#B89B72] font-bold text-lg mb-3">01.</div>
+                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-white mb-2 leading-tight">Turn Key<br/>Build</h3>
+                <p className="text-[10px] sm:text-xs text-zinc-300 font-light leading-relaxed">
                   Experience pre-designed luxury homes with automated smart features included.
                 </p>
               </div>
-              <div className="flex justify-end w-full">
-                 <ArrowRight className="text-[#B89B72]/60 group-hover:text-[#B89B72] group-hover:translate-x-2 transition-all duration-300" size={20} />
+              <div className="flex justify-end w-full relative z-10">
+                 <ArrowRight className="text-[#B89B72] group-hover:translate-x-2 transition-all duration-300" size={20} />
               </div>
             </motion.button>
 
             {/* 2. Young Professional Build */}
             <motion.button
-              disabled={true} // TODO: TEMPORARY - Remove disabled={true} and pointer-events-none tomorrow to enable clicks
               onClick={onYoungProfessionalBuild}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="group relative flex flex-col justify-between text-left w-full h-[260px] sm:h-[280px] p-5 rounded-2xl bg-white/80 border border-[#B89B72]/15 transition-all duration-300 shadow-sm hover:shadow-[0_12px_30px_rgba(184,155,114,0.12)] hover:bg-white hover:border-[#B89B72]/40 overflow-hidden pointer-events-none cursor-default"
+              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-black border border-[#B89B72]/15 transition-all duration-300 shadow-lg hover:shadow-[0_12px_30px_rgba(184,155,114,0.3)] hover:border-[#B89B72]/60 overflow-hidden"
             >
-              <div>
-                <div className="text-[#B89B72]/60 group-hover:text-[#B89B72] transition-colors duration-300 font-bold text-lg mb-3">02.</div>
-                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-zinc-800 mb-2 leading-tight group-hover:text-zinc-950 transition-colors">Young<br/>Professional</h3>
-                <p className="text-[10px] sm:text-xs text-zinc-500 font-light leading-relaxed group-hover:text-zinc-600 transition-colors">
+              <div className="absolute inset-0 z-0">
+                <img src="/young_professional.png" alt="Young Professional" className="w-full h-full object-cover opacity-50 group-hover:opacity-70 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+              </div>
+              <div className="relative z-10">
+                <div className="text-[#B89B72] font-bold text-lg mb-3">02.</div>
+                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-white mb-2 leading-tight">Young<br/>Professional</h3>
+                <p className="text-[10px] sm:text-xs text-zinc-300 font-light leading-relaxed">
                   Modern, efficient, and tailored architectural designs for the ambitious professional.
                 </p>
               </div>
-              <div className="flex justify-end w-full">
-                 <ArrowRight className="text-[#B89B72]/60 group-hover:text-[#B89B72] group-hover:translate-x-2 transition-all duration-300" size={20} />
+              <div className="flex justify-end w-full relative z-10">
+                 <ArrowRight className="text-[#B89B72] group-hover:translate-x-2 transition-all duration-300" size={20} />
               </div>
             </motion.button>
 
             {/* 3. Private Purchase */}
             <div
-              className="group relative flex flex-col justify-between text-left w-full h-[260px] sm:h-[280px] p-5 rounded-2xl bg-white/30 border border-[#B89B72]/10 opacity-75 transition-all duration-300 shadow-sm overflow-hidden cursor-not-allowed"
+              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-black border border-[#B89B72]/10 opacity-75 transition-all duration-300 shadow-lg overflow-hidden cursor-not-allowed"
             >
-              <div>
-                <div className="text-zinc-400 font-bold text-lg mb-3">03.</div>
-                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-zinc-400 mb-2 leading-tight">Private<br/>Purchase</h3>
+              <div className="absolute inset-0 z-0">
+                <img src="/private_purchase.png" alt="Private Purchase" className="w-full h-full object-cover opacity-30 transition-opacity duration-500 grayscale" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent" />
+              </div>
+              <div className="relative z-10">
+                <div className="text-[#B89B72]/60 font-bold text-lg mb-3">03.</div>
+                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-zinc-300 mb-2 leading-tight">Private<br/>Purchase</h3>
                 <p className="text-[10px] sm:text-xs text-zinc-400 font-light leading-relaxed">
                   Exclusive, confidential acquisitions and bespoke developments.
                 </p>
               </div>
-              <div className="flex items-center justify-between w-full font-sans">
+              <div className="flex items-center justify-between w-full font-sans relative z-10">
                  <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#B89B72]/40 animate-pulse" />
                   <span className="text-[9px] font-bold uppercase tracking-widest text-[#B89B72]/60">Soon</span>
@@ -291,21 +291,25 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
               disabled={isBuilding}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="group relative flex flex-col justify-between text-left w-full h-[260px] sm:h-[280px] p-5 rounded-2xl bg-white/80 border border-[#B89B72]/15 transition-all duration-300 shadow-sm hover:shadow-[0_12px_30px_rgba(184,155,114,0.12)] hover:bg-white hover:border-[#B89B72]/40 overflow-hidden"
+              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-black border border-[#B89B72]/15 transition-all duration-300 shadow-lg hover:shadow-[0_12px_30px_rgba(184,155,114,0.3)] hover:border-[#B89B72]/60 overflow-hidden"
             >
-              <div>
-                <div className="text-[#B89B72]/60 group-hover:text-[#B89B72] transition-colors duration-300 font-bold text-lg mb-3">04.</div>
-                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-zinc-800 mb-2 leading-tight group-hover:text-zinc-950 transition-colors">Build<br/>Your Own</h3>
-                <p className="text-[10px] sm:text-xs text-zinc-500 font-light leading-relaxed group-hover:text-zinc-600 transition-colors">
+              <div className="absolute inset-0 z-0">
+                <img src="/build_your_own.png" alt="Build Your Own" className="w-full h-full object-cover opacity-50 group-hover:opacity-70 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+              </div>
+              <div className="relative z-10">
+                <div className="text-[#B89B72] font-bold text-lg mb-3">04.</div>
+                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-white mb-2 leading-tight">Build<br/>Your Own</h3>
+                <p className="text-[10px] sm:text-xs text-zinc-300 font-light leading-relaxed">
                   Fully customize layouts, explore real-time floor plans, and configure smart home features.
                 </p>
               </div>
-              <div className="flex justify-end w-full">
-                 <ArrowRight className="text-[#B89B72]/60 group-hover:text-[#B89B72] group-hover:translate-x-2 transition-all duration-300" size={20} />
+              <div className="flex justify-end w-full relative z-10">
+                 <ArrowRight className="text-[#B89B72] group-hover:translate-x-2 transition-all duration-300" size={20} />
               </div>
 
               {isBuilding && (
-                <div className="absolute inset-0 bg-[#F8F7F4]/95 backdrop-blur-md flex flex-col items-center justify-center z-20 gap-3">
+                <div className="absolute inset-0 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center z-20 gap-3">
                   <HouseBlueprintSVG />
                   <span className="font-bold tracking-widest uppercase text-[#B89B72] animate-pulse text-xs text-center">Constructing...</span>
                 </div>
@@ -318,7 +322,7 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
             <div className="pt-2 flex justify-center border-t border-[#B89B72]/10 mt-1">
               <button
                 onClick={onExplore}
-                className="text-center py-2 text-[9px] sm:text-[10px] font-bold tracking-[0.25em] uppercase text-zinc-400 hover:text-zinc-600 transition-colors duration-300"
+                className="text-center py-2 text-[9px] sm:text-[10px] font-bold tracking-[0.25em] uppercase text-zinc-400 hover:text-white transition-colors duration-300"
               >
                 Direct Architectural Overview
               </button>

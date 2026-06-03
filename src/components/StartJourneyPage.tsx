@@ -118,29 +118,39 @@ export const StartJourneyPage = ({ onProceed, onSkip }: StartJourneyPageProps) =
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="relative z-10 flex flex-col items-center text-center px-6"
           >
-            {/* Logo mark — animated on mount */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.6, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ duration: 1, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-              className="mb-8"
-            >
-              {/* Glowing ring behind logo */}
-              <div className="relative">
-                <motion.div
-                  className="absolute -inset-6 rounded-full"
-                  style={{
-                    background: 'radial-gradient(circle, rgba(0,161,179,0.12) 0%, transparent 70%)',
-                  }}
-                  animate={{
-                    scale: [1, 1.15, 1],
-                    opacity: [0.6, 1, 0.6],
-                  }}
-                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                />
-                <GBTILogoMark size={140} animate={logoReady} />
-              </div>
-            </motion.div>
+            {/* Logo mark and powered by text */}
+            <div className="flex flex-col items-center mb-8 gap-5 relative z-10">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.6, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 1, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              >
+                {/* Glowing ring behind logo */}
+                <div className="relative">
+                  <motion.div
+                    className="absolute -inset-6 rounded-full"
+                    style={{
+                      background: 'radial-gradient(circle, rgba(0,161,179,0.12) 0%, transparent 70%)',
+                    }}
+                    animate={{
+                      scale: [1, 1.15, 1],
+                      opacity: [0.6, 1, 0.6],
+                    }}
+                    transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                  <GBTILogoMark size={140} animate={logoReady} />
+                </div>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+                className="font-bold uppercase text-white leading-none drop-shadow-md text-center"
+                style={{ fontSize: '10px', letterSpacing: '0.25em', opacity: 0.9 }}
+              >
+                Powered by Beharry-Amber Technologies
+              </motion.div>
+            </div>
 
             {/* Thin separator */}
             <motion.div
