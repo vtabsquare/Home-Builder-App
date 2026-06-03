@@ -221,11 +221,11 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
               onClick={onTurnkeyBuild}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-black border border-[#B89B72]/15 transition-all duration-300 shadow-lg hover:shadow-[0_12px_30px_rgba(184,155,114,0.3)] hover:border-[#B89B72]/60 overflow-hidden"
+              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-zinc-800/40 backdrop-blur-md border border-[#B89B72] transition-all duration-300 shadow-lg hover:shadow-[0_0_30px_rgba(184,155,114,0.4)] hover:border-white/40 overflow-hidden"
             >
               <div className="absolute inset-0 z-0">
-                <img src="/turnkey.png" alt="Turn Key Build" className="w-full h-full object-cover opacity-50 group-hover:opacity-70 transition-opacity duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+                <img src="/turnkey.png" alt="Turn Key Build" className="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-black/60" />
               </div>
               <div className="relative z-10">
                 <div className="text-[#B89B72] font-bold text-lg mb-3">01.</div>
@@ -244,11 +244,11 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
               onClick={onYoungProfessionalBuild}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-black border border-[#B89B72]/15 transition-all duration-300 shadow-lg hover:shadow-[0_12px_30px_rgba(184,155,114,0.3)] hover:border-[#B89B72]/60 overflow-hidden"
+              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-zinc-800/40 backdrop-blur-md border border-[#B89B72] transition-all duration-300 shadow-lg hover:shadow-[0_0_30px_rgba(184,155,114,0.4)] hover:border-white/40 overflow-hidden"
             >
               <div className="absolute inset-0 z-0">
-                <img src="/young_professional.png" alt="Young Professional" className="w-full h-full object-cover opacity-50 group-hover:opacity-70 transition-opacity duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+                <img src="/young_professional.png" alt="Young Professional" className="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-black/60" />
               </div>
               <div className="relative z-10">
                 <div className="text-[#B89B72] font-bold text-lg mb-3">02.</div>
@@ -264,11 +264,11 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
 
             {/* 3. Private Purchase */}
             <div
-              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-black border border-[#B89B72]/10 opacity-75 transition-all duration-300 shadow-lg overflow-hidden cursor-not-allowed"
+              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-zinc-800/40 backdrop-blur-md border border-[#B89B72]/60 opacity-75 transition-all duration-300 shadow-lg overflow-hidden cursor-not-allowed"
             >
               <div className="absolute inset-0 z-0">
-                <img src="/private_purchase.png" alt="Private Purchase" className="w-full h-full object-cover opacity-30 transition-opacity duration-500 grayscale" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent" />
+                <img src="/private_purchase.png" alt="Private Purchase" className="w-full h-full object-cover opacity-60 transition-opacity duration-500 grayscale" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/30 to-black/60" />
               </div>
               <div className="relative z-10">
                 <div className="text-[#B89B72]/60 font-bold text-lg mb-3">03.</div>
@@ -291,11 +291,11 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
               disabled={isBuilding}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-black border border-[#B89B72]/15 transition-all duration-300 shadow-lg hover:shadow-[0_12px_30px_rgba(184,155,114,0.3)] hover:border-[#B89B72]/60 overflow-hidden"
+              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-zinc-800/40 backdrop-blur-md border border-[#B89B72] transition-all duration-300 shadow-lg hover:shadow-[0_0_30px_rgba(184,155,114,0.4)] hover:border-white/40 overflow-hidden"
             >
               <div className="absolute inset-0 z-0">
-                <img src="/build_your_own.png" alt="Build Your Own" className="w-full h-full object-cover opacity-50 group-hover:opacity-70 transition-opacity duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+                <img src="/build_your_own.png" alt="Build Your Own" className="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-black/60" />
               </div>
               <div className="relative z-10">
                 <div className="text-[#B89B72] font-bold text-lg mb-3">04.</div>
