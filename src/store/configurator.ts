@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 export type LandChoice = 'own' | 'need' | null;
 export type LandSize = 'small' | 'medium' | 'large' | 'custom' | null;
 export type HomeType = 'starter' | 'family' | 'premium' | 'turnkey' | 'young_professional';
+export type FinishingQuality = 'standard' | 'premium';
 export type KitchenType = 'standard' | 'open' | 'galley';
 export type AddOn = 'solar' | 'carport' | 'water_tank' | 'smart_home' | 'fence' | 'landscaping';
 export type RoofType = 'gable' | 'flat';
@@ -101,6 +102,8 @@ export interface ConfigState {
   addons: AddOn[];
   roof: RoofType;
   material: Material;
+  // Finishing quality
+  finishingQuality: FinishingQuality;
   // Lead
   name: string;
   phone: string;
@@ -145,6 +148,7 @@ export interface ConfigActions {
   setKitchen: (k: KitchenType) => void;
   toggleAddon: (a: AddOn) => void;
   setRoof: (r: RoofType) => void;
+  setFinishingQuality: (q: FinishingQuality) => void;
   setMaterial: (m: Material) => void;
   setLead: (p: Partial<Pick<ConfigState, 'name' | 'phone' | 'email' | 'timeline'>>) => void;
   setKioskMode: (v: boolean) => void;
@@ -201,6 +205,7 @@ const initial: ConfigState = {
   kitchen: 'open',
   addons: [],
   roof: 'gable',
+  finishingQuality: 'standard' as FinishingQuality,
   material: 'modern',
   name: '',
   phone: '',
@@ -271,6 +276,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
         };
       }),
       setRoof: (roof) => set({ roof }),
+      setFinishingQuality: (finishingQuality) => set({ finishingQuality }),
       setMaterial: (material) => set({ material }),
       setLead: (p) => set((s) => ({ ...s, ...p })),
       setKioskMode: (kioskMode) => set({ kioskMode }),

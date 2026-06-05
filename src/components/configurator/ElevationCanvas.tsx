@@ -127,8 +127,17 @@ const CameraController = ({ activeRoom, plan, firstFloorPlan, activeFloor, isDou
       animProgress.current = 0; 
 
       if (!activeRoom || activeRoom === 'overview' || activeRoom === 'garden') {
-        targetPos.current.set(45, 25 + levelY, 45);
-        targetLookAt.current.set(0, levelY, 0);
+        const door = findMainDoorWorld(plan);
+        if (door) {
+          const dist = Math.max(55, Math.max(plan.width || 40, plan.height || 40) * 1.4);
+          const offsetX = door.nz !== 0 ? dist * 0.7 : 0;
+          const offsetZ = door.nx !== 0 ? dist * 0.7 : 0;
+          targetPos.current.set(door.nx * dist + offsetX, 25 + levelY, door.nz * dist + offsetZ);
+          targetLookAt.current.set(0, levelY, 0);
+        } else {
+          targetPos.current.set(55, 35 + levelY, 55);
+          targetLookAt.current.set(0, levelY, 0);
+        }
       } else {
         const rs = (currentPlan.rooms || []).filter(r => roomMatchesActiveTab(r, activeRoom));
         if (rs.length > 0) {
@@ -578,10 +587,12 @@ export const ElevationCanvas = ({
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-2xl bg-gradient-to-b from-[hsl(210,35%,22%)] to-[hsl(210,30%,12%)]">
-      <Canvas
-        shadows="soft"
+      <div className="absolute inset-0 w-full h-full">
+        <Canvas
+          shadows="soft"
+          style={{ width: '100%', height: '100%', display: 'block' }}
         camera={{
-          position: [22, 24, 22],
+          position: [60, 40, 60],
           fov: 38,
           near: 0.1,
           far: 1000
@@ -651,6 +662,7 @@ export const ElevationCanvas = ({
 
         </Suspense>
       </Canvas>
+      </div>
       {!hideHelpers && (
         <div className="pointer-events-none absolute left-4 top-4 rounded-xl glass-panel px-3 py-2 text-[9px] font-display font-semibold uppercase tracking-[0.2em]">
           {interiorMode && !isDoubleStorey ? 'Interior mode · Drag to rotate · Scroll to zoom · Drag right button to pan' : activeRoom && activeRoom !== 'overview' ? 'Drag to rotate · Scroll to zoom · Free camera' : 'Drag to rotate · Scroll to zoom'}

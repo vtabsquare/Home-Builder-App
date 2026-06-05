@@ -105,12 +105,13 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const apiKey = Deno.env.get('BREVO_API_KEY');
-    const senderEmail = Deno.env.get('BREVO_SENDER_EMAIL');
-    const senderName = Deno.env.get('BREVO_SENDER_NAME') || 'GBTI Architectural Team';
+    const apiKey = Deno.env.get('INFOBIP_API_KEY');
+    const baseUrl = Deno.env.get('INFOBIP_BASE_URL');
+    const senderEmail = Deno.env.get('INFOBIP_SENDER_EMAIL');
+    const senderName = Deno.env.get('INFOBIP_SENDER_NAME') || 'GBTI Architectural Team';
 
-    if (!apiKey || !senderEmail) {
-      return new Response(JSON.stringify({ error: 'Missing Brevo configuration' }), {
+    if (!apiKey || !baseUrl || !senderEmail) {
+      return new Response(JSON.stringify({ error: 'Missing Infobip configuration' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -139,43 +140,30 @@ Deno.serve(async (req: Request) => {
       `Reference ID: ${payload.leadId}`,
     ].join('\n');
 
-    const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+    const form = new FormData();
+    form.append('from', `${senderName} <${senderEmail}>`);
+    form.append('to', `${payload.name} <${payload.email}>`);
+    form.append('subject', 'Your GBTI proposal request and estimate');
+    form.append('html', htmlContent);
+    form.append('text', textContent);
+
+    const infobipResponse = await fetch(`${baseUrl}/email/3/send`, {
       method: 'POST',
       headers: {
-        accept: 'application/json',
-        'api-key': apiKey,
-        'content-type': 'application/json',
+        Authorization: `App ${apiKey}`,
       },
-      body: JSON.stringify({
-        sender: {
-          email: senderEmail,
-          name: senderName,
-        },
-        to: [
-          {
-            email: payload.email,
-            name: payload.name,
-          },
-        ],
-        replyTo: {
-          email: senderEmail,
-          name: senderName,
-        },
-        subject: 'Your GBTI proposal request and estimate',
-        htmlContent,
-        textContent,
-      }),
+      body: form,
     });
 
-    if (!brevoResponse.ok) {
-      const errorText = await brevoResponse.text();
-      return new Response(JSON.stringify({ error: errorText || 'Brevo request failed' }), {
+    if (!infobipResponse.ok) {
+      const errorText = await infobipResponse.text();
+      return new Response(JSON.stringify({ error: errorText || 'Infobip request failed' }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const result = await brevoResponse.json();
+    const result = await infobipResponse.json();
     return new Response(JSON.stringify({ ok: true, result }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

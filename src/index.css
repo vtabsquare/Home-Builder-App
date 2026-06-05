@@ -65,6 +65,10 @@
   * {
     @apply border-border;
   }
+  html {
+    /* 90% zoom on desktop for comfortable viewing */
+    zoom: 0.9;
+  }
   html, body, #root {
     height: 100%;
   }
@@ -88,6 +92,9 @@
 }
 
 @media (max-width: 768px) {
+  html {
+    zoom: 1; /* Reset zoom on mobile — let the device handle scaling */
+  }
   body {
     background-attachment: scroll;
   }
@@ -189,3 +196,8 @@
   }
 }
 
+
+canvas {
+  width: 100% !important;
+  height: 100% !important;
+}

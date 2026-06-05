@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -13,332 +13,268 @@ interface LandingPageProps {
 
 const HouseBlueprintSVG = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#B89B72]">
-    {/* Foundation / Floor line */}
-    <motion.path
-      d="M2 21H22"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      initial={{ pathLength: 0 }}
-      animate={{ pathLength: 1 }}
-      transition={{ duration: 0.3 }}
-    />
-    {/* Walls */}
-    <motion.path
-      d="M4 21V11H20V21"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      initial={{ pathLength: 0 }}
-      animate={{ pathLength: 1 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
-    />
-    {/* Roof */}
-    <motion.path
-      d="M2 11L12 3L22 11"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      initial={{ pathLength: 0 }}
-      animate={{ pathLength: 1 }}
-      transition={{ duration: 0.4, delay: 0.6 }}
-    />
-    {/* Door */}
-    <motion.path
-      d="M10 21V15H14V21"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      initial={{ pathLength: 0 }}
-      animate={{ pathLength: 1 }}
-      transition={{ duration: 0.3, delay: 0.9 }}
-    />
-    {/* Window */}
-    <motion.path
-      d="M9 7H15"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      initial={{ pathLength: 0 }}
-      animate={{ pathLength: 1 }}
-      transition={{ duration: 0.2, delay: 1.1 }}
-    />
+    <motion.path d="M2 21H22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.3 }} />
+    <motion.path d="M4 21V11H20V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.5, delay: 0.2 }} />
+    <motion.path d="M2 11L12 3L22 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4, delay: 0.6 }} />
+    <motion.path d="M10 21V15H14V21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+      initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.3, delay: 0.9 }} />
   </svg>
 );
 
+/* ── Individual card ───────────────────────────────────────── */
+interface CardProps {
+  num: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  img: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  soon?: boolean;
+  loading?: boolean;
+}
+
+const Card = ({ num, title, subtitle, description, img, onClick, disabled, soon, loading }: CardProps) => (
+  <motion.button
+    onClick={onClick}
+    disabled={disabled || soon}
+    whileHover={!disabled && !soon ? { scale: 1.02 } : {}}
+    whileTap={!disabled && !soon ? { scale: 0.98 } : {}}
+    className={`group relative flex flex-col justify-between text-left w-full
+      h-[190px] sm:h-[420px] lg:h-[480px] xl:h-[540px]
+      p-3 sm:p-5 lg:p-6
+      rounded-2xl sm:rounded-3xl
+      bg-zinc-800/40 backdrop-blur-md
+      border transition-all duration-300 shadow-lg overflow-hidden
+      ${soon
+        ? 'border-[#B89B72]/40 opacity-70 cursor-not-allowed'
+        : 'border-[#B89B72] hover:shadow-[0_0_30px_rgba(184,155,114,0.35)] hover:border-white/40'
+      }`}
+  >
+    {/* Background image */}
+    <div className="absolute inset-0 z-0">
+      <img
+        src={img}
+        alt={title}
+        className={`w-full h-full object-cover transition-opacity duration-500
+          ${soon ? 'opacity-50 grayscale' : 'opacity-80 group-hover:opacity-100'}`}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/10 to-black/65" />
+    </div>
+
+    {/* Top content */}
+    <div className="relative z-10">
+      <div className={`font-bold text-sm sm:text-lg mb-1 sm:mb-3 ${soon ? 'text-[#B89B72]/50' : 'text-[#B89B72]'}`}>
+        {num}
+      </div>
+      <h3 className={`text-[11px] sm:text-base lg:text-lg font-bold tracking-widest uppercase leading-tight mb-1 sm:mb-2
+        ${soon ? 'text-zinc-400' : 'text-white'}`}>
+        {title}<br />{subtitle}
+      </h3>
+      <p className="hidden sm:block text-[10px] sm:text-xs text-zinc-300 font-light leading-relaxed">
+        {description}
+      </p>
+    </div>
+
+    {/* Bottom row */}
+    <div className="relative z-10 flex items-center justify-between w-full">
+      {soon ? (
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#B89B72]/40 animate-pulse" />
+          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-[#B89B72]/60">Soon</span>
+        </div>
+      ) : (
+        <ArrowRight
+          className="text-[#B89B72] group-hover:translate-x-1 transition-transform duration-300 ml-auto"
+          size={16}
+        />
+      )}
+    </div>
+
+    {/* Loading overlay */}
+    {loading && (
+      <div className="absolute inset-0 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center z-20 gap-3">
+        <HouseBlueprintSVG />
+        <span className="font-bold tracking-widest uppercase text-[#B89B72] animate-pulse text-xs text-center">
+          Constructing...
+        </span>
+      </div>
+    )}
+  </motion.button>
+);
+
+/* ── Main Component ────────────────────────────────────────── */
 export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfessionalBuild }: LandingPageProps) => {
   const [isBuilding, setIsBuilding] = useState(false);
   const isMobile = useIsMobile();
-
-  // Mouse reactive parallax effect using Framer Motion
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  const springConfig = { damping: 30, stiffness: 90 };
-  const rotateX = useSpring(useTransform(mouseY, [-400, 400], [1.5, -1.5]), springConfig);
-  const rotateY = useSpring(useTransform(mouseX, [-400, 400], [-1.5, 1.5]), springConfig);
-  const translateX = useSpring(useTransform(mouseX, [-400, 400], [-12, 12]), springConfig);
-  const translateY = useSpring(useTransform(mouseY, [-400, 400], [-12, 12]), springConfig);
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isMobile) return;
-    const { clientX, clientY } = e;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const x = clientX - width / 2;
-    const y = clientY - height / 2;
-    mouseX.set(x);
-    mouseY.set(y);
-  };
 
   const handleStart = () => {
     if (isBuilding) return;
     setIsBuilding(true);
     const delay = isMobile ? 250 : 1600;
-    setTimeout(() => {
-      onStart();
-    }, delay);
+    setTimeout(() => onStart(), delay);
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-50 w-full min-h-[100dvh] overflow-hidden bg-[#F8F7F4] text-zinc-900 flex flex-col font-sans select-none relative"
-      style={{ touchAction: 'manipulation' }}
+    <div
+      className="fixed inset-0 z-50 w-full overflow-x-hidden overflow-y-auto font-sans select-none"
+      style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
     >
-      {/* Full-Screen Parallax Blurred Background */}
-      <div className="absolute inset-0 z-0 overflow-hidden w-full h-full pointer-events-none">
-        <motion.div
-          className="w-full h-full absolute inset-0"
-        >
-          <motion.img
-            initial={{ scale: 1.05, opacity: 0 }}
-            animate={{ 
-              scale: isBuilding ? 1.02 : 1.05,
-              opacity: 1 
-            }}
-            transition={{ 
-              scale: { duration: isBuilding ? 1.6 : 30, ease: "easeOut" },
-              opacity: { duration: 1.2 }
-            }}
-            src="/hero-render.png"
-            alt="Luxury Architectural Home"
-            className="w-full h-full object-cover filter blur-[8px] brightness-[0.9] object-center"
-          />
-          
-          {/* Gradients and light overlays matching dark UI */}
-          <div className="absolute inset-0 bg-black/30 pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
-
-          {/* Ambient Lighting Accents */}
-          <div className="absolute top-[25%] right-[25%] w-[350px] h-[350px] bg-amber-500/[0.04] rounded-full filter blur-[100px] pointer-events-none animate-ambient-glow-pulse" />
-          <div className="absolute bottom-[25%] left-[15%] w-[400px] h-[400px] bg-cyan-500/[0.03] rounded-full filter blur-[120px] pointer-events-none animate-ambient-glow-pulse" style={{ animationDelay: '-4s' }} />
-
-          {/* Dotted micro architectural grid overlay */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'40\' height=\'40\' viewBox=\'0 0 40 40\' xmlns=\'svg\'%3E%3Cpath d=\'M39 0h1v1h-1V0zM0 39h1v1H0v-1z\' fill=\'%23b89b72\' fill-opacity=\'0.06\' fill-rule=\'evenodd\'/%3E%3C/svg%3E')] pointer-events-none" />
-        </motion.div>
+      {/* ── Background ─────────────────────────────────────── */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <motion.img
+          initial={{ scale: 1.06, opacity: 0 }}
+          animate={{ scale: isBuilding ? 1.02 : 1.06, opacity: 1 }}
+          transition={{
+            scale: { duration: isBuilding ? 1.6 : 30, ease: 'easeOut' },
+            opacity: { duration: 1.2 },
+          }}
+          src="/hero-render.png"
+          alt="Luxury Home"
+          className="w-full h-full object-cover blur-[8px] brightness-90 object-center"
+        />
+        <div className="absolute inset-0 bg-black/35" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
+        {/* ambient glows */}
+        <div className="absolute top-[20%] right-[20%] w-[300px] h-[300px] bg-amber-500/[0.04] rounded-full blur-[100px]" />
+        <div className="absolute bottom-[20%] left-[10%] w-[350px] h-[350px] bg-cyan-500/[0.03] rounded-full blur-[120px]" />
       </div>
 
-      {/* Blueprint Grid Scanner (Active during transition) */}
+      {/* Blueprint scanner */}
       <AnimatePresence>
         {isBuilding && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.12 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="absolute inset-0 z-10 bg-[linear-gradient(to_right,rgba(184,155,114,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(184,155,114,0.15)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none"
+            initial={{ opacity: 0 }} animate={{ opacity: 0.12 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-10 bg-[linear-gradient(to_right,rgba(184,155,114,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(184,155,114,0.15)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isBuilding && (
+          <motion.div
+            initial={{ top: '-5%' }} animate={{ top: '105%' }}
+            transition={{ duration: 1.5, ease: 'easeInOut' }}
+            className="fixed left-0 right-0 h-1.5 bg-[#B89B72]/80 shadow-[0_0_20px_#B89B72,0_0_40px_#B89B72] z-20 pointer-events-none"
           />
         )}
       </AnimatePresence>
 
-      {/* Laser scanner sweeping line */}
-      <AnimatePresence>
-        {isBuilding && (
-          <motion.div
-            initial={{ top: "-5%" }}
-            animate={{ top: "105%" }}
-            transition={{ duration: 1.5, ease: "easeInOut" }}
-            className="absolute left-0 right-0 h-1.5 bg-[#B89B72]/80 shadow-[0_0_20px_#B89B72,0_0_40px_#B89B72] z-25 pointer-events-none"
-          />
-        )}
-      </AnimatePresence>
+      {/* ── Scrollable content ─────────────────────────────── */}
+      <div className="relative z-20 min-h-[100dvh] w-full flex flex-col">
 
-      {/* Central Interactive Menu Container */}
-      <div className="relative z-20 w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
-        
-        {/* Brand & Sub-brand Header */}
-        <div className="absolute top-4 right-4 lg:top-8 lg:right-8 flex flex-col items-center gap-2 z-50">
+        {/* ── Top bar ──────────────────────────────────────── */}
+        <div className="flex items-start justify-between px-3 pt-3 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8">
+          {/* Title (left) */}
+          <motion.div
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="flex flex-col"
+          >
+            <h1 className="text-xl sm:text-3xl lg:text-4xl font-display font-light tracking-tight text-white leading-[1.1]">
+              Design Your Home
+            </h1>
+            <p className="text-[8px] sm:text-[10px] text-[#B89B72] font-semibold tracking-[0.2em] uppercase mt-1">
+              Select an architectural pathway
+            </p>
+          </motion.div>
+
+          {/* GBTI logo (right) */}
           <motion.div
             initial={{ opacity: 0, scale: 0.8, x: 20 }}
             animate={{ opacity: 1, scale: 1, x: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="bg-black/40 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/5 shadow-xl"
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="flex flex-col items-center gap-1 flex-shrink-0 ml-3"
           >
-            <GBTILogoMark size={56} />
-          </motion.div>
-          <div className="text-center flex flex-col gap-1">
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
-              className="text-[10px] sm:text-xs font-bold tracking-[0.25em] uppercase text-white leading-none drop-shadow-md"
-            >
+            <div className="bg-black/45 backdrop-blur-md px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl border border-white/5 shadow-xl">
+              <GBTILogoMark size={isMobile ? 32 : 48} />
+            </div>
+            <span className="text-[7px] sm:text-[9px] font-bold tracking-[0.18em] uppercase text-white/80 leading-none">
               Smart Home Builder
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-              className="font-bold uppercase text-white leading-none drop-shadow-md"
-              style={{ fontSize: '7.5px', letterSpacing: '0.2em', opacity: 0.9 }}
-            >
-              Powered by Beharry-Amber Technologies
-            </motion.div>
-          </div>
+            </span>
+          </motion.div>
         </div>
 
-        {/* Vertical Options Container */}
+        {/* ── Cards grid ───────────────────────────────────── */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-[95vw] lg:max-w-[1400px] p-2 sm:p-4 flex flex-col gap-8 relative"
+          transition={{ duration: 0.8, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className="flex-1 px-3 pt-3 pb-6 sm:px-6 sm:pt-4 sm:pb-8 lg:px-10 lg:pt-6 lg:pb-10"
         >
-          <div className="text-center mb-2">
-            <h1 className="text-3xl sm:text-4xl font-display font-light leading-[1.1] tracking-tight text-white mb-2">
-              Design Your Home
-            </h1>
-            <p className="text-[11px] sm:text-xs text-[#B89B72] font-semibold tracking-widest uppercase">Select an architectural pathway</p>
-          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6 w-full">
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 w-full">
-            
             {/* 1. Turn Key Build */}
-            <motion.button
+            <Card
+              num="01."
+              title="Turn Key"
+              subtitle="Build"
+              description="Experience pre-designed luxury homes with automated smart features included."
+              img="/turnkey.png"
               onClick={onTurnkeyBuild}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-zinc-800/40 backdrop-blur-md border border-[#B89B72] transition-all duration-300 shadow-lg hover:shadow-[0_0_30px_rgba(184,155,114,0.4)] hover:border-white/40 overflow-hidden"
-            >
-              <div className="absolute inset-0 z-0">
-                <img src="/turnkey.png" alt="Turn Key Build" className="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-black/60" />
-              </div>
-              <div className="relative z-10">
-                <div className="text-[#B89B72] font-bold text-lg mb-3">01.</div>
-                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-white mb-2 leading-tight">Turn Key<br/>Build</h3>
-                <p className="text-[10px] sm:text-xs text-zinc-300 font-light leading-relaxed">
-                  Experience pre-designed luxury homes with automated smart features included.
-                </p>
-              </div>
-              <div className="flex justify-end w-full relative z-10">
-                 <ArrowRight className="text-[#B89B72] group-hover:translate-x-2 transition-all duration-300" size={20} />
-              </div>
-            </motion.button>
+            />
 
-            {/* 2. Young Professional Build */}
-            <motion.button
+            {/* 2. Young Professional */}
+            <Card
+              num="02."
+              title="Young"
+              subtitle="Professional"
+              description="Modern, efficient, and tailored architectural designs for the ambitious professional."
+              img="/young_professional.png"
               onClick={onYoungProfessionalBuild}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-zinc-800/40 backdrop-blur-md border border-[#B89B72] transition-all duration-300 shadow-lg hover:shadow-[0_0_30px_rgba(184,155,114,0.4)] hover:border-white/40 overflow-hidden"
-            >
-              <div className="absolute inset-0 z-0">
-                <img src="/young_professional.png" alt="Young Professional" className="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-black/60" />
-              </div>
-              <div className="relative z-10">
-                <div className="text-[#B89B72] font-bold text-lg mb-3">02.</div>
-                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-white mb-2 leading-tight">Young<br/>Professional</h3>
-                <p className="text-[10px] sm:text-xs text-zinc-300 font-light leading-relaxed">
-                  Modern, efficient, and tailored architectural designs for the ambitious professional.
-                </p>
-              </div>
-              <div className="flex justify-end w-full relative z-10">
-                 <ArrowRight className="text-[#B89B72] group-hover:translate-x-2 transition-all duration-300" size={20} />
-              </div>
-            </motion.button>
+            />
 
-            {/* 3. Private Purchase */}
-            <div
-              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-zinc-800/40 backdrop-blur-md border border-[#B89B72]/60 opacity-75 transition-all duration-300 shadow-lg overflow-hidden cursor-not-allowed"
-            >
-              <div className="absolute inset-0 z-0">
-                <img src="/private_purchase.png" alt="Private Purchase" className="w-full h-full object-cover opacity-60 transition-opacity duration-500 grayscale" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/30 to-black/60" />
-              </div>
-              <div className="relative z-10">
-                <div className="text-[#B89B72]/60 font-bold text-lg mb-3">03.</div>
-                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-zinc-300 mb-2 leading-tight">Private<br/>Purchase</h3>
-                <p className="text-[10px] sm:text-xs text-zinc-400 font-light leading-relaxed">
-                  Exclusive, confidential acquisitions and bespoke developments.
-                </p>
-              </div>
-              <div className="flex items-center justify-between w-full font-sans relative z-10">
-                 <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#B89B72]/40 animate-pulse" />
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-[#B89B72]/60">Soon</span>
-                 </div>
-              </div>
-            </div>
+            {/* 3. Private Purchase (coming soon) */}
+            <Card
+              num="03."
+              title="Private"
+              subtitle="Purchase"
+              description="Exclusive, confidential acquisitions and bespoke developments."
+              img="/private_purchase.png"
+              soon
+            />
 
             {/* 4. Build Your Own */}
-            <motion.button
+            <Card
+              num="04."
+              title="Build"
+              subtitle="Your Own"
+              description="Fully customize layouts, explore real-time floor plans, and configure smart home features."
+              img="/build_your_own.png"
               onClick={handleStart}
               disabled={isBuilding}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="group relative flex flex-col justify-between text-left w-full h-[450px] sm:h-[550px] lg:h-[650px] p-6 rounded-3xl bg-zinc-800/40 backdrop-blur-md border border-[#B89B72] transition-all duration-300 shadow-lg hover:shadow-[0_0_30px_rgba(184,155,114,0.4)] hover:border-white/40 overflow-hidden"
-            >
-              <div className="absolute inset-0 z-0">
-                <img src="/build_your_own.png" alt="Build Your Own" className="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-black/60" />
-              </div>
-              <div className="relative z-10">
-                <div className="text-[#B89B72] font-bold text-lg mb-3">04.</div>
-                <h3 className="text-base sm:text-lg font-bold tracking-widest uppercase text-white mb-2 leading-tight">Build<br/>Your Own</h3>
-                <p className="text-[10px] sm:text-xs text-zinc-300 font-light leading-relaxed">
-                  Fully customize layouts, explore real-time floor plans, and configure smart home features.
-                </p>
-              </div>
-              <div className="flex justify-end w-full relative z-10">
-                 <ArrowRight className="text-[#B89B72] group-hover:translate-x-2 transition-all duration-300" size={20} />
-              </div>
-
-              {isBuilding && (
-                <div className="absolute inset-0 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center z-20 gap-3">
-                  <HouseBlueprintSVG />
-                  <span className="font-bold tracking-widest uppercase text-[#B89B72] animate-pulse text-xs text-center">Constructing...</span>
-                </div>
-              )}
-            </motion.button>
+              loading={isBuilding}
+            />
 
           </div>
-          
+
+          {/* Explore link */}
           {onExplore && (
-            <div className="pt-2 flex justify-center border-t border-[#B89B72]/10 mt-1">
+            <div className="pt-3 sm:pt-4 flex justify-center border-t border-[#B89B72]/10 mt-2">
               <button
                 onClick={onExplore}
-                className="text-center py-2 text-[9px] sm:text-[10px] font-bold tracking-[0.25em] uppercase text-zinc-400 hover:text-white transition-colors duration-300"
+                className="text-[8px] sm:text-[9px] font-bold tracking-[0.25em] uppercase text-zinc-400 hover:text-white transition-colors duration-300 py-2"
               >
                 Direct Architectural Overview
               </button>
             </div>
           )}
-
         </motion.div>
-        
-        {/* Footer info */}
+
+        {/* ── Bottom footer — Beharry-Amber branding ──────── */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.8 }}
-          className="absolute bottom-6 sm:bottom-8 text-[8px] sm:text-[9px] uppercase tracking-widest text-zinc-400"
+          transition={{ duration: 1, delay: 0.9 }}
+          className="pb-4 pt-2 flex flex-col items-center gap-1.5 border-t border-white/[0.06] mx-4 sm:mx-6"
         >
-          Powered by Advanced Visualization Technology
+          <span className="text-white/35 uppercase font-semibold tracking-[0.25em]" style={{ fontSize: '7px' }}>Powered By</span>
+          <img src="/beharry-amber-logo-mark.png" alt="Beharry-Amber" className="h-4 sm:h-5 object-contain opacity-60" />
+          <span className="text-white/55 font-semibold tracking-wide" style={{ fontSize: '8.5px' }}>Beharry-Amber Technologies Inc.</span>
+          <span className="text-white/30 font-medium" style={{ fontSize: '7px', letterSpacing: '0.06em' }}>AI Engineered Solutions</span>
         </motion.div>
 
       </div>

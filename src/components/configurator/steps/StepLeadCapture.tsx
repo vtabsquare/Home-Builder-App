@@ -16,9 +16,10 @@ import { formatMoneyDynamic } from '@/hooks/useDynamicPricing';
 type ConfigStore = ConfigState & ConfigActions;
 
 const TIMELINES = ['0–3 months', '3–6 months', '6–12 months', '12+ months'];
-const BREVO_API_KEY = import.meta.env.VITE_BREVO_API_KEY;
-const BREVO_SENDER_EMAIL = import.meta.env.VITE_BREVO_SENDER_EMAIL;
-const BREVO_SENDER_NAME = import.meta.env.VITE_BREVO_SENDER_NAME || 'GBTI Architectural Team';
+const INFOBIP_API_KEY = import.meta.env.VITE_INFOBIP_API_KEY;
+const INFOBIP_BASE_URL = import.meta.env.VITE_INFOBIP_BASE_URL;
+const INFOBIP_SENDER_EMAIL = import.meta.env.VITE_INFOBIP_SENDER_EMAIL;
+const INFOBIP_SENDER_NAME = import.meta.env.VITE_INFOBIP_SENDER_NAME || 'GBTI Architectural Team';
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Enter your name').max(100),
@@ -87,6 +88,7 @@ const buildBrevoHtml = ({
         <p style="margin:0 0 8px;">Bedrooms: <strong>${c.bedrooms}</strong></p>
         <p style="margin:0 0 8px;">Bathrooms: <strong>${c.bathrooms}</strong></p>
         <p style="margin:0 0 8px;">Kitchen: <strong>${c.kitchen}</strong></p>
+        <p style="margin:0 0 8px;">Finishing: <strong>${c.finishingQuality === 'premium' ? 'Premium' : 'Standard'}</strong></p>
         <p style="margin:0 0 8px;">Roof: <strong>${c.roof}</strong></p>
         <p style="margin:0 0 8px;">Material: <strong>${c.material}</strong></p>
         <p style="margin:0 0 8px;">Storeys: <strong>${c.isDoubleStorey ? 'Double' : 'Single'}</strong></p>
@@ -105,7 +107,7 @@ const buildBrevoHtml = ({
   `;
 };
 
-const sendBrevoFromFrontend = async ({
+const sendEmailViaInfobip = async ({
   name,
   email,
   leadId,
@@ -120,8 +122,8 @@ const sendBrevoFromFrontend = async ({
   cost: CostBreakdown;
   c: ConfigStore;
 }) => {
-  if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) {
-    throw new Error('Brevo env is not configured');
+  if (!INFOBIP_API_KEY || !INFOBIP_BASE_URL || !INFOBIP_SENDER_EMAIL) {
+    throw new Error('Infobip env is not configured');
   }
 
   const htmlContent = buildBrevoHtml({ name, leadId, timeline, cost, c });
@@ -139,37 +141,24 @@ const sendBrevoFromFrontend = async ({
     `Reference ID: ${leadId}`,
   ].join('\n');
 
-  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+  const form = new FormData();
+  form.append('from', `${INFOBIP_SENDER_NAME} <${INFOBIP_SENDER_EMAIL}>`);
+  form.append('to', `${name} <${email}>`);
+  form.append('subject', 'Your GBTI proposal request and estimate');
+  form.append('html', htmlContent);
+  form.append('text', textContent);
+
+  const response = await fetch(`${INFOBIP_BASE_URL}/email/3/send`, {
     method: 'POST',
     headers: {
-      accept: 'application/json',
-      'api-key': BREVO_API_KEY,
-      'content-type': 'application/json',
+      Authorization: `App ${INFOBIP_API_KEY}`,
     },
-    body: JSON.stringify({
-      sender: {
-        email: BREVO_SENDER_EMAIL,
-        name: BREVO_SENDER_NAME,
-      },
-      to: [
-        {
-          email,
-          name,
-        },
-      ],
-      replyTo: {
-        email: BREVO_SENDER_EMAIL,
-        name: BREVO_SENDER_NAME,
-      },
-      subject: 'Your GBTI proposal request and estimate',
-      htmlContent,
-      textContent,
-    }),
+    body: form,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || 'Brevo request failed');
+    throw new Error(errorText || 'Infobip request failed');
   }
 };
 
@@ -242,6 +231,7 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
       bedrooms: c.bedrooms,
       bathrooms: c.bathrooms,
       kitchen: c.kitchen,
+      finishing_quality: c.finishingQuality,
       addons: c.addons,
       roof: c.roof,
       material: c.material,
@@ -289,8 +279,8 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
     }
 
     try {
-      if (BREVO_API_KEY && BREVO_SENDER_EMAIL) {
-        await sendBrevoFromFrontend({
+      if (INFOBIP_API_KEY && INFOBIP_BASE_URL && INFOBIP_SENDER_EMAIL) {
+        await sendEmailViaInfobip({
           name: c.name.trim(),
           email: c.email.trim(),
           leadId,
@@ -322,6 +312,7 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
               bedrooms: c.bedrooms,
               bathrooms: c.bathrooms,
               kitchen: c.kitchen,
+              finishingQuality: c.finishingQuality,
               addons: c.addons,
               roof: c.roof,
               material: c.material,

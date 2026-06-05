@@ -30,14 +30,14 @@ export const StepShell = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      className="flex h-full flex-col relative z-10 pb-24 md:pb-32"
+      className="flex h-full flex-col relative z-10 pb-16 md:pb-20"
     >
-      <div className="mb-8 md:mb-12">
+      <div className="mb-4 md:mb-6">
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1, duration: 0.5 }}
-          className="text-[10px] uppercase tracking-[0.4em] text-muted-foreground font-bold mb-4"
+          className="text-[10px] uppercase tracking-[0.4em] text-muted-foreground font-bold mb-2"
         >
           {eyebrow}
         </motion.div>
@@ -45,7 +45,7 @@ export const StepShell = ({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="font-display text-4xl md:text-6xl font-normal tracking-tight text-balance leading-[1.05] text-foreground"
+          className="font-display text-3xl md:text-4xl font-normal tracking-tight text-balance leading-[1.05] text-foreground"
         >
           {title}
         </motion.h1>
@@ -54,7 +54,7 @@ export const StepShell = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.5 }}
-            className="mt-6 max-w-2xl text-base md:text-lg text-muted-foreground leading-relaxed font-light"
+            className="mt-2 max-w-2xl text-sm md:text-base text-muted-foreground leading-relaxed font-light"
           >
             {subtitle}
           </motion.p>

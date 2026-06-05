@@ -66,14 +66,21 @@ export function useHomeTypeMeta() {
   const p = usePricing();
 
   return Object.fromEntries(
-    (Object.keys(HOME_TYPE_DEFAULTS) as HomeType[]).map((homeType) => [
-      homeType,
-      {
-        ...HOME_TYPE_DEFAULTS[homeType],
-        baseArea: p.home_types[homeType].baseArea,
-        baseCost: p.home_types[homeType].baseCost,
-      },
-    ])
+    (Object.keys(HOME_TYPE_DEFAULTS) as HomeType[]).map((homeType) => {
+      let baseCost = p.home_types[homeType].baseCost;
+      if (homeType === 'starter' || homeType === 'family' || homeType === 'premium') {
+        const finishKey = homeType as 'starter' | 'family' | 'premium';
+        baseCost = p.finishing_costs?.[finishKey]?.standard_1storey || baseCost;
+      }
+      return [
+        homeType,
+        {
+          ...HOME_TYPE_DEFAULTS[homeType],
+          baseArea: p.home_types[homeType].baseArea,
+          baseCost: baseCost,
+        },
+      ];
+    })
   ) as Record<HomeType, (typeof HOME_TYPE_DEFAULTS)[HomeType]>;
 }
 

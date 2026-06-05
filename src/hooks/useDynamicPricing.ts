@@ -20,6 +20,12 @@ export interface PricingConfig {
   addon_costs: Record<AddOn, number>;
   turnkey_cost: number;
   young_professional_cost: number;
+  finishing_costs: Record<'starter' | 'family' | 'premium', {
+    standard_1storey: number;
+    premium_1storey: number;
+    standard_2storey: number;
+    premium_2storey: number;
+  }>;
 }
 
 const DEFAULTS: PricingConfig = {
@@ -46,6 +52,26 @@ const DEFAULTS: PricingConfig = {
   },
   turnkey_cost: 350000,
   young_professional_cost: 180000,
+  finishing_costs: {
+    starter: {
+      standard_1storey: 14700000,
+      premium_1storey: 19866000,
+      standard_2storey: 24110400,
+      premium_2storey: 32580000,
+    },
+    family: {
+      standard_1storey: 22050000,
+      premium_1storey: 29799000,
+      standard_2storey: 36165600,
+      premium_2storey: 48870000,
+    },
+    premium: {
+      standard_1storey: 25725000,
+      premium_1storey: 34765500,
+      standard_2storey: 42193200,
+      premium_2storey: 57015000,
+    },
+  },
 };
 
 const ADDON_LABELS: Record<AddOn, string> = {
@@ -100,6 +126,11 @@ function mergePricing(saved: any): PricingConfig {
     addon_costs: { ...DEFAULTS.addon_costs, ...saved.addon_costs },
     turnkey_cost: saved.turnkey_cost ?? DEFAULTS.turnkey_cost,
     young_professional_cost: saved.young_professional_cost ?? DEFAULTS.young_professional_cost,
+    finishing_costs: {
+      starter: { ...DEFAULTS.finishing_costs.starter, ...saved.finishing_costs?.starter },
+      family: { ...DEFAULTS.finishing_costs.family, ...saved.finishing_costs?.family },
+      premium: { ...DEFAULTS.finishing_costs.premium, ...saved.finishing_costs?.premium },
+    },
   };
 }
 
@@ -140,15 +171,31 @@ export function computeCostDynamic(c: ConfigState, p: PricingConfig, opts: { int
     const includedArea = p.home_types[c.homeType].baseArea;
     const extraArea = Math.max(0, area - includedArea);
     
-    baseStructure = p.home_types[c.homeType].baseCost + extraArea * p.sqft_rate;
+    // Determine finishing quality cost
+    const finishKey = c.homeType as 'starter' | 'family' | 'premium';
+    const finishConfig = p.finishing_costs[finishKey];
+    const finishingQuality = c.finishingQuality || 'standard';
+    const is2Storey = c.isDoubleStorey;
+    
+    if (finishingQuality === 'premium') {
+      baseStructure = is2Storey ? finishConfig.premium_2storey : finishConfig.premium_1storey;
+    } else {
+      baseStructure = is2Storey ? finishConfig.standard_2storey : finishConfig.standard_1storey;
+    }
+    
+    // Add extra area cost on top of the flat finishing cost
+    baseStructure += extraArea * p.sqft_rate;
+    
     bedroomCost = c.bedrooms * p.bedroom_cost;
     bathroomCost = c.bathrooms * p.bathroom_cost;
     kitchenCost = p.kitchen_costs[c.kitchen];
     addonsCost = c.addons.reduce((sum, a) => sum + (p.addon_costs[a] || 0), 0);
     landCost = c.land === 'need' ? p.flat_land_cost : 0;
     
+    const finishLabel = finishingQuality === 'premium' ? 'Premium' : 'Standard';
+    const storeyLabel = is2Storey ? '2 Storey' : '1 Storey';
     items = [
-      { label: `Base structure · ${area} sqft`, amount: baseStructure },
+      { label: `Base structure · ${finishLabel} · ${storeyLabel} · ${area} sqft`, amount: baseStructure },
       { label: `Bedrooms × ${c.bedrooms}`, amount: bedroomCost },
       { label: `Bathrooms × ${c.bathrooms}`, amount: bathroomCost },
       { label: `Kitchen · ${c.kitchen}`, amount: kitchenCost },
