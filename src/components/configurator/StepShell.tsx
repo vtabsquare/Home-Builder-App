@@ -32,7 +32,7 @@ export const StepShell = ({
       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
       className="flex h-full flex-col relative z-10 pb-16 md:pb-20"
     >
-      <div className="mb-4 md:mb-6">
+      <div className="mb-3 md:mb-6">
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -45,7 +45,7 @@ export const StepShell = ({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="font-display text-3xl md:text-4xl font-normal tracking-tight text-balance leading-[1.05] text-foreground"
+          className="font-display text-2xl md:text-4xl font-normal tracking-tight text-balance leading-[1.05] text-foreground"
         >
           {title}
         </motion.h1>
@@ -71,7 +71,7 @@ export const StepShell = ({
           transition={{ duration: 0.3 }}
           className="fixed bottom-6 md:bottom-12 pb-[env(safe-area-inset-bottom)] left-0 right-0 z-[200] px-4 pointer-events-none"
         >
-          <div className="mx-auto max-w-[1440px] w-full relative flex items-center justify-center min-h-[56px] pointer-events-none gap-4">
+          <div className="mx-auto max-w-[1440px] w-full relative flex items-center justify-center min-h-[56px] pointer-events-none gap-2 sm:gap-4 overflow-hidden md:overflow-visible">
             {/* Left-aligned Back button */}
             <div className="md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2 pointer-events-auto">
               {!hidePrev && onPrev ? (
@@ -85,15 +85,15 @@ export const StepShell = ({
             </div>
 
             {/* Centered Continue button */}
-            <div className="pointer-events-auto flex-1 md:flex-none flex justify-center">
+            <div className="pointer-events-auto flex-1 md:flex-none flex justify-center min-w-0">
               {onNext && (
                 <button
                   onClick={onNext}
                   disabled={nextDisabled}
                   className="group relative flex items-center justify-center gap-4 rounded-full bg-primary text-primary-foreground h-12 md:h-14 w-full md:min-w-[340px] md:w-auto px-6 md:px-12 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] shadow-lg transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-30 disabled:hover:brightness-100 disabled:active:scale-100"
                 >
-                  <span className="relative z-10">{nextLabel}</span>
-                  <ArrowRight size={14} className="relative z-10 transition-transform group-hover:translate-x-1" />
+                  <span className="relative z-10 truncate">{nextLabel}</span>
+                  <ArrowRight size={14} className="relative z-10 flex-shrink-0 transition-transform group-hover:translate-x-1" />
                 </button>
               )}
             </div>
@@ -121,7 +121,7 @@ export const SelectableCard = ({
 }) => (
   <button
     onClick={onClick}
-    className={`group relative w-full overflow-hidden rounded-2xl p-4 md:p-6 text-left transition-all duration-500 border ${
+    className={`group relative w-full overflow-hidden rounded-2xl p-3 md:p-6 text-left transition-all duration-500 border ${
       selected
         ? 'bg-surface shadow-elev border-clay/30 scale-[1.01]'
         : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'

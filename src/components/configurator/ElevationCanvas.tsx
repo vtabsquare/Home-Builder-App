@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, ContactShadows, Html } from '@react-three/drei';
+import { OrbitControls, ContactShadows, Html, useGLTF } from '@react-three/drei';
 import { Suspense, useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { Plan, resolveStairGeometry, ensureGarageDoors, applySmartRotations } from '@/lib/floorplan';
@@ -2848,10 +2848,10 @@ const GarageInterior = ({ r, cx, cz, isNight, wallH = 10 }: { r: Plan['rooms'][n
 
   const Cars = () => (
     <>
-      <group position={[-w * 0.24, 0.18, h * 0.04]} rotation={[0, 0, 0]} scale={[2.0, 2.0, 2.0]}>
+      <group position={[-w * 0.24, 0.18, h * 0.04]} rotation={[0, 0, 0]} scale={[2.8, 2.8, 2.8]}>
         <ParkedCar color="#0a0f1e" accent="#080808" />
       </group>
-      <group position={[w * 0.24, 0.18, h * 0.04]} rotation={[0, 0, 0]} scale={[2.0, 2.0, 2.0]}>
+      <group position={[w * 0.24, 0.18, h * 0.04]} rotation={[0, 0, 0]} scale={[2.8, 2.8, 2.8]}>
         <ParkedCar color="#3d0000" accent="#080808" />
       </group>
     </>
@@ -2970,94 +2970,70 @@ const GarageRoof = ({ garage, planW, planH, wallH, colors, wallTextures }: { gar
   );
 };
 
-/* Low-poly parked car. Car length runs along +/- Z (rotate the parent group to orient). */
-const ParkedCar = ({ color = '#1f2937', accent = '#0a0a0a' }: { color?: string; accent?: string }) => {
-  return (
-    <group>
-      {/* Lower body (chassis) */}
-      <mesh position={[0, 0.55, 0]} castShadow receiveShadow>
-        <boxGeometry args={[1.85, 0.55, 4.3]} />
-        <meshStandardMaterial color={color} roughness={0.35} metalness={0.55} />
-      </mesh>
-      {/* Hood ridge — slightly raised at front */}
-      <mesh position={[0, 0.95, 1.45]} castShadow>
-        <boxGeometry args={[1.78, 0.18, 1.4]} />
-        <meshStandardMaterial color={color} roughness={0.35} metalness={0.55} />
-      </mesh>
-      {/* Trunk lid — slightly raised at rear */}
-      <mesh position={[0, 0.95, -1.55]} castShadow>
-        <boxGeometry args={[1.78, 0.18, 1.2]} />
-        <meshStandardMaterial color={color} roughness={0.35} metalness={0.55} />
-      </mesh>
-      {/* Cabin (greenhouse) — narrower than body */}
-      <mesh position={[0, 1.32, -0.1]} castShadow>
-        <boxGeometry args={[1.65, 0.7, 2.4]} />
-        <meshStandardMaterial color={color} roughness={0.35} metalness={0.55} />
-      </mesh>
-      {/* Side windows (tinted glass) */}
-      <mesh position={[0.83, 1.32, -0.1]}>
-        <boxGeometry args={[0.02, 0.55, 2.25]} />
-        <meshPhysicalMaterial color="#1a2540" roughness={0.05} metalness={0.4} transparent opacity={0.55} clearcoat={1} />
-      </mesh>
-      <mesh position={[-0.83, 1.32, -0.1]}>
-        <boxGeometry args={[0.02, 0.55, 2.25]} />
-        <meshPhysicalMaterial color="#1a2540" roughness={0.05} metalness={0.4} transparent opacity={0.55} clearcoat={1} />
-      </mesh>
-      {/* Windscreen + rear glass */}
-      <mesh position={[0, 1.32, 1.12]} rotation={[Math.PI * 0.06, 0, 0]}>
-        <boxGeometry args={[1.55, 0.55, 0.04]} />
-        <meshPhysicalMaterial color="#1a2540" roughness={0.05} metalness={0.4} transparent opacity={0.55} clearcoat={1} />
-      </mesh>
-      <mesh position={[0, 1.32, -1.32]} rotation={[-Math.PI * 0.06, 0, 0]}>
-        <boxGeometry args={[1.55, 0.55, 0.04]} />
-        <meshPhysicalMaterial color="#1a2540" roughness={0.05} metalness={0.4} transparent opacity={0.55} clearcoat={1} />
-      </mesh>
-      {/* Wheels (4) */}
-      {[
-        [-0.85, 0.4, 1.5], [0.85, 0.4, 1.5],
-        [-0.85, 0.4, -1.5], [0.85, 0.4, -1.5],
-      ].map(([x, y, z], i) => (
-        <group key={i} position={[x, y, z]}>
-          <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.4, 0.4, 0.28, 18]} />
-            <meshStandardMaterial color={accent} roughness={0.95} />
-          </mesh>
-          {/* Hubcap */}
-          <mesh rotation={[0, 0, Math.PI / 2]} position={[x > 0 ? 0.145 : -0.145, 0, 0]}>
-            <cylinderGeometry args={[0.2, 0.2, 0.02, 12]} />
-            <meshStandardMaterial color="#bdbdbd" roughness={0.4} metalness={0.7} />
-          </mesh>
-        </group>
-      ))}
-      {/* Headlights */}
-      {[-0.55, 0.55].map((x, i) => (
-        <mesh key={`hl-${i}`} position={[x, 0.7, 2.16]}>
-          <boxGeometry args={[0.42, 0.2, 0.06]} />
-          <meshStandardMaterial color="#fff8d4" emissive="#fff8d4" emissiveIntensity={0.6} roughness={0.3} />
-        </mesh>
-      ))}
-      {/* Tail lights */}
-      {[-0.55, 0.55].map((x, i) => (
-        <mesh key={`tl-${i}`} position={[x, 0.7, -2.16]}>
-          <boxGeometry args={[0.42, 0.2, 0.06]} />
-          <meshStandardMaterial color="#a91212" emissive="#a91212" emissiveIntensity={0.35} roughness={0.4} />
-        </mesh>
-      ))}
-      {/* Grille */}
-      <mesh position={[0, 0.55, 2.16]}>
-        <boxGeometry args={[1.0, 0.25, 0.04]} />
-        <meshStandardMaterial color="#0d0d0d" roughness={0.5} metalness={0.6} />
-      </mesh>
-      {/* Side mirrors */}
-      {[-0.95, 0.95].map((x, i) => (
-        <mesh key={`mir-${i}`} position={[x, 1.2, 0.7]} castShadow>
-          <boxGeometry args={[0.18, 0.12, 0.18]} />
-          <meshStandardMaterial color={color} roughness={0.35} metalness={0.55} />
-        </mesh>
-      ))}
-    </group>
-  );
+/* Realistic parked car loaded from a real 3D model (GLB).
+   The model is normalized to length CAR_TARGET_LENGTH along +/- Z so existing
+   callers (carport + garage) keep working with their current position/rotation/scale. */
+const CAR_MODEL_URL = '/models/car.glb';
+const CAR_TARGET_LENGTH = 4.8; // local units — matches the previous car footprint (callers apply scale 2.0)
+
+const ParkedCar = ({ color = '#1f2937' }: { color?: string; accent?: string }) => {
+  const { scene } = useGLTF(CAR_MODEL_URL);
+
+  const model = useMemo(() => {
+    const root = scene.clone(true);
+
+    // Re-skin body panels with glossy automotive paint in the requested colour;
+    // give glass a tinted, reflective look. Other parts (rims, lights, interior) stay as authored.
+    root.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      const name = mesh.name.toLowerCase();
+      if (name.includes('body') || name.includes('paint') || name.includes('carrosserie') || name.includes('coque')) {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color(color),
+          metalness: 0.85,
+          roughness: 0.28,
+          clearcoat: 1,
+          clearcoatRoughness: 0.05,
+          envMapIntensity: 1.4,
+        });
+      } else if (name.includes('glass') || name.includes('window') || name.includes('vitre') || name.includes('windshield')) {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color('#0c1422'),
+          metalness: 0.1,
+          roughness: 0.05,
+          transmission: 0.6,
+          transparent: true,
+          opacity: 0.6,
+          clearcoat: 1,
+          ior: 1.45,
+        });
+      }
+    });
+
+    // Normalize: centre on X/Z, rest on the ground (y = 0), scale to the target length.
+    const box = new THREE.Box3().setFromObject(root);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    root.position.set(-center.x, -box.min.y, -center.z);
+
+    const wrapper = new THREE.Group();
+    wrapper.add(root);
+    const lengthAxis = Math.max(size.x, size.z) || 1;
+    wrapper.scale.setScalar(CAR_TARGET_LENGTH / lengthAxis);
+    // Orient the longest dimension along Z (front/back) to match the previous convention.
+    if (size.x > size.z) wrapper.rotation.y = Math.PI / 2;
+
+    return wrapper;
+  }, [scene, color]);
+
+  return <primitive object={model} />;
 };
+useGLTF.preload(CAR_MODEL_URL);
 
 const Carport = ({ plan, plotW, plotD, gateSide }: { plan: Plan; plotW: number; plotD: number; gateSide: Side }) => {
   const info = useMemo(() => getCarportInfo(plan), [plan]);
@@ -3104,9 +3080,15 @@ const Carport = ({ plan, plotW, plotD, gateSide }: { plan: Plan; plotW: number; 
   const dwCX = (dwMinX + dwMaxX) / 2;
   const dwCZ = (dwMinZ + dwMaxZ) / 2;
 
-  // Parked car position: centered in carport, oriented along driving axis
-  const carX = cx;
-  const carZ = cz;
+  // Parked car position: shifted toward the opening so the larger car doesn't clip the house wall
+  const carPullOut = 1.5; // pull the car toward the driveway opening
+  let carX = cx;
+  let carZ = cz;
+  if (isVertical) {
+    carZ += openingSide === 'top' ? -carPullOut : carPullOut;
+  } else {
+    carX += openingSide === 'left' ? -carPullOut : carPullOut;
+  }
 
   const rampAngle = Math.atan2(cpElevation, rampL);
   const rampHypot = Math.hypot(cpElevation, rampL);
@@ -3211,7 +3193,7 @@ const Carport = ({ plan, plotW, plotD, gateSide }: { plan: Plan; plotW: number; 
       )}
 
       {/* ── Parked car ── */}
-      <group position={[carX, cpElevation, carZ]} rotation={[0, carYaw, 0]} scale={[2.0, 2.0, 2.0]}>
+      <group position={[carX, cpElevation, carZ]} rotation={[0, carYaw, 0]} scale={[2.8, 2.8, 2.8]}>
         <ParkedCar color="#1f2a44" />
       </group>
     </group>

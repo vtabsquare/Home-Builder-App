@@ -557,19 +557,19 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
       onNext={next}
       onPrev={prev}
     >
-      <div className="space-y-8">
+      <div className="space-y-4 sm:space-y-8">
         {/* View toggle + controls */}
-        <div className="flex flex-col gap-6 bg-surface p-6 rounded-3xl border border-border shadow-soft">
+        <div className="flex flex-col gap-4 sm:gap-6 bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-border shadow-soft">
           {/* Main Controls Row */}
           {!advancedEditorMode ? (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6">
+            <div className="flex flex-col md:flex-row md:items-center gap-3 sm:gap-4 md:gap-6">
               <div className="inline-flex rounded-xl bg-soft-section p-1 border border-border shadow-inner overflow-x-auto scrollbar-hide">
                 {(['2d', '3d', 'elevation'] as const).map((v) => (
                   <button
                     key={v}
                     onClick={() => { setView(v); setAdvancedEditorMode(false); setIsSelectedAll(false); }}
-                    className={`relative rounded-lg px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
+                    className={`relative rounded-lg px-3 sm:px-6 py-2 sm:py-2.5 text-[8px] sm:text-[10px] whitespace-nowrap font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
                       view === v && !advancedEditorMode ? 'text-white' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
@@ -632,17 +632,17 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   <div className="flex items-center gap-1 sm:border-l sm:border-border sm:pl-3 md:pl-4">
                     <button
                       onClick={exportAsPDF}
-                      className="flex items-center justify-center h-10 md:h-11 rounded-xl border border-border bg-white text-muted-foreground px-4 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section hover:text-foreground transition-all active:scale-95"
+                      className="flex items-center justify-center h-9 md:h-11 rounded-xl border border-border bg-white text-muted-foreground px-3 md:px-4 text-[8px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section hover:text-foreground transition-all active:scale-95"
                       title="Export as PDF"
                     >
-                      <Download size={14} className="mr-2" /> PDF
+                      <Download size={14} className="mr-1 sm:mr-2" /> PDF
                     </button>
                     <button
                       onClick={exportAsSVG}
-                      className="flex items-center justify-center h-10 md:h-11 rounded-xl border border-border bg-white text-muted-foreground px-4 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section hover:text-foreground transition-all active:scale-95"
+                      className="flex items-center justify-center h-9 md:h-11 rounded-xl border border-border bg-white text-muted-foreground px-3 md:px-4 text-[8px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section hover:text-foreground transition-all active:scale-95"
                       title="Export as SVG"
                     >
-                      <Download size={14} className="mr-2" /> SVG
+                      <Download size={14} className="mr-1 sm:mr-2" /> SVG
                     </button>
                   </div>
                 </>

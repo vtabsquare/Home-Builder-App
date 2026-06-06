@@ -69,7 +69,7 @@ export const StepHomeType = () => {
       hidePrev
     >
       {/* Property Status Segmented Toggle Control */}
-      <div className="flex p-1 bg-soft-section border border-border/60 rounded-full max-w-[280px] mx-auto mb-10 shadow-sm">
+      <div className="flex p-1 bg-soft-section border border-border/60 rounded-full max-w-[280px] mx-auto mb-6 sm:mb-10 shadow-sm">
         <button
           type="button"
           onClick={() => setLand('own')}
@@ -111,19 +111,19 @@ export const StepHomeType = () => {
             >
               <SelectableCard selected={active} onClick={() => setHomeType(id)} className="h-full flex flex-col justify-between">
                 <div>
-                  <div className={`text-[10px] uppercase tracking-[0.3em] font-bold mb-3 ${active ? 'text-clay' : 'text-muted-foreground/40'}`}>{tag}</div>
-                  <h3 className="font-display text-xl sm:text-2xl md:text-3xl font-normal tracking-tight text-foreground">{d.label}</h3>
-                  <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 num">
+                  <div className={`text-[9px] sm:text-[10px] uppercase tracking-[0.3em] font-bold mb-2 sm:mb-3 ${active ? 'text-clay' : 'text-muted-foreground/40'}`}>{tag}</div>
+                  <h3 className="font-display text-lg sm:text-2xl md:text-3xl font-normal tracking-tight text-foreground">{d.label}</h3>
+                  <div className="mt-1 sm:mt-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 num">
                     {d.areaRange[0]}–{d.areaRange[1]} SQ FT · {d.bedrooms} BED
                   </div>
-                  <p className="mt-5 text-sm text-muted-foreground leading-relaxed font-light">
+                  <p className="mt-3 sm:mt-5 text-xs sm:text-sm text-muted-foreground leading-relaxed font-light">
                     {desc}
                   </p>
                 </div>
-                <div className="mt-8 pt-6 border-t border-border flex items-end justify-between">
+                <div className="mt-4 sm:mt-8 pt-4 sm:pt-6 border-t border-border flex items-end justify-between">
                   <div>
-                    <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground/40 mb-1 font-bold">Estimated</div>
-                    <div className="font-display text-xl font-normal num tracking-tight text-foreground">{formatMoney(d.baseCost)}</div>
+                    <div className="text-[8px] sm:text-[9px] uppercase tracking-[0.2em] text-muted-foreground/40 mb-1 font-bold">Estimated</div>
+                    <div className="font-display text-lg sm:text-xl font-normal num tracking-tight text-foreground">{formatMoney(d.baseCost)}</div>
                   </div>
                   <MiniSilhouette type={id} active={active} />
                 </div>

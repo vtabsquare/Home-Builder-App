@@ -15,22 +15,22 @@ export function QuoteSummary({ quote, mortgageEngine }: QuoteSummaryProps) {
       
       {/* Top Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-5 bg-white border-gray-200 shadow-sm rounded-3xl">
-          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Property Price</p>
-          <h2 className="text-lg sm:text-xl font-light text-gray-900 tracking-tight leading-tight whitespace-nowrap">{formatMoneyDynamic(quote.totalPropertyPrice)}</h2>
-          <p className="text-xs text-gray-400 mt-2">Base + Addons + Land</p>
+        <Card className="p-4 sm:p-5 bg-white border-gray-200 shadow-sm rounded-2xl sm:rounded-3xl">
+          <p className="text-[10px] sm:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Property Price</p>
+          <h2 className="text-base sm:text-xl font-light text-gray-900 tracking-tight leading-tight whitespace-nowrap">{formatMoneyDynamic(quote.totalPropertyPrice)}</h2>
+          <p className="text-[10px] sm:text-xs text-gray-400 mt-1 sm:mt-2">Base + Addons + Land</p>
         </Card>
         
-        <Card className="p-5 bg-white border-gray-200 shadow-sm rounded-3xl">
-          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Monthly Repayment</p>
-          <h2 className="text-lg sm:text-xl font-semibold text-emerald-600 tracking-tight leading-tight whitespace-nowrap">{formatMoneyDynamic(quote.monthlyEMI)}</h2>
-          <p className="text-xs text-gray-400 mt-2">{quote.tenureYears} Years @ {quote.interestRate.toFixed(2)}% APR</p>
+        <Card className="p-4 sm:p-5 bg-white border-gray-200 shadow-sm rounded-2xl sm:rounded-3xl">
+          <p className="text-[10px] sm:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Monthly Repayment</p>
+          <h2 className="text-base sm:text-xl font-semibold text-emerald-600 tracking-tight leading-tight whitespace-nowrap">{formatMoneyDynamic(quote.monthlyEMI)}</h2>
+          <p className="text-[10px] sm:text-xs text-gray-400 mt-1 sm:mt-2">{quote.tenureYears} Years @ {quote.interestRate.toFixed(2)}% APR</p>
         </Card>
 
-        <Card className="p-5 bg-[#faf8f5] border-[#b8956a]/20 shadow-sm rounded-3xl">
-          <p className="text-sm font-semibold text-[#b8956a] uppercase tracking-wider mb-1">Cash Required Now</p>
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 tracking-tight leading-tight whitespace-nowrap">{formatMoneyDynamic(quote.cashRequiredNow)}</h2>
-          <p className="text-xs text-gray-500 mt-2">Down Payment + Closing Fees</p>
+        <Card className="p-4 sm:p-5 bg-[#faf8f5] border-[#b8956a]/20 shadow-sm rounded-2xl sm:rounded-3xl">
+          <p className="text-[10px] sm:text-sm font-semibold text-[#b8956a] uppercase tracking-wider mb-1">Cash Required Now</p>
+          <h2 className="text-base sm:text-xl font-semibold text-gray-900 tracking-tight leading-tight whitespace-nowrap">{formatMoneyDynamic(quote.cashRequiredNow)}</h2>
+          <p className="text-[10px] sm:text-xs text-gray-500 mt-1 sm:mt-2">Down Payment + Closing Fees</p>
         </Card>
       </div>
 
