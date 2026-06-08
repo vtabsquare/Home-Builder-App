@@ -2974,7 +2974,7 @@ const GarageRoof = ({ garage, planW, planH, wallH, colors, wallTextures }: { gar
    The model is normalized to length CAR_TARGET_LENGTH along +/- Z so existing
    callers (carport + garage) keep working with their current position/rotation/scale. */
 const CAR_MODEL_URL = '/models/car.glb';
-const CAR_TARGET_LENGTH = 3.6; // local units — normalized car length
+const CAR_TARGET_LENGTH = 2.4; // local units — normalized car length
 
 const ParkedCar = ({ color = '#1f2937' }: { color?: string; accent?: string }) => {
   const { scene } = useGLTF(CAR_MODEL_URL);
