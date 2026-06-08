@@ -2848,10 +2848,10 @@ const GarageInterior = ({ r, cx, cz, isNight, wallH = 10 }: { r: Plan['rooms'][n
 
   const Cars = () => (
     <>
-      <group position={[-w * 0.24, 0.18, h * 0.04]} rotation={[0, 0, 0]} scale={[2.8, 2.8, 2.8]}>
+      <group position={[-w * 0.24, 0.18, h * 0.04]} rotation={[0, 0, 0]} scale={[1.6, 1.6, 1.6]}>
         <ParkedCar color="#0a0f1e" accent="#080808" />
       </group>
-      <group position={[w * 0.24, 0.18, h * 0.04]} rotation={[0, 0, 0]} scale={[2.8, 2.8, 2.8]}>
+      <group position={[w * 0.24, 0.18, h * 0.04]} rotation={[0, 0, 0]} scale={[1.6, 1.6, 1.6]}>
         <ParkedCar color="#3d0000" accent="#080808" />
       </group>
     </>
@@ -2974,7 +2974,7 @@ const GarageRoof = ({ garage, planW, planH, wallH, colors, wallTextures }: { gar
    The model is normalized to length CAR_TARGET_LENGTH along +/- Z so existing
    callers (carport + garage) keep working with their current position/rotation/scale. */
 const CAR_MODEL_URL = '/models/car.glb';
-const CAR_TARGET_LENGTH = 4.8; // local units — matches the previous car footprint (callers apply scale 2.0)
+const CAR_TARGET_LENGTH = 3.6; // local units — normalized car length
 
 const ParkedCar = ({ color = '#1f2937' }: { color?: string; accent?: string }) => {
   const { scene } = useGLTF(CAR_MODEL_URL);
@@ -3279,7 +3279,7 @@ const Carport = ({ plan, plotW, plotD, gateSide }: { plan: Plan; plotW: number; 
       )}
 
       {/* ── Parked car ── */}
-      <group position={[carX, cpElevation, carZ]} rotation={[0, carYaw, 0]} scale={[2.8, 2.8, 2.8]}>
+      <group position={[carX, cpElevation, carZ]} rotation={[0, carYaw, 0]} scale={[1.6, 1.6, 1.6]}>
         <ParkedCar color="#1f2a44" />
       </group>
     </group>
