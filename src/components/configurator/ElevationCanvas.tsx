@@ -2982,38 +2982,57 @@ const ParkedCar = ({ color = '#1f2937' }: { color?: string; accent?: string }) =
   const model = useMemo(() => {
     const root = scene.clone(true);
 
-    // Re-skin body panels with glossy automotive paint in the requested colour;
-    // give glass a tinted, reflective look. Other parts (rims, lights, interior) stay as authored.
+    // Re-skin using material names (more precise than mesh names for this GLB).
     root.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      const name = mesh.name.toLowerCase();
-      if (name.includes('body') || name.includes('paint') || name.includes('carrosserie') || name.includes('coque')) {
+      const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+      const matName = (mat?.name || mesh.name).toLowerCase();
+      if (matName === 'body' || matName === 'body_2') {
         mesh.material = new THREE.MeshPhysicalMaterial({
           color: new THREE.Color(color),
-          metalness: 0.85,
-          roughness: 0.28,
+          metalness: 0.82,
+          roughness: 0.26,
           clearcoat: 1,
           clearcoatRoughness: 0.05,
           envMapIntensity: 1.4,
         });
-      } else if (name.includes('glass') || name.includes('window') || name.includes('vitre') || name.includes('windshield')) {
+      } else if (matName === 'grills') {
+        mesh.material = new THREE.MeshStandardMaterial({ color: '#0a0a0a', roughness: 0.45, metalness: 0.8 });
+      } else if (matName === 'bottom') {
+        mesh.material = new THREE.MeshStandardMaterial({ color: '#111214', roughness: 0.9, metalness: 0.1 });
+      } else if (matName === 'window') {
         mesh.material = new THREE.MeshPhysicalMaterial({
           color: new THREE.Color('#0c1422'),
-          metalness: 0.1,
-          roughness: 0.05,
-          transmission: 0.6,
-          transparent: true,
-          opacity: 0.6,
-          clearcoat: 1,
-          ior: 1.45,
+          metalness: 0.1, roughness: 0.04,
+          transmission: 0.62, transparent: true, opacity: 0.65,
+          clearcoat: 1, ior: 1.45,
+        });
+      } else if (matName === 'headlights') {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+          color: '#f0f6ff', roughness: 0.05, metalness: 0.1,
+          transmission: 0.4, transparent: true, opacity: 0.92,
+          clearcoat: 1, emissive: new THREE.Color('#fff8e0'), emissiveIntensity: 0.35,
+        });
+      } else if (matName === 'brakelights' || matName === 'tailights') {
+        mesh.material = new THREE.MeshStandardMaterial({ color: '#7a0000', emissive: new THREE.Color('#cc1111'), emissiveIntensity: 0.5, roughness: 0.3 });
+      } else if (matName === 'reverselights') {
+        mesh.material = new THREE.MeshStandardMaterial({ color: '#ddeeff', roughness: 0.2 });
+      } else if (matName.includes('paint') || matName.includes('carrosserie')) {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color(color), metalness: 0.85, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.05,
+        });
+      } else if (matName.includes('glass') || matName.includes('vitre') || matName.includes('windshield')) {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color('#0c1422'), metalness: 0.1, roughness: 0.05,
+          transmission: 0.6, transparent: true, opacity: 0.6, clearcoat: 1, ior: 1.45,
         });
       }
     });
 
-    // Normalize: centre on X/Z, rest on the ground (y = 0), scale to the target length.
+    // Normalize: centre on X/Z, rest on ground (y = 0), scale to target length.
     const box = new THREE.Box3().setFromObject(root);
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
@@ -3025,8 +3044,75 @@ const ParkedCar = ({ color = '#1f2937' }: { color?: string; accent?: string }) =
     wrapper.add(root);
     const lengthAxis = Math.max(size.x, size.z) || 1;
     wrapper.scale.setScalar(CAR_TARGET_LENGTH / lengthAxis);
-    // Orient the longest dimension along Z (front/back) to match the previous convention.
     if (size.x > size.z) wrapper.rotation.y = Math.PI / 2;
+
+    // The GLB wheel nodes are empty transforms (no mesh).
+    // Find them by name, get their world positions, and add procedural tyres there.
+    wrapper.updateMatrixWorld(true);
+    const WHEEL_R = 0.50;
+    const WHEEL_W = 0.36;
+    const RIM_R   = 0.32;
+    const tyreMat  = new THREE.MeshStandardMaterial({ color: '#0c0c0e', roughness: 0.94, metalness: 0.04 });
+    const rimMat   = new THREE.MeshStandardMaterial({ color: '#c4c8cc', roughness: 0.22, metalness: 0.92 });
+    const capMat   = new THREE.MeshStandardMaterial({ color: '#1a1a1c', roughness: 0.4, metalness: 0.7 });
+
+    root.traverse((obj) => {
+      if (!obj.name.toLowerCase().startsWith('wheel')) return;
+      const worldPos = new THREE.Vector3();
+      obj.getWorldPosition(worldPos);
+      const lp = wrapper.worldToLocal(worldPos.clone());
+
+      const wg = new THREE.Group();
+      wg.position.copy(lp);
+
+      // Tyre body
+      const tyreM = new THREE.Mesh(new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, WHEEL_W, 40), tyreMat);
+      tyreM.rotation.z = Math.PI / 2;
+      tyreM.castShadow = true;
+      wg.add(tyreM);
+
+      // Tread shoulder ring
+      const treadM = new THREE.Mesh(new THREE.CylinderGeometry(WHEEL_R + 0.015, WHEEL_R + 0.015, WHEEL_W - 0.08, 40), new THREE.MeshStandardMaterial({ color: '#161618', roughness: 1.0 }));
+      treadM.rotation.z = Math.PI / 2;
+      wg.add(treadM);
+
+      // Alloy rim (outboard face)
+      const side = lp.x > 0 ? 1 : -1;
+      const rimFace = new THREE.Mesh(new THREE.CylinderGeometry(RIM_R, RIM_R, 0.04, 28), rimMat);
+      rimFace.rotation.z = Math.PI / 2;
+      rimFace.position.x = side * (WHEEL_W / 2 - 0.01);
+      rimFace.castShadow = true;
+      wg.add(rimFace);
+
+      // Rim dish
+      const dish = new THREE.Mesh(new THREE.CylinderGeometry(RIM_R - 0.04, RIM_R, 0.10, 28), new THREE.MeshStandardMaterial({ color: '#9aa0a6', roughness: 0.35, metalness: 0.88 }));
+      dish.rotation.z = Math.PI / 2;
+      dish.position.x = side * (WHEEL_W / 2 - 0.08);
+      wg.add(dish);
+
+      // Spokes ×5
+      for (let i = 0; i < 5; i++) {
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, RIM_R * 1.8), rimMat);
+        spoke.rotation.x = (i * Math.PI * 2) / 5;
+        spoke.rotation.z = Math.PI / 2;
+        spoke.position.x = side * (WHEEL_W / 2 - 0.01);
+        wg.add(spoke);
+      }
+
+      // Center cap
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.03, 16), capMat);
+      cap.rotation.z = Math.PI / 2;
+      cap.position.x = side * (WHEEL_W / 2);
+      wg.add(cap);
+
+      // Brake disc (inboard side)
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(RIM_R - 0.04, RIM_R - 0.04, 0.04, 28), new THREE.MeshStandardMaterial({ color: '#3a3d42', roughness: 0.5, metalness: 0.6 }));
+      disc.rotation.z = Math.PI / 2;
+      disc.position.x = -side * (WHEEL_W / 2 - 0.01);
+      wg.add(disc);
+
+      wrapper.add(wg);
+    });
 
     return wrapper;
   }, [scene, color]);
