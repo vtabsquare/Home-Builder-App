@@ -109,6 +109,7 @@ export interface ConfigState {
   phone: string;
   email: string;
   timeline: string;
+  preferredBranch: string;
   // Kiosk
   kioskMode: boolean;
   // Presets & Custom Editor
@@ -133,6 +134,8 @@ export interface ConfigState {
   downPaymentPercent: number;
   interestRate: number;
   tenureYears: number;
+  // Loyalty
+  loyaltyProducts: string[];
 }
 
 export interface ConfigActions {
@@ -150,7 +153,7 @@ export interface ConfigActions {
   setRoof: (r: RoofType) => void;
   setFinishingQuality: (q: FinishingQuality) => void;
   setMaterial: (m: Material) => void;
-  setLead: (p: Partial<Pick<ConfigState, 'name' | 'phone' | 'email' | 'timeline'>>) => void;
+  setLead: (p: Partial<Pick<ConfigState, 'name' | 'phone' | 'email' | 'timeline' | 'preferredBranch'>>) => void;
   setKioskMode: (v: boolean) => void;
   setPresetId: (id: number) => void;
   setAdvancedEditorMode: (v: boolean) => void;
@@ -175,6 +178,7 @@ export interface ConfigActions {
   setDownPaymentPercent: (v: number) => void;
   setInterestRate: (v: number) => void;
   setTenureYears: (v: number) => void;
+  toggleLoyaltyProduct: (p: string) => void;
   reset: () => void;
 }
 
@@ -211,6 +215,7 @@ const initial: ConfigState = {
   phone: '',
   email: '',
   timeline: '',
+  preferredBranch: '',
   kioskMode: false,
   presetId: 0,
   advancedEditorMode: false,
@@ -228,6 +233,7 @@ const initial: ConfigState = {
   downPaymentPercent: 10,
   interestRate: 6.5,
   tenureYears: 25,
+  loyaltyProducts: [],
 };
 
 export const useConfig = create<ConfigState & ConfigActions>()(
@@ -477,6 +483,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       setDownPaymentPercent: (v) => set({ downPaymentPercent: v }),
       setInterestRate: (v) => set({ interestRate: v }),
       setTenureYears: (v) => set({ tenureYears: v }),
+      toggleLoyaltyProduct: (p) => set((state) => ({ loyaltyProducts: state.loyaltyProducts.includes(p) ? state.loyaltyProducts.filter(x => x !== p) : [...state.loyaltyProducts, p] })),
       reset: () => set((state) => ({
         ...initial,
         savedPresets: state.savedPresets,

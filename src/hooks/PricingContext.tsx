@@ -5,7 +5,7 @@
  * Wraps the app via <PricingProvider> and consumed via usePricing().
  */
 import { createContext, useContext, ReactNode } from 'react';
-import { useDynamicPricing, PricingConfig, computeCostDynamic, formatMoneyDynamic, LAND_PACKAGES_STATIC } from './useDynamicPricing';
+import { useDynamicPricing, PricingConfig, computeCostDynamic, formatMoneyDynamic, LAND_PACKAGES_STATIC, NON_LOAN_ADDONS } from './useDynamicPricing';
 import { HOME_TYPE_DEFAULTS } from '@/store/configurator';
 import type { AddOn, HomeType, KitchenType } from '@/store/configurator';
 
@@ -30,13 +30,13 @@ export function usePricing(): PricingConfig {
 /** Utility: build ADDON_META dynamically from current pricing */
 export function useAddonMeta() {
   const p = usePricing();
-  const ADDON_LABELS: Record<AddOn, { label: string; cost: number }> = {
-    solar: { label: 'Solar Panels', cost: p.addon_costs.solar },
-    carport: { label: 'Carport', cost: p.addon_costs.carport },
-    water_tank: { label: 'Water Tank', cost: p.addon_costs.water_tank },
-    smart_home: { label: 'Generator', cost: p.addon_costs.smart_home },
-    fence: { label: 'Perimeter Fence/Bridge', cost: p.addon_costs.fence },
-    landscaping: { label: 'Furniture', cost: p.addon_costs.landscaping },
+  const ADDON_LABELS: Record<AddOn, { label: string; cost: number; isNonLoan: boolean; layoutOnly: boolean }> = {
+    solar:       { label: 'Solar Panels',          cost: p.addon_costs.solar,       isNonLoan: true,  layoutOnly: false },
+    carport:     { label: 'Carport',               cost: p.addon_costs.carport,     isNonLoan: false, layoutOnly: true  },
+    water_tank:  { label: 'Water Tank',            cost: p.addon_costs.water_tank,  isNonLoan: true,  layoutOnly: false },
+    smart_home:  { label: 'Generator',             cost: p.addon_costs.smart_home,  isNonLoan: true,  layoutOnly: false },
+    fence:       { label: 'Perimeter Fence/Bridge',cost: p.addon_costs.fence,       isNonLoan: false, layoutOnly: false },
+    landscaping: { label: 'Furniture',             cost: p.addon_costs.landscaping, isNonLoan: false, layoutOnly: false },
   };
   return ADDON_LABELS;
 }
@@ -108,4 +108,4 @@ export function useLandSqftRate() {
   return usePricing().land_sqft_rate;
 }
 
-export { computeCostDynamic, formatMoneyDynamic };
+export { computeCostDynamic, formatMoneyDynamic, NON_LOAN_ADDONS };

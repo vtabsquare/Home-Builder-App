@@ -8,10 +8,13 @@ import { fetchElevationImagesByVariant, resolveElevationVariant } from '@/lib/el
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, ArrowRight } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Mail, Pencil, X, Send, Loader2 } from 'lucide-react';
 import { useQuotationEngine } from '@/hooks/useQuotationEngine';
 import { QuoteSummary } from '@/components/financing/QuoteSummary';
 import { formatMoneyDynamic } from '@/hooks/useDynamicPricing';
+import { generateEstimatePDF } from '@/lib/generateEstimatePDF';
+import { FloorPlanCanvas, FloorPlanCanvasHandle } from '../FloorPlanCanvas';
+import { Plan } from '@/lib/floorplan';
 
 type ConfigStore = ConfigState & ConfigActions;
 
@@ -21,6 +24,9 @@ const INFOBIP_BASE_URL = import.meta.env.VITE_INFOBIP_BASE_URL;
 const INFOBIP_SENDER_EMAIL = import.meta.env.VITE_INFOBIP_SENDER_EMAIL;
 const INFOBIP_SENDER_NAME = import.meta.env.VITE_INFOBIP_SENDER_NAME || 'GBTI Architectural Team';
 
+// Tracked loan application link — Supabase increments click count per leadId
+const LOAN_APPLICATION_URL = 'https://gbtibank.com/apply-for-a-loan/';
+
 const schema = z.object({
   name: z.string().trim().min(2, 'Enter your name').max(100),
   phone: z.string().trim().min(6, 'Enter a valid phone').max(30),
@@ -28,17 +34,17 @@ const schema = z.object({
   timeline: z.string().optional(),
 });
 
+const emailSchema = z.string().trim().email('Enter a valid email address');
+
 interface Props {
   cost: CostBreakdown;
+  plan: Plan;
   onReset?: () => void;
 }
 
 const generateLeadId = () => {
   const cryptoApi = globalThis.crypto as Crypto | undefined;
-  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') {
-    return cryptoApi.randomUUID();
-  }
-
+  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') return cryptoApi.randomUUID();
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
     const random = Math.floor(Math.random() * 16);
     const value = char === 'x' ? random : (random & 0x3) | 0x8;
@@ -46,113 +52,153 @@ const generateLeadId = () => {
   });
 };
 
-const buildBrevoHtml = ({
+// ── Email HTML builder (new GBTI verbatim) ─────────────────────────────────
+
+const buildGBTIEmailHtml = ({
   name,
   leadId,
-  timeline,
   cost,
-  c,
+  loanAmount,
+  downPayment,
+  monthlyEMI,
 }: {
   name: string;
   leadId: string;
-  timeline: string;
   cost: CostBreakdown;
-  c: ConfigStore;
-}) => {
-  const addons = c.addons.length ? c.addons.join(', ') : 'None';
-  const landText = c.land === 'need'
-    ? c.landSize === 'custom'
-      ? `Need land · ${c.customLandArea} sqft`
-      : `Need land · ${c.landSize || 'Not specified'}`
-    : c.land === 'own'
-      ? 'Already own land'
-      : 'Land preference not specified';
+  loanAmount: number;
+  downPayment: number;
+  monthlyEMI: number;
+}) => `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f4f2;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:640px;margin:0 auto;background:#ffffff;">
 
-  return `
-    <div style="font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.6;max-width:640px;margin:0 auto;padding:24px;">
-      <h1 style="font-size:28px;margin:0 0 16px;">Thank you for contacting us</h1>
-      <p style="margin:0 0 16px;">Hi ${name},</p>
-      <p style="margin:0 0 16px;">Thank you for contacting us. Our agents will contact you soon.</p>
-      <p style="margin:0 0 24px;">Here is the current estimate for your requested proposal.</p>
-      <div style="border:1px solid #e5e7eb;border-radius:16px;padding:20px;margin:0 0 24px;">
-        <h2 style="font-size:20px;margin:0 0 12px;">Estimate summary</h2>
-        <p style="margin:0 0 8px;">Total estimate: <strong>${formatMoney(cost.total)}</strong></p>
-        <p style="margin:0 0 8px;">Area: <strong>${cost.area} sqft</strong></p>
-        <p style="margin:0 0 8px;">Down payment: <strong>${formatMoney(cost.downPayment)}</strong></p>
-        <p style="margin:0 0 8px;">Loan amount: <strong>${formatMoney(cost.loanAmount)}</strong></p>
-        <p style="margin:0;">Estimated monthly EMI: <strong>${formatMoney(cost.emi)}</strong></p>
-      </div>
-      <div style="border:1px solid #e5e7eb;border-radius:16px;padding:20px;margin:0 0 24px;">
-        <h2 style="font-size:20px;margin:0 0 12px;">Configuration overview</h2>
-        <p style="margin:0 0 8px;">Home type: <strong>${c.homeType}</strong></p>
-        <p style="margin:0 0 8px;">Bedrooms: <strong>${c.bedrooms}</strong></p>
-        <p style="margin:0 0 8px;">Bathrooms: <strong>${c.bathrooms}</strong></p>
-        <p style="margin:0 0 8px;">Kitchen: <strong>${c.kitchen}</strong></p>
-        <p style="margin:0 0 8px;">Finishing: <strong>${c.finishingQuality === 'premium' ? 'Premium' : 'Standard'}</strong></p>
-        <p style="margin:0 0 8px;">Roof: <strong>${c.roof}</strong></p>
-        <p style="margin:0 0 8px;">Material: <strong>${c.material}</strong></p>
-        <p style="margin:0 0 8px;">Storeys: <strong>${c.isDoubleStorey ? 'Double' : 'Single'}</strong></p>
-        <p style="margin:0 0 8px;">Land: <strong>${landText}</strong></p>
-        <p style="margin:0;">Add-ons: <strong>${addons}</strong></p>
-      </div>
-      <div style="border:1px solid #e5e7eb;border-radius:16px;padding:20px;margin:0 0 24px;">
-        <h2 style="font-size:20px;margin:0 0 12px;">Estimate breakdown</h2>
-        <ul style="padding-left:20px;margin:0;">
-          ${cost.items.map((item) => `<li style="margin:0 0 8px;">${item.label}: <strong>${formatMoney(item.amount)}</strong></li>`).join('')}
-        </ul>
-      </div>
-      <p style="margin:0 0 8px;">Reference ID: <strong>${leadId}</strong></p>
-      <p style="margin:0;">Timeline preference: <strong>${timeline}</strong></p>
+    <!-- Header -->
+    <div style="background:#111827;padding:32px 32px 28px;">
+      <div style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">GBTI</div>
+      <div style="font-size:10px;letter-spacing:0.2em;color:#b8956a;margin-top:4px;text-transform:uppercase;">Architectural Configurator</div>
     </div>
-  `;
-};
 
-const sendEmailViaInfobip = async ({
+    <!-- Gold accent bar -->
+    <div style="height:4px;background:linear-gradient(90deg,#b8956a,#d4af7a);"></div>
+
+    <!-- Body -->
+    <div style="padding:36px 32px;">
+      <h1 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 8px;">Your Home Estimate is Ready</h1>
+      <p style="color:#6b7280;font-size:13px;margin:0 0 28px;">Reference ID: <strong style="color:#111827;">${leadId.slice(0,8).toUpperCase()}</strong></p>
+
+      <p style="font-size:15px;color:#111827;line-height:1.7;margin:0 0 16px;">Dear ${name},</p>
+      <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px;">Thank you for starting your home dream journey with GBTI.</p>
+      <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px;">We have attached your personalized dream home and cost estimate PDF for your records. We hope this helps you get a clearer picture of your path forward.</p>
+      <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 28px;">You can take the next step toward your goals by starting your formal application here:</p>
+
+      <!-- CTA Button -->
+      <div style="text-align:center;margin:0 0 36px;">
+        <a href="${LOAN_APPLICATION_URL}?ref=${leadId}" target="_blank"
+           style="display:inline-block;background:#b8956a;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:16px 40px;border-radius:50px;letter-spacing:0.05em;">
+          Start Your Loan Application →
+        </a>
+      </div>
+
+      <!-- Summary Card -->
+      <div style="background:#faf8f5;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin:0 0 28px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.15em;color:#b8956a;text-transform:uppercase;margin-bottom:16px;">Estimate Summary</div>
+        <table style="width:100%;border-collapse:collapse;">
+          ${[
+            ['Est. Property Price', formatMoney(cost.total)],
+            ['Loan Amount', formatMoney(loanAmount)],
+            ['Down Payment', formatMoney(downPayment)],
+            ['Monthly Repayment', formatMoney(monthlyEMI)],
+          ].map(([label, value]) => `
+          <tr style="border-bottom:1px solid #f3f4f6;">
+            <td style="padding:10px 0;font-size:13px;color:#6b7280;">${label}</td>
+            <td style="padding:10px 0;font-size:13px;font-weight:700;color:#111827;text-align:right;">${value}</td>
+          </tr>`).join('')}
+        </table>
+        <p style="font-size:10px;color:#9ca3af;margin:12px 0 0;line-height:1.5;">
+          * Solar Panels, Water Tank, and Generator are included in the total estimate but not in the loan amount due to ineligibility for bank financing.
+        </p>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 28px;">
+
+      <p style="font-size:14px;color:#374151;line-height:1.7;margin:0 0 8px;">Our dedicated team is here to support you at every stage. If you have any questions or need guidance, please don't hesitate to reach out on</p>
+      <p style="font-size:15px;font-weight:700;color:#111827;margin:0 0 28px;">+592 231 4400</p>
+      <p style="font-size:14px;color:#374151;line-height:1.7;margin:0 0 4px;">We look forward to helping you build your future.</p>
+      <p style="font-size:14px;color:#374151;margin:0 0 32px;">Best regards,<br><strong style="color:#111827;">GBTI Architectural Team</strong></p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#111827;padding:20px 32px;text-align:center;">
+      <p style="font-size:11px;color:#6b7280;margin:0 0 4px;">GBTI Bank · +592 231 4400</p>
+      <p style="font-size:10px;color:#4b5563;margin:0;">Estimates are indicative. Final pricing confirmed by your architect.</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+// ── Send email via Infobip with PDF attachment ──────────────────────────────
+
+const sendGBTIEmail = async ({
   name,
   email,
   leadId,
-  timeline,
   cost,
-  c,
+  loanAmount,
+  downPayment,
+  monthlyEMI,
+  pdfBlob,
 }: {
   name: string;
   email: string;
   leadId: string;
-  timeline: string;
   cost: CostBreakdown;
-  c: ConfigStore;
+  loanAmount: number;
+  downPayment: number;
+  monthlyEMI: number;
+  pdfBlob?: Blob;
 }) => {
   if (!INFOBIP_API_KEY || !INFOBIP_BASE_URL || !INFOBIP_SENDER_EMAIL) {
     throw new Error('Infobip env is not configured');
   }
 
-  const htmlContent = buildBrevoHtml({ name, leadId, timeline, cost, c });
-  const textContent = [
-    `Hi ${name},`,
-    '',
-    'Thank you for contacting us. Our agents will contact you soon.',
-    '',
-    `Total estimate: ${formatMoney(cost.total)}`,
-    `Area: ${cost.area} sqft`,
-    `Down payment: ${formatMoney(cost.downPayment)}`,
-    `Loan amount: ${formatMoney(cost.loanAmount)}`,
-    `Estimated monthly EMI: ${formatMoney(cost.emi)}`,
-    '',
-    `Reference ID: ${leadId}`,
-  ].join('\n');
+  const htmlContent = buildGBTIEmailHtml({ name, leadId, cost, loanAmount, downPayment, monthlyEMI });
 
   const form = new FormData();
   form.append('from', `${INFOBIP_SENDER_NAME} <${INFOBIP_SENDER_EMAIL}>`);
   form.append('to', `${name} <${email}>`);
-  form.append('subject', 'Your GBTI proposal request and estimate');
+  form.append('subject', `${name} - Your GBTI Home Estimate is ready`);
   form.append('html', htmlContent);
-  form.append('text', textContent);
+  form.append('text', [
+    `Dear ${name},`,
+    '',
+    'Thank you for starting your home dream journey with GBTI.',
+    '',
+    'We have attached your personalized dream home and cost estimate PDF for your records.',
+    'We hope this helps you get a clearer picture of your path forward.',
+    '',
+    'You can take the next step toward your goals by starting your formal application here:',
+    `Start Your Loan Application: ${LOAN_APPLICATION_URL}?ref=${leadId}`,
+    '',
+    `Our dedicated team is here to support you at every stage. If you have any questions`,
+    `or need guidance, please don't hesitate to reach out on +592 231 4400`,
+    '',
+    'We look forward to helping you build your future.',
+    '',
+    'Best regards,',
+    'GBTI Architectural Team',
+  ].join('\n'));
+
+  if (pdfBlob) {
+    form.append('attachment', pdfBlob, `GBTI_Estimate_${leadId.slice(0, 8).toUpperCase()}.pdf`);
+  }
 
   const response = await fetch(`${INFOBIP_BASE_URL}/email/3/send`, {
     method: 'POST',
-    headers: {
-      Authorization: `App ${INFOBIP_API_KEY}`,
-    },
+    headers: { Authorization: `App ${INFOBIP_API_KEY}` },
     body: form,
   });
 
@@ -162,26 +208,178 @@ const sendEmailViaInfobip = async ({
   }
 };
 
-export const StepLeadCapture = ({ cost, onReset }: Props) => {
+// ── Send to Inbox Modal ─────────────────────────────────────────────────────
+
+interface InboxModalProps {
+  originalEmail: string;
+  name: string;
+  onConfirm: (finalEmail: string, emailChanged: boolean) => Promise<void>;
+  onClose: () => void;
+  sending: boolean;
+}
+
+const SendToInboxModal = ({ originalEmail, name, onConfirm, onClose, sending }: InboxModalProps) => {
+  const [email, setEmail] = useState(originalEmail);
+  const [emailError, setEmailError] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+
+  const emailChanged = email.trim().toLowerCase() !== originalEmail.trim().toLowerCase();
+
+  const handleConfirm = async () => {
+    const result = emailSchema.safeParse(email);
+    if (!result.success) {
+      setEmailError(result.error.errors[0].message);
+      return;
+    }
+    setEmailError('');
+    await onConfirm(email.trim(), emailChanged);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget && !sending) onClose(); }}
+    >
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0, y: 12 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.94, opacity: 0, y: 12 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+      >
+        {/* Header */}
+        <div className="bg-[#111827] px-6 py-5 flex items-center justify-between">
+          <div>
+            <div className="text-white font-bold text-base">Send to My Inbox</div>
+            <div className="text-[#b8956a] text-[10px] uppercase tracking-widest mt-0.5">GBTI Home Estimate PDF</div>
+          </div>
+          {!sending && (
+            <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-6 space-y-5">
+          <p className="text-sm text-gray-600 leading-relaxed">
+            We'll send your personalised home estimate PDF to the email below.
+            You can update it if needed before sending.
+          </p>
+
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 block mb-2">
+              Delivery Email
+            </label>
+            <div className={`flex items-center gap-2 rounded-xl border px-4 py-3 transition-all ${isEditing ? 'border-[#b8956a] ring-2 ring-[#b8956a]/20' : 'border-gray-200 bg-gray-50'}`}>
+              <Mail size={15} className="text-gray-400 flex-shrink-0" />
+              {isEditing ? (
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setEmailError(''); }}
+                  className="flex-1 bg-transparent text-sm text-gray-900 outline-none"
+                  autoFocus
+                  onBlur={() => setIsEditing(false)}
+                />
+              ) : (
+                <span className="flex-1 text-sm text-gray-900">{email}</span>
+              )}
+              {!isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="text-[#b8956a] hover:text-[#a07850] transition-colors flex items-center gap-1 text-[11px] font-semibold"
+                >
+                  <Pencil size={11} /> Change
+                </button>
+              )}
+            </div>
+            {emailError && <p className="mt-1.5 text-xs text-red-500">{emailError}</p>}
+            {emailChanged && !emailError && (
+              <p className="mt-1.5 text-[10px] text-amber-600 font-medium">
+                ✱ Different from your initial entry — we'll note this change.
+              </p>
+            )}
+          </div>
+
+          {/* What they'll receive */}
+          <div className="bg-[#faf8f5] rounded-xl p-4 border border-[#e5e7eb] space-y-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-[#b8956a]">What you'll receive</div>
+            {[
+              'Personalised PDF estimate with floor plan & elevation',
+              'Full cost breakdown & financing summary',
+              'Direct link to start your formal loan application',
+            ].map((item) => (
+              <div key={item} className="flex items-start gap-2 text-xs text-gray-600">
+                <span className="text-[#b8956a] mt-0.5">✓</span> {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="px-6 pb-6 flex gap-3">
+          {!sending && (
+            <button
+              onClick={onClose}
+              className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={handleConfirm}
+            disabled={sending}
+            className="flex-1 py-3 rounded-xl bg-[#111827] text-white text-sm font-semibold hover:bg-[#1f2937] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {sending ? (
+              <>
+                <Loader2 size={15} className="animate-spin" />
+                Sending…
+              </>
+            ) : (
+              <>
+                <Send size={14} />
+                Send to My Inbox
+              </>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// ── Main Component ─────────────────────────────────────────────────────────
+
+export const StepLeadCapture = ({ cost, plan, onReset }: Props) => {
   const c = useConfig();
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [showInboxModal, setShowInboxModal] = useState(false);
+  const [sending, setSending] = useState(false);
+  const leadIdRef = useRef<string | null>(null);
+  const floorPlanRef = useRef<FloorPlanCanvasHandle>(null);
 
-  const { mortgageEngine, finalQuote } = useQuotationEngine(cost.total, cost.landCost);
+  const { mortgageEngine, finalQuote } = useQuotationEngine(
+    cost.total,
+    cost.landCost,
+    cost.total - (cost.nonLoanAddonsCost ?? 0)
+  );
 
-  // ── 10-second auto-reset countdown ──────────────────────
+  // ── Auto-reset countdown ──────────────────────────────────────────────
   const COUNTDOWN_SECONDS = 10;
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleFullReset = useCallback(() => {
     if (countdownRef.current) clearInterval(countdownRef.current);
-    if (onReset) {
-      onReset();
-    } else {
-      useConfig.getState().reset();
-    }
+    if (onReset) onReset();
+    else useConfig.getState().reset();
   }, [onReset]);
 
   useEffect(() => {
@@ -197,12 +395,11 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
         return prev - 1;
       });
     }, 1000);
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
   }, [done, handleFullReset]);
 
-  const submit = async () => {
+  // ── Save lead to Supabase (first step — before email modal) ──────────
+  const handleRequestSend = async () => {
     const parsed = schema.safeParse({ name: c.name, phone: c.phone, email: c.email, timeline: c.timeline });
     if (!parsed.success) {
       toast.error('Missing contact details. Please start over.');
@@ -210,6 +407,7 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
     }
     setErrors({});
     setSubmitting(true);
+
     const timelineVal = c.timeline || 'Not specified';
     const presetKey = getBuiltInPresetKey(c, c.presetId);
     const elevationKeyOrder = getElevationLookupKeys(c, c.presetId);
@@ -259,177 +457,242 @@ export const StepLeadCapture = ({ cost, onReset }: Props) => {
         items: cost.items,
       },
     };
+
     const leadId = generateLeadId();
-    const { error } = await supabase
-      .from('leads')
-      .insert({
-        id: leadId,
-        name: c.name.trim(),
-        phone: c.phone.trim(),
-        email: c.email.trim(),
-        timeline: timelineVal,
-        config,
-        total_cost: cost.total,
-      });
+    leadIdRef.current = leadId;
+
+    const { error } = await supabase.from('leads').insert({
+      id: leadId,
+      name: c.name.trim(),
+      phone: c.phone.trim(),
+      email: c.email.trim(),
+      timeline: timelineVal,
+      config,
+      total_cost: cost.total,
+    });
 
     setSubmitting(false);
+
     if (error) {
       toast.error('Submission failed — please try again');
       return;
     }
 
+    // Open modal to confirm/change email
+    setShowInboxModal(true);
+  };
+
+  // ── Handle final email send (from modal) ─────────────────────────────
+  const handleSendToInbox = async (finalEmail: string, emailChanged: boolean) => {
+    setSending(true);
+    const leadId = leadIdRef.current!;
+    const timelineVal = c.timeline || 'Not specified';
+
     try {
-      if (INFOBIP_API_KEY && INFOBIP_BASE_URL && INFOBIP_SENDER_EMAIL) {
-        await sendEmailViaInfobip({
-          name: c.name.trim(),
-          email: c.email.trim(),
-          leadId,
-          timeline: timelineVal,
+      // Track email address changes
+      if (emailChanged) {
+        await supabase.from('leads').update({
+          config: {
+            email_changed: true,
+            original_email: c.email.trim(),
+            delivery_email: finalEmail,
+          } as any,
+        }).eq('id', leadId);
+      }
+
+      // Generate PDF
+      const elevationVariant = await resolveElevationVariant(c, c.presetId);
+      const elevationRows = await fetchElevationImagesByVariant(
+        elevationVariant.id,
+        getElevationLookupKeys(c, c.presetId)
+      );
+      const elevationImageUrl = elevationRows?.[0]?.image_url || undefined;
+
+      // Capture floor plan snapshot from hidden canvas
+      let floorPlanDataUrl: string | undefined;
+      try {
+        const stage = floorPlanRef.current?.getStage();
+        if (stage) {
+          floorPlanDataUrl = stage.toDataURL({ pixelRatio: 2, mimeType: 'image/png' });
+        }
+      } catch (snapErr) {
+        console.warn('Floor plan snapshot failed:', snapErr);
+      }
+
+      let pdfBlob: Blob | undefined;
+      try {
+        pdfBlob = await generateEstimatePDF({
           cost,
           c,
+          loanAmount: finalQuote.loanAmount,
+          downPayment: finalQuote.downPayment,
+          monthlyEMI: finalQuote.monthlyEMI,
+          interestRate: finalQuote.interestRate,
+          tenureYears: finalQuote.tenureYears,
+          elevationImageUrl,
+          floorPlanDataUrl,
+          leadId,
+        });
+      } catch (pdfErr) {
+        console.error('PDF generation failed, sending without attachment:', pdfErr);
+      }
+
+      // Send email
+      if (INFOBIP_API_KEY && INFOBIP_BASE_URL && INFOBIP_SENDER_EMAIL) {
+        await sendGBTIEmail({
+          name: c.name.trim(),
+          email: finalEmail,
+          leadId,
+          cost,
+          loanAmount: finalQuote.loanAmount,
+          downPayment: finalQuote.downPayment,
+          monthlyEMI: finalQuote.monthlyEMI,
+          pdfBlob,
         });
       } else {
-        const { error: emailError } = await supabase.functions.invoke('send-proposal-email', {
+        // Fallback: Supabase edge function
+        await supabase.functions.invoke('send-proposal-email', {
           body: {
             leadId,
             name: c.name.trim(),
-            email: c.email.trim(),
+            email: finalEmail,
             phone: c.phone.trim(),
             timeline: timelineVal,
             estimate: {
               total: cost.total,
               area: cost.area,
-              downPayment: cost.downPayment,
-              loanAmount: cost.loanAmount,
-              emi: cost.emi,
+              downPayment: finalQuote.downPayment,
+              loanAmount: finalQuote.loanAmount,
+              emi: finalQuote.monthlyEMI,
               items: cost.items,
-            },
-            configuration: {
-              land: c.land,
-              landSize: c.landSize,
-              customLandArea: c.customLandArea,
-              homeType: c.homeType,
-              bedrooms: c.bedrooms,
-              bathrooms: c.bathrooms,
-              kitchen: c.kitchen,
-              finishingQuality: c.finishingQuality,
-              addons: c.addons,
-              roof: c.roof,
-              material: c.material,
-              isDoubleStorey: c.isDoubleStorey,
             },
           },
         });
-
-        if (emailError) {
-          throw emailError;
-        }
       }
-    } catch {
-      toast.error('Proposal saved, but email delivery could not be triggered');
-    }
 
-    setDone(true);
+      setShowInboxModal(false);
+      setDone(true);
+    } catch {
+      toast.error('Estimate saved, but email delivery failed. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
-    <StepShell
-      eyebrow="Step 05 · Finalization"
-      title="Request your proposal."
-      subtitle="Review your financing options and connect with our design team."
-      onPrev={() => useConfig.getState().prev()}
-    >
-      <div className="max-w-5xl mx-auto">
-        <AnimatePresence mode="wait">
-          {done ? (
-            <motion.div
-              key="done"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="py-6 sm:py-12 text-center"
-            >
+    <>
+      <StepShell
+        eyebrow="Step 05 · Finalization"
+        title="Request your proposal."
+        subtitle="Review your financing options and connect with our design team."
+        onPrev={() => useConfig.getState().prev()}
+      >
+        <div className="max-w-5xl mx-auto">
+          <AnimatePresence mode="wait">
+            {done ? (
               <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="inline-flex items-center justify-center h-16 w-16 sm:h-24 sm:w-24 rounded-full bg-soft-section border border-clay/20 text-clay mb-10"
+                key="done"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                className="py-6 sm:py-12 text-center"
               >
-                <CheckCircle2 size={40} strokeWidth={1} />
-              </motion.div>
-
-              <h3 className="font-display text-2xl sm:text-3xl md:text-5xl font-normal tracking-tight text-foreground mb-6">
-                Proposal secured.
-              </h3>
-
-              <p className="text-muted-foreground max-w-md mx-auto text-base sm:text-lg leading-relaxed font-light">
-                Thank you, <span className="text-foreground font-medium">{c.name.split(' ')[0]}</span>. Your architectural configuration has been received. Our studio will contact you within 24 hours.
-              </p>
-
-              <button
-                onClick={handleFullReset}
-                className="mt-12 inline-flex items-center gap-3 rounded-full bg-foreground text-background px-6 py-3 sm:px-10 sm:py-4 text-[10px] font-bold uppercase tracking-[0.3em] transition-all hover:scale-105 active:scale-95"
-              >
-                New Configuration <ArrowRight size={14} />
-              </button>
-
-              {/* Auto-reset countdown bar */}
-              <div className="mt-8 max-w-xs mx-auto">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">
-                    Returning to start
-                  </span>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 num">
-                    {countdown}s
-                  </span>
-                </div>
-                <div className="w-full h-1 rounded-full bg-border/60 overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full bg-clay"
-                    initial={{ width: '100%' }}
-                    animate={{ width: '0%' }}
-                    transition={{ duration: COUNTDOWN_SECONDS, ease: 'linear' }}
-                  />
-                </div>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="form"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="max-w-2xl mx-auto"
-            >
-              <QuoteSummary quote={finalQuote} mortgageEngine={mortgageEngine} />
-              
-              <div className="mt-8 flex justify-center">
-                <button
-                  onClick={submit}
-                  disabled={submitting}
-                  className="w-full py-4 rounded-xl bg-[#b8956a] hover:bg-[#a07850] text-white font-semibold transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.6, delay: 0.2 }}
+                  className="inline-flex items-center justify-center h-16 w-16 sm:h-24 sm:w-24 rounded-full bg-soft-section border border-clay/20 text-clay mb-10"
                 >
-                  {submitting ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, ease: 'linear', duration: 1 }}
-                      className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full"
-                    />
-                  ) : (
-                    <>
-                      Request Proposal — {formatMoneyDynamic(finalQuote.totalPropertyPrice)}
-                      <ArrowRight size={18} />
-                    </>
-                  )}
+                  <CheckCircle2 size={40} strokeWidth={1} />
+                </motion.div>
+
+                <h3 className="font-display text-2xl sm:text-3xl md:text-5xl font-normal tracking-tight text-foreground mb-4">
+                  On its way!
+                </h3>
+
+                <p className="text-muted-foreground max-w-md mx-auto text-base sm:text-lg leading-relaxed font-light mb-2">
+                  Your estimate PDF has been sent to your inbox, <span className="text-foreground font-medium">{c.name.split(' ')[0]}</span>.
+                </p>
+                <p className="text-muted-foreground/60 text-sm">
+                  Check your email and click <span className="text-foreground font-medium">"Start Your Loan Application"</span> when you're ready to proceed.
+                </p>
+
+                <button
+                  onClick={handleFullReset}
+                  className="mt-12 inline-flex items-center gap-3 rounded-full bg-foreground text-background px-6 py-3 sm:px-10 sm:py-4 text-[10px] font-bold uppercase tracking-[0.3em] transition-all hover:scale-105 active:scale-95"
+                >
+                  New Configuration <ArrowRight size={14} />
                 </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+
+                {/* Auto-reset countdown */}
+                <div className="mt-8 max-w-xs mx-auto">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Returning to start</span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 num">{countdown}s</span>
+                  </div>
+                  <div className="w-full h-1 rounded-full bg-border/60 overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full bg-clay"
+                      initial={{ width: '100%' }}
+                      animate={{ width: '0%' }}
+                      transition={{ duration: COUNTDOWN_SECONDS, ease: 'linear' }}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="form"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                className="max-w-2xl mx-auto"
+              >
+                <QuoteSummary quote={finalQuote} mortgageEngine={mortgageEngine} />
+
+                <div className="mt-8 flex justify-center">
+                  <button
+                    onClick={handleRequestSend}
+                    disabled={submitting}
+                    className="w-full py-4 rounded-xl bg-[#111827] hover:bg-[#1f2937] text-white font-semibold transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 text-[15px]"
+                  >
+                    {submitting ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <>
+                        <Mail size={18} />
+                        Send to My Inbox — {formatMoneyDynamic(finalQuote.totalPropertyPrice)}
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="mt-6 text-center text-[10px] sm:text-xs text-muted-foreground leading-relaxed p-4 rounded-xl border border-border/40 bg-white/[0.02]">
+                  &quot;Mortgage rates and total costs are subject to change based on lender requirements, credit profile, and real-time market data. Always consult with a qualified financial advisor before making final commitments.&quot;
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </StepShell>
+
+      {/* Hidden canvas for PDF snapshot generation */}
+      <div style={{ position: 'absolute', top: -9999, left: -9999, width: 800, height: 600, opacity: 0, pointerEvents: 'none' }}>
+        <FloorPlanCanvas ref={floorPlanRef} plan={plan} advanced={false} minimal={true} hideZoomHelper={true} />
       </div>
-    </StepShell>
+
+      {/* Send to Inbox Modal */}
+      <AnimatePresence>
+        {showInboxModal && (
+          <SendToInboxModal
+            originalEmail={c.email.trim()}
+            name={c.name.trim()}
+            onConfirm={handleSendToInbox}
+            onClose={() => !sending && setShowInboxModal(false)}
+            sending={sending}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 };
-
-
-

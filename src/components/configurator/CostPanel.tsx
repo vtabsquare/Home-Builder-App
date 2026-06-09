@@ -15,7 +15,7 @@ export const CostPanel = ({ cost, compact }: Props) => {
     <div className="relative rounded-2xl bg-surface border border-border p-6 shadow-elev overflow-hidden">
       <div className="relative z-10 flex items-end justify-between">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-1 font-bold">Total estimate</div>
+          <div className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-1 font-bold">Est. Property Price</div>
           <motion.div
             key={cost.total}
             initial={{ opacity: 0.4, y: 4 }}
@@ -31,11 +31,12 @@ export const CostPanel = ({ cost, compact }: Props) => {
         </div>
       </div>
 
-      <div className={`relative z-10 mt-6 grid grid-cols-2 ${cost.landCost > 0 ? 'xs:grid-cols-4' : 'xs:grid-cols-3'} gap-2 md:gap-3 text-center`}>
+      <div className={`relative z-10 mt-6 grid grid-cols-2 ${cost.landCost > 0 ? 'xs:grid-cols-5' : 'xs:grid-cols-4'} gap-2 md:gap-3 text-center`}>
         <Stat label={`Down ${cost.downPaymentPercent}%`} value={formatMoney(cost.downPayment)} />
         <Stat label="Loan" value={formatMoney(cost.loanAmount)} />
         {cost.landCost > 0 && <Stat label="Land" value={formatMoney(cost.landCost)} />}
-        <Stat label="Monthly" value={formatMoney(cost.emi)} highlight />
+        <Stat label="Monthly Repayment" value={formatMoney(cost.emi)} highlight />
+        <Stat label="Min. Monthly Salary" value={formatMoney(cost.emi / 0.39)} />
       </div>
 
       <button
@@ -71,28 +72,14 @@ export const CostPanel = ({ cost, compact }: Props) => {
         )}
       </AnimatePresence>
 
-      {/* Budget line */}
-      <div className="relative z-10 mt-6">
-        <div className="flex justify-between text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mb-3">
-          <span>Budget Utilization</span>
-          <span>{cost.area} sqft</span>
-        </div>
-        <div className="h-1 w-full overflow-hidden rounded-full bg-soft-section">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${Math.min(100, (cost.total / 600000) * 100)}%` }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="h-full bg-clay"
-          />
-        </div>
-      </div>
+
     </div>
   );
 };
 
 const Stat = ({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) => (
-  <div className={`relative rounded-xl px-2 py-3 border transition-colors ${highlight ? 'bg-soft-section border-clay/20 text-clay' : 'bg-white border-border text-muted-foreground'}`}>
-    <div className={`text-[8px] font-bold uppercase tracking-[0.2em] mb-1 ${highlight ? 'text-clay/80' : 'text-muted-foreground/50'}`}>{label}</div>
+  <div className={`relative h-full flex flex-col rounded-xl px-2 py-3 border transition-colors ${highlight ? 'bg-soft-section border-clay/20 text-clay' : 'bg-white border-border text-muted-foreground'}`}>
+    <div className={`text-[8px] font-bold uppercase tracking-[0.2em] mb-1 flex-1 flex flex-col justify-end ${highlight ? 'text-clay/80' : 'text-muted-foreground/50'}`}>{label}</div>
     <div className={`font-display text-xs md:text-[13px] num font-medium ${highlight ? 'text-clay' : 'text-foreground'}`}>{value}</div>
   </div>
 );

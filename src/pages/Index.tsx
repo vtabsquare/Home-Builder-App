@@ -116,7 +116,7 @@ const IndexInner = () => {
       case 0: return <StepHomeType key="0" />;
       case 1: return <StepFeatures key="1" />;
       case 2: return <StepPreview key="2" plan={plan} onChange={setCustomPlan} onResetPlan={() => setCustomPlan(null)} />;
-      case 3: return <StepLeadCapture key="3" cost={cost} onReset={() => { reset(); setFlowStep('journey'); }} />;
+      case 3: return <StepLeadCapture key="3" cost={cost} plan={plan} onReset={() => { reset(); setFlowStep('journey'); }} />;
       default: return null;
     }
   };

@@ -35,6 +35,7 @@ export interface CostBreakdown {
   bathroomCost: number;
   kitchenCost: number;
   addonsCost: number;
+  nonLoanAddonsCost?: number; // addons in total estimate but not eligible for bank loan
   landCost: number;
   total: number;
   downPayment: number;

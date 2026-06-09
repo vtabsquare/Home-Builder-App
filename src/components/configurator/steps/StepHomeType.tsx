@@ -68,6 +68,10 @@ export const StepHomeType = () => {
       nextDisabled={!canProceed}
       hidePrev
     >
+      <div className="max-w-2xl mx-auto mb-8 text-center text-[11px] sm:text-xs text-muted-foreground leading-relaxed p-4 rounded-xl border border-border/40 bg-white/[0.02]">
+        &quot;Estimates provided are for informational purposes only. Please note that construction and market costs fluctuate; this estimate should be used for budgeting purposes only. We recommend using these as a starting point for your planning.&quot;
+      </div>
+
       {/* Property Status Segmented Toggle Control */}
       <div className="flex p-1 bg-soft-section border border-border/60 rounded-full max-w-[280px] mx-auto mb-6 sm:mb-10 shadow-sm">
         <button

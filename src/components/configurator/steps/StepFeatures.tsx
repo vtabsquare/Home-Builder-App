@@ -2,7 +2,7 @@ import { useConfig, AddOn, KitchenType, HOME_TYPE_LIMITS, type FinishingQuality 
 import { StepShell } from '../StepShell';
 import { formatMoney } from '@/lib/cost';
 import { useAddonMeta, useKitchenMeta, useRoomPricingMeta, usePricing } from '@/hooks/PricingContext';
-import { Minus, Plus, Sun, Car, Droplets, Cpu, Check, Fence, Trees, LucideIcon } from 'lucide-react';
+import { Minus, Plus, Sun, Car, Droplets, Cpu, Fence, Trees, LucideIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const ADDON_ICON: Record<AddOn, LucideIcon> = {
@@ -31,11 +31,6 @@ export const StepFeatures = () => {
   // Compute upgrade cost for premium vs standard
   const finishKey = homeType as 'starter' | 'family' | 'premium';
   const finishConfig = pricing.finishing_costs?.[finishKey];
-  const currentFinishCost = finishConfig
-    ? (finishingQuality === 'premium'
-        ? (isDoubleStorey ? finishConfig.premium_2storey : finishConfig.premium_1storey)
-        : (isDoubleStorey ? finishConfig.standard_2storey : finishConfig.standard_1storey))
-    : 0;
   const standardCost = finishConfig
     ? (isDoubleStorey ? finishConfig.standard_2storey : finishConfig.standard_1storey)
     : 0;
@@ -55,38 +50,16 @@ export const StepFeatures = () => {
       onPrev={prev}
     >
       <div className="space-y-3">
+        {/* ── Floor Plan Layout ─────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex items-baseline justify-between">
             <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Floor Plan Layout</h3>
-            <div className="flex items-center gap-4">
-              {showFinishingToggle && (
-                <div className="flex items-center bg-surface/80 rounded-full p-1 border border-border shadow-sm">
-                  <button
-                    onClick={() => setFinishingQuality('standard')}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${
-                      finishingQuality === 'standard' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground/60 hover:text-foreground'
-                    }`}
-                  >
-                    Standard
-                  </button>
-                  <button
-                    onClick={() => setFinishingQuality('premium')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${
-                      finishingQuality === 'premium' ? 'bg-amber-100/50 text-amber-700 shadow-sm border border-amber-200/50' : 'text-amber-600/60 hover:text-amber-700 hover:bg-amber-50/50'
-                    }`}
-                  >
-                    ★ Premium
-                    {finishingQuality !== 'premium' && upgradeDiff > 0 && <span className="opacity-70 lowercase font-medium tracking-normal text-[9px] ml-1">+{formatMoney(upgradeDiff)}</span>}
-                  </button>
-                </div>
-              )}
-              <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold hidden sm:inline-block">Base</span>
-            </div>
+            <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold hidden sm:inline-block">Base</span>
           </div>
           <div className="grid gap-2 md:gap-3 sm:grid-cols-2">
             {[
               { id: false, label: 'Bungalow', desc: 'Single-storey home design' },
-              { id: true, label: 'Multi-Storey', desc: 'Two or more floors' }
+              { id: true, label: 'Multi-Storey', desc: 'Multi-Storey home design' }
             ].map((k) => {
               const active = isDoubleStorey === k.id;
               return (
@@ -110,8 +83,54 @@ export const StepFeatures = () => {
           </div>
         </motion.div>
 
+        {/* ── Finish Quality ────────────────────────────────── */}
+        {showFinishingToggle && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
+            <div className="mb-2 flex items-baseline justify-between">
+              <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Finish Quality</h3>
+              <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Quality</span>
+            </div>
+            <div className="grid gap-2 md:gap-3 sm:grid-cols-2">
+              {([
+                { id: 'standard' as FinishingQuality, label: 'Standard', desc: 'Quality finishes at an accessible price point', price: standardCost },
+                { id: 'premium' as FinishingQuality, label: '★ Premium', desc: 'Elevated materials, premium fixtures and refined detailing', price: premiumCost },
+              ]).map((k) => {
+                const active = finishingQuality === k.id;
+                return (
+                  <button
+                    key={k.id}
+                    onClick={() => setFinishingQuality(k.id)}
+                    className={`group relative overflow-hidden rounded-xl p-2 sm:p-3 text-left transition-all duration-500 border ${
+                      active
+                        ? k.id === 'premium'
+                          ? 'bg-amber-50/30 shadow-elev border-amber-200/50 scale-[1.02]'
+                          : 'bg-surface shadow-elev border-clay/30 scale-[1.02]'
+                        : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'
+                    }`}
+                  >
+                    <div className="relative z-10 flex items-center justify-between mb-2">
+                      <span className={`font-display font-medium tracking-tight text-base ${active ? (k.id === 'premium' ? 'text-amber-700' : 'text-foreground') : 'text-foreground/80'}`}>{k.label}</span>
+                      <div className="flex items-center gap-2">
+                        {k.price > 0 && (
+                          <span className={`text-[10px] font-bold uppercase tracking-widest num ${active && k.id === 'premium' ? 'text-amber-600' : 'text-clay'}`}>
+                            {formatMoney(k.price)}
+                          </span>
+                        )}
+                        {active && <div className={`h-1.5 w-1.5 rounded-full ${k.id === 'premium' ? 'bg-amber-500' : 'bg-clay'}`} />}
+                      </div>
+                    </div>
+                    <p className="relative z-10 text-[11px] text-muted-foreground leading-relaxed font-light">{k.desc}</p>
+                    {!active && k.id === 'premium' && upgradeDiff > 0 && (
+                      <p className="relative z-10 text-[9px] text-amber-600/70 font-medium mt-1">+{formatMoney(upgradeDiff)} upgrade</p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
 
-
+        {/* ── Bedrooms & Bathrooms ──────────────────────────── */}
         <div className="grid gap-2 md:gap-4 sm:grid-cols-2">
           <Stepper
             label="Bedrooms"
@@ -119,7 +138,6 @@ export const StepFeatures = () => {
             onChange={setBedrooms}
             min={bedroomLimits.min}
             max={bedroomLimits.max}
-            price={bedroomCost}
             hint="Min 10×10 ft"
             note={bedroomLimits.min === bedroomLimits.max ? `Fixed at ${bedroomLimits.min}` : `${bedroomLimits.min} to ${bedroomLimits.max}`}
           />
@@ -129,21 +147,20 @@ export const StepFeatures = () => {
             onChange={setBathrooms}
             min={bathroomLimits.min}
             max={bathroomLimits.max}
-            price={bathroomCost}
             hint="Min 5×7 ft"
             note={bathroomLimits.min === bathroomLimits.max ? `Fixed at ${bathroomLimits.min}` : `${bathroomLimits.min} to ${bathroomLimits.max}`}
           />
         </div>
 
+        {/* ── Spatial Layout ────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
           <div className="mb-2 flex items-baseline justify-between">
             <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Spatial Layout</h3>
             <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Options</span>
           </div>
-          <div className="grid gap-2 md:gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2 md:gap-3 sm:grid-cols-2">
             {KITCHENS.map((k) => {
               const active = kitchen === k.id;
-              const kitchenMeta = KITCHEN_META[k.id];
               return (
                 <button
                   key={k.id}
@@ -156,10 +173,7 @@ export const StepFeatures = () => {
                 >
                   <div className="relative z-10 flex items-center justify-between mb-2">
                     <span className={`font-display font-medium tracking-tight text-base ${active ? 'text-foreground' : 'text-foreground/80'}`}>{k.label}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-clay num">+{formatMoney(kitchenMeta.cost)}</span>
-                      {active && <div className="h-1.5 w-1.5 rounded-full bg-clay" />}
-                    </div>
+                    {active && <div className="h-1.5 w-1.5 rounded-full bg-clay" />}
                   </div>
                   <p className="relative z-10 text-[11px] text-muted-foreground leading-relaxed font-light">{k.desc}</p>
                 </button>
@@ -168,6 +182,7 @@ export const StepFeatures = () => {
           </div>
         </motion.div>
 
+        {/* ── Enhancements ─────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
           <div className="mb-2 flex items-baseline justify-between">
             <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Enhancements</h3>
@@ -178,6 +193,8 @@ export const StepFeatures = () => {
               const meta = ADDON_META[id];
               const Icon = ADDON_ICON[id];
               const active = addons.includes(id);
+              const showAsterisk = meta.isNonLoan;
+              const displayLabel = meta.label + (showAsterisk ? ' *' : '');
               return (
                 <motion.button
                   key={id}
@@ -193,8 +210,12 @@ export const StepFeatures = () => {
                     <Icon size={14} strokeWidth={1.25} />
                   </div>
                   <div className="relative z-10 flex-1">
-                    <div className={`font-medium tracking-tight text-sm ${active ? 'text-foreground' : 'text-foreground/80'}`}>{meta.label}</div>
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-clay num mt-1">+{formatMoney(meta.cost)}</div>
+                    <div className={`font-medium tracking-tight text-sm ${active ? 'text-foreground' : 'text-foreground/80'}`}>{meta.label}{showAsterisk && <span className="text-clay ml-0.5">*</span>}</div>
+                    {meta.layoutOnly ? (
+                      <div className="text-[10px] uppercase tracking-widest text-muted-foreground/50 mt-1">Layout only</div>
+                    ) : (
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-clay num mt-1">+{formatMoney(meta.cost)}</div>
+                    )}
                   </div>
                   {active && (
                     <div className="relative z-10 h-1.5 w-1.5 rounded-full bg-clay" />
@@ -203,6 +224,10 @@ export const StepFeatures = () => {
               );
             })}
           </div>
+          {/* Non-loan disclaimer */}
+          <p className="mt-3 text-[9px] text-muted-foreground/60 leading-relaxed border-t border-border/40 pt-3">
+            <span className="text-clay font-semibold">*</span> Price is included in the total estimate, but not included in the total loan amount due to ineligibility for bank financing.
+          </p>
         </motion.div>
       </div>
     </StepShell>
@@ -210,13 +235,12 @@ export const StepFeatures = () => {
 };
 
 const Stepper = ({
-  label, value, onChange, min, max, price, hint, note,
-}: { label: string; value: number; onChange: (n: number) => void; min: number; max: number; price?: number; hint?: string; note?: string }) => (
+  label, value, onChange, min, max, hint, note,
+}: { label: string; value: number; onChange: (n: number) => void; min: number; max: number; hint?: string; note?: string }) => (
   <div className="relative rounded-xl bg-surface border border-border p-2 sm:p-3 shadow-soft transition-all hover:shadow-soft group">
     <div className="flex items-baseline justify-between mb-2">
       <span className="font-display text-base tracking-tight text-foreground/80 font-normal">{label}</span>
       <div className="flex items-center gap-2">
-        {price !== undefined && <span className="text-[9px] uppercase tracking-[0.2em] text-clay font-bold num">+{formatMoney(price)}</span>}
         {hint && <span className="text-[8px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">{hint}</span>}
       </div>
     </div>

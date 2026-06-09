@@ -44,7 +44,7 @@ const Card = ({ num, title, subtitle, description, img, onClick, disabled, soon,
     whileHover={!disabled && !soon ? { scale: 1.02 } : {}}
     whileTap={!disabled && !soon ? { scale: 0.98 } : {}}
     className={`group relative flex flex-col justify-between text-left w-full
-      h-[190px] sm:h-[420px] lg:h-[480px] xl:h-[540px]
+      h-[240px] sm:h-[500px] lg:h-[600px] xl:h-[680px]
       p-3 sm:p-5 lg:p-6
       rounded-2xl sm:rounded-3xl
       bg-zinc-800/40 backdrop-blur-md
@@ -212,7 +212,7 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
               num="01."
               title="Turn Key"
               subtitle="Build"
-              description="Experience pre-designed luxury homes with automated smart features included."
+              description="Experience an effortless path to homeownership and visualize this professionally designed, built, and ready for you to move in home."
               img="/turnkey.png"
               onClick={onTurnkeyBuild}
             />
@@ -222,7 +222,7 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
               num="02."
               title="Young"
               subtitle="Professional"
-              description="Modern, efficient, and tailored architectural designs for the ambitious professional."
+              description="Walk through this modern, and stylish living space —the perfect foundation for your career, lifestyle and future growth."
               img="/young_professional.png"
               onClick={onYoungProfessionalBuild}
             />
@@ -232,7 +232,7 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
               num="03."
               title="Private"
               subtitle="Purchase"
-              description="Exclusive, confidential acquisitions and bespoke developments."
+              description="Total freedom to own your dream property with a seamless, transparent buying experience for your own private property, backed by trusted GBTI expert guidance."
               img="/private_purchase.png"
               soon
             />

@@ -28,12 +28,15 @@ export interface PricingConfig {
   }>;
 }
 
+// Addons that are included in total estimate but NOT in the loan amount
+export const NON_LOAN_ADDONS: AddOn[] = ['solar', 'water_tank', 'smart_home'];
+
 const DEFAULTS: PricingConfig = {
   sqft_rate: 145,
   land_sqft_rate: 75,
   flat_land_cost: 50000,
-  bedroom_cost: 9500,
-  bathroom_cost: 6800,
+  bedroom_cost: 0,   // bedrooms affect layout only, not pricing
+  bathroom_cost: 0,  // bathrooms affect layout only, not pricing
   home_types: {
     starter: { baseCost: 135000, baseArea: 900 },
     family: { baseCost: 245000, baseArea: 1400 },
@@ -41,14 +44,14 @@ const DEFAULTS: PricingConfig = {
     turnkey: { baseCost: 350000, baseArea: 0 },
     young_professional: { baseCost: 180000, baseArea: 0 },
   },
-  kitchen_costs: { standard: 8000, open: 14000, galley: 6500 },
+  kitchen_costs: { standard: 0, open: 0, galley: 0 }, // kitchen affects layout only, not pricing
   addon_costs: {
-    solar: 12500,
-    carport: 8500,
-    water_tank: 4200,
-    smart_home: 15800,
-    fence: 15000,
-    landscaping: 10000,
+    solar: 100000,        // in total, NOT in loan
+    carport: 0,           // layout/visual only, no price
+    water_tank: 18000,    // in total, NOT in loan
+    smart_home: 300000,   // Generator — in total, NOT in loan
+    fence: 2500000,       // Perimeter Fence/Bridge — in total AND in loan
+    landscaping: 2000000, // Furniture — in total AND in loan
   },
   turnkey_cost: 350000,
   young_professional_cost: 180000,
@@ -75,10 +78,10 @@ const DEFAULTS: PricingConfig = {
 };
 
 const ADDON_LABELS: Record<AddOn, string> = {
-  solar: 'Solar Panels',
+  solar: 'Solar Panels *',
   carport: 'Carport',
-  water_tank: 'Water Tank',
-  smart_home: 'Smart Home Package',
+  water_tank: 'Water Tank *',
+  smart_home: 'Generator *',
   fence: 'Perimeter Fence/Bridge',
   landscaping: 'Furniture',
 };
@@ -96,6 +99,7 @@ export interface CostBreakdown {
   bathroomCost: number;
   kitchenCost: number;
   addonsCost: number;
+  nonLoanAddonsCost: number;  // addons in total but excluded from loan
   landCost: number;
   total: number;
   downPayment: number;
@@ -113,8 +117,8 @@ function mergePricing(saved: any): PricingConfig {
     sqft_rate: saved.sqft_rate ?? DEFAULTS.sqft_rate,
     land_sqft_rate: saved.land_sqft_rate ?? DEFAULTS.land_sqft_rate,
     flat_land_cost: saved.flat_land_cost ?? DEFAULTS.flat_land_cost,
-    bedroom_cost: saved.bedroom_cost ?? DEFAULTS.bedroom_cost,
-    bathroom_cost: saved.bathroom_cost ?? DEFAULTS.bathroom_cost,
+    bedroom_cost: 0,   // always 0 — bedrooms are layout-only
+    bathroom_cost: 0,  // always 0 — bathrooms are layout-only
     home_types: {
       starter: { ...DEFAULTS.home_types.starter, ...saved.home_types?.starter },
       family: { ...DEFAULTS.home_types.family, ...saved.home_types?.family },
@@ -122,7 +126,7 @@ function mergePricing(saved: any): PricingConfig {
       turnkey: { ...DEFAULTS.home_types.turnkey, ...saved.home_types?.turnkey },
       young_professional: { ...DEFAULTS.home_types.young_professional, ...saved.home_types?.young_professional },
     },
-    kitchen_costs: { ...DEFAULTS.kitchen_costs, ...saved.kitchen_costs },
+    kitchen_costs: { standard: 0, open: 0, galley: 0 }, // always 0 — kitchen is layout-only
     addon_costs: { ...DEFAULTS.addon_costs, ...saved.addon_costs },
     turnkey_cost: saved.turnkey_cost ?? DEFAULTS.turnkey_cost,
     young_professional_cost: saved.young_professional_cost ?? DEFAULTS.young_professional_cost,
@@ -151,10 +155,11 @@ export function computeCostDynamic(c: ConfigState, p: PricingConfig, opts: { int
 
   let area = 0;
   let baseStructure = 0;
-  let bedroomCost = 0;
-  let bathroomCost = 0;
-  let kitchenCost = 0;
+  const bedroomCost = 0;   // layout only
+  const bathroomCost = 0;  // layout only
+  const kitchenCost = 0;   // layout only
   let addonsCost = 0;
+  let nonLoanAddonsCost = 0;
   let landCost = 0;
   let items: { label: string; amount: number }[] = [];
 
@@ -186,33 +191,38 @@ export function computeCostDynamic(c: ConfigState, p: PricingConfig, opts: { int
     // Add extra area cost on top of the flat finishing cost
     baseStructure += extraArea * p.sqft_rate;
     
-    bedroomCost = c.bedrooms * p.bedroom_cost;
-    bathroomCost = c.bathrooms * p.bathroom_cost;
-    kitchenCost = p.kitchen_costs[c.kitchen];
+    // Compute addons — separating non-loan addons
     addonsCost = c.addons.reduce((sum, a) => sum + (p.addon_costs[a] || 0), 0);
+    nonLoanAddonsCost = c.addons
+      .filter((a) => NON_LOAN_ADDONS.includes(a))
+      .reduce((sum, a) => sum + (p.addon_costs[a] || 0), 0);
+
     landCost = c.land === 'need' ? p.flat_land_cost : 0;
     
     const finishLabel = finishingQuality === 'premium' ? 'Premium' : 'Standard';
     const storeyLabel = is2Storey ? '2 Storey' : '1 Storey';
     items = [
       { label: `Base structure · ${finishLabel} · ${storeyLabel} · ${area} sqft`, amount: baseStructure },
-      { label: `Bedrooms × ${c.bedrooms}`, amount: bedroomCost },
-      { label: `Bathrooms × ${c.bathrooms}`, amount: bathroomCost },
-      { label: `Kitchen · ${c.kitchen}`, amount: kitchenCost },
-      ...c.addons.map((a) => ({ label: ADDON_LABELS[a] || a, amount: p.addon_costs[a] || 0 })),
+      ...c.addons
+        .filter((a) => (p.addon_costs[a] || 0) > 0)
+        .map((a) => ({ label: ADDON_LABELS[a] || a, amount: p.addon_costs[a] || 0 })),
     ];
     if (landCost) items.push({ label: 'Land package', amount: landCost });
   }
 
+  // Total includes ALL addons (including non-loan ones)
   const total = Math.round(baseStructure + bedroomCost + bathroomCost + kitchenCost + addonsCost + landCost);
   const downPayment = Math.round(total * (c.downPaymentPercent / 100));
-  const loanAmount = total - downPayment;
+  
+  // Loan excludes non-loan addons (solar, water_tank, generator)
+  const loanBase = Math.max(0, total - nonLoanAddonsCost);
+  const loanAmount = loanBase - Math.round(loanBase * (c.downPaymentPercent / 100));
 
   const r = interestRate / 12;
   const n = tenureYears * 12;
   const emi = Math.round((loanAmount * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1));
 
-  return { area, baseStructure, bedroomCost, bathroomCost, kitchenCost, addonsCost, landCost, total, downPayment, loanAmount, emi, items, downPaymentPercent: c.downPaymentPercent };
+  return { area, baseStructure, bedroomCost, bathroomCost, kitchenCost, addonsCost, nonLoanAddonsCost, landCost, total, downPayment, loanAmount, emi, items, downPaymentPercent: c.downPaymentPercent };
 }
 
 // ── React Hook ──────────────────────────────────────────────────────────────

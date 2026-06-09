@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS visitor_sessions (
   full_name TEXT,
   phone TEXT,
   project_timeline TEXT,
+  preferred_branch TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -93,7 +94,8 @@ CREATE OR REPLACE FUNCTION store_visitor_session(
   p_user_agent TEXT,
   p_full_name TEXT DEFAULT NULL,
   p_phone TEXT DEFAULT NULL,
-  p_project_timeline TEXT DEFAULT NULL
+  p_project_timeline TEXT DEFAULT NULL,
+  p_preferred_branch TEXT DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -102,8 +104,8 @@ AS $$
 DECLARE
   v_id UUID;
 BEGIN
-  INSERT INTO visitor_sessions (email, device_type, browser, os, screen_width, screen_height, user_agent, full_name, phone, project_timeline)
-  VALUES (LOWER(TRIM(p_email)), p_device_type, p_browser, p_os, p_screen_width, p_screen_height, p_user_agent, p_full_name, p_phone, p_project_timeline)
+  INSERT INTO visitor_sessions (email, device_type, browser, os, screen_width, screen_height, user_agent, full_name, phone, project_timeline, preferred_branch)
+  VALUES (LOWER(TRIM(p_email)), p_device_type, p_browser, p_os, p_screen_width, p_screen_height, p_user_agent, p_full_name, p_phone, p_project_timeline, p_preferred_branch)
   RETURNING id INTO v_id;
 
   RETURN v_id;

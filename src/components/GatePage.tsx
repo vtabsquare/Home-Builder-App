@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { ArrowRight, Mail, Send, ShieldCheck, Smartphone, User, Phone, Clock } from 'lucide-react';
+import { ArrowRight, Mail, Send, ShieldCheck, Smartphone, User, Phone, Clock, MapPin } from 'lucide-react';
 import { GBTILogoMark } from './GBTILogo';
 import { useConfig } from '@/store/configurator';
 
@@ -57,6 +57,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [preferredBranch, setPreferredBranch] = useState('');
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);
   const [showAuth, setShowAuth] = useState(mode === 'auth');
@@ -115,6 +116,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
         p_full_name: fullName.trim(),
         p_phone: phone.trim(),
         p_project_timeline: null,
+        p_preferred_branch: preferredBranch || null,
       });
     } catch {
       // Non-critical — continue even if session store fails
@@ -126,6 +128,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
       phone: phone.trim(),
       email: email.trim(),
       timeline: '',
+      preferredBranch,
     });
 
     // Play success animation then proceed
@@ -429,7 +432,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                             type="tel"
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
-                            placeholder="+1 (555) 000-0000"
+                            placeholder="+592 (555) 000-0000"
                             autoComplete="tel"
                             className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
                           />
@@ -453,6 +456,40 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                           autoComplete="email"
                           className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
                         />
+                      </div>
+                    </div>
+
+                    {/* Preferred Branch full-width */}
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
+                        Preferred Branch (Optional)
+                      </label>
+                      <div className="relative">
+                        <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
+                        <select
+                          id="gate-branch-desktop"
+                          value={preferredBranch}
+                          onChange={(e) => setPreferredBranch(e.target.value)}
+                          className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300 appearance-none"
+                        >
+                          <option value="" className="bg-[#0a0a0a] text-white/50">Select a branch</option>
+                          <option value="Anna Regina" className="bg-[#0a0a0a]">Anna Regina</option>
+                          <option value="Bartica" className="bg-[#0a0a0a]">Bartica</option>
+                          <option value="Corriverton" className="bg-[#0a0a0a]">Corriverton</option>
+                          <option value="Diamond" className="bg-[#0a0a0a]">Diamond</option>
+                          <option value="Lethem" className="bg-[#0a0a0a]">Lethem</option>
+                          <option value="Mon Repos Branch" className="bg-[#0a0a0a]">Mon Repos Branch</option>
+                          <option value="Parika" className="bg-[#0a0a0a]">Parika</option>
+                          <option value="Port Mourant" className="bg-[#0a0a0a]">Port Mourant</option>
+                          <option value="Port Kaituma" className="bg-[#0a0a0a]">Port Kaituma</option>
+                          <option value="Providence" className="bg-[#0a0a0a]">Providence</option>
+                          <option value="Regent St. Branch" className="bg-[#0a0a0a]">Regent St. Branch</option>
+                          <option value="Water St. Branch" className="bg-[#0a0a0a]">Water St. Branch</option>
+                          <option value="Vreed-en-Hoop Branch" className="bg-[#0a0a0a]">Vreed-en-Hoop Branch</option>
+                        </select>
+                        <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                          <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
                       </div>
                     </div>
 
@@ -591,7 +628,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+1 (555) 000-0000"
+                    placeholder="+592 (555) 000-0000"
                     autoComplete="tel"
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
                   />
@@ -613,6 +650,39 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
                     autoComplete="email"
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block">
+                  Preferred Branch (Optional)
+                </label>
+                <div className="relative">
+                  <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
+                  <select
+                    id="gate-branch"
+                    value={preferredBranch}
+                    onChange={(e) => setPreferredBranch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-[#b8956a]/50 focus:bg-white/[0.08] transition-all duration-300 appearance-none"
+                  >
+                    <option value="" className="bg-[#0a0a0a] text-white/50">Select a branch</option>
+                    <option value="Anna Regina" className="bg-[#0a0a0a]">Anna Regina</option>
+                    <option value="Bartica" className="bg-[#0a0a0a]">Bartica</option>
+                    <option value="Corriverton" className="bg-[#0a0a0a]">Corriverton</option>
+                    <option value="Diamond" className="bg-[#0a0a0a]">Diamond</option>
+                    <option value="Lethem" className="bg-[#0a0a0a]">Lethem</option>
+                    <option value="Mon Repos Branch" className="bg-[#0a0a0a]">Mon Repos Branch</option>
+                    <option value="Parika" className="bg-[#0a0a0a]">Parika</option>
+                    <option value="Port Mourant" className="bg-[#0a0a0a]">Port Mourant</option>
+                    <option value="Port Kaituma" className="bg-[#0a0a0a]">Port Kaituma</option>
+                    <option value="Providence" className="bg-[#0a0a0a]">Providence</option>
+                    <option value="Regent St. Branch" className="bg-[#0a0a0a]">Regent St. Branch</option>
+                    <option value="Water St. Branch" className="bg-[#0a0a0a]">Water St. Branch</option>
+                    <option value="Vreed-en-Hoop Branch" className="bg-[#0a0a0a]">Vreed-en-Hoop Branch</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                    <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
                 </div>
               </div>
 

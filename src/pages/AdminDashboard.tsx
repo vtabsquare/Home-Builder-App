@@ -47,6 +47,23 @@ interface PricingConfig {
     fence: number;
     landscaping: number;
   };
+  interest_rate_tiers: {
+    upTo4M: number;
+    upTo9M: number;
+    upTo20M: number;
+    upTo40M: number;
+    upTo60M: number;
+    above60M: number;
+  };
+  loyalty_discounts: {
+    salary: number;
+    home_start: number;
+    credit_card: number;
+    insurance: number;
+    auto_loan: number;
+    other_credit: number;
+    investments: number;
+  };
 }
 
 const DEFAULT_PRICING: PricingConfig = {
@@ -67,6 +84,23 @@ const DEFAULT_PRICING: PricingConfig = {
     smart_home: 15800,
     fence: 15000,
     landscaping: 10000,
+  },
+  interest_rate_tiers: {
+    upTo4M: 3.5,
+    upTo9M: 3.7,
+    upTo20M: 4.25,
+    upTo40M: 4.75,
+    upTo60M: 4.99,
+    above60M: 6.5,
+  },
+  loyalty_discounts: {
+    salary: 0.05,
+    home_start: 0.05,
+    credit_card: 0.10,
+    insurance: 0.05,
+    auto_loan: 0.10,
+    other_credit: 0.10,
+    investments: 0.05,
   },
 };
 
@@ -887,6 +921,27 @@ const PricingTab = ({ pricing, onSave }: { pricing: PricingConfig; onSave: (p: P
           <PriceInput label="Perimeter Fence/Bridge" value={local.addon_costs.fence} onChange={(v) => updateField('addon_costs.fence', v)} prefix="$" />
           <PriceInput label="Furniture" value={local.addon_costs.landscaping} onChange={(v) => updateField('addon_costs.landscaping', v)} prefix="$" />
         </PricingCard>
+
+        {/* Interest Rate Tiers */}
+        <PricingCard title="Interest Rate Tiers" icon={<DollarSign size={16} />}>
+          <PriceInput label="Up to $4M" value={local.interest_rate_tiers?.upTo4M ?? 3.5} onChange={(v) => updateField('interest_rate_tiers.upTo4M', v)} suffix="%" />
+          <PriceInput label="$4M - $9M" value={local.interest_rate_tiers?.upTo9M ?? 3.7} onChange={(v) => updateField('interest_rate_tiers.upTo9M', v)} suffix="%" />
+          <PriceInput label="$9M - $20M" value={local.interest_rate_tiers?.upTo20M ?? 4.25} onChange={(v) => updateField('interest_rate_tiers.upTo20M', v)} suffix="%" />
+          <PriceInput label="$20M - $40M" value={local.interest_rate_tiers?.upTo40M ?? 4.75} onChange={(v) => updateField('interest_rate_tiers.upTo40M', v)} suffix="%" />
+          <PriceInput label="$40M - $60M" value={local.interest_rate_tiers?.upTo60M ?? 4.99} onChange={(v) => updateField('interest_rate_tiers.upTo60M', v)} suffix="%" />
+          <PriceInput label="Above $60M" value={local.interest_rate_tiers?.above60M ?? 6.5} onChange={(v) => updateField('interest_rate_tiers.above60M', v)} suffix="%" />
+        </PricingCard>
+
+        {/* Loyalty Discounts */}
+        <PricingCard title="Loyalty Discounts" icon={<DollarSign size={16} />}>
+          <PriceInput label="Salary Assignment" value={local.loyalty_discounts?.salary ?? 0.05} onChange={(v) => updateField('loyalty_discounts.salary', v)} suffix="%" />
+          <PriceInput label="Home Start Advantage" value={local.loyalty_discounts?.home_start ?? 0.05} onChange={(v) => updateField('loyalty_discounts.home_start', v)} suffix="%" />
+          <PriceInput label="Credit Card" value={local.loyalty_discounts?.credit_card ?? 0.10} onChange={(v) => updateField('loyalty_discounts.credit_card', v)} suffix="%" />
+          <PriceInput label="Insurance" value={local.loyalty_discounts?.insurance ?? 0.05} onChange={(v) => updateField('loyalty_discounts.insurance', v)} suffix="%" />
+          <PriceInput label="Auto Loan" value={local.loyalty_discounts?.auto_loan ?? 0.10} onChange={(v) => updateField('loyalty_discounts.auto_loan', v)} suffix="%" />
+          <PriceInput label="Other Credit" value={local.loyalty_discounts?.other_credit ?? 0.10} onChange={(v) => updateField('loyalty_discounts.other_credit', v)} suffix="%" />
+          <PriceInput label="Investments" value={local.loyalty_discounts?.investments ?? 0.05} onChange={(v) => updateField('loyalty_discounts.investments', v)} suffix="%" />
+        </PricingCard>
       </div>
     </TabWrapper>
   );
@@ -902,7 +957,7 @@ const PricingCard = ({ title, icon, children }: { title: string; icon: React.Rea
   </div>
 );
 
-const PriceInput = ({ label, value, onChange, prefix }: { label: string; value: number; onChange: (v: number) => void; prefix?: string }) => (
+const PriceInput = ({ label, value, onChange, prefix, suffix }: { label: string; value: number; onChange: (v: number) => void; prefix?: string; suffix?: string }) => (
   <div className="flex items-center justify-between gap-4">
     <label className="text-sm text-foreground/80 flex-1">{label}</label>
     <div className="flex items-center gap-1 bg-background rounded-lg border border-border px-3 py-1.5 w-36">
@@ -913,6 +968,7 @@ const PriceInput = ({ label, value, onChange, prefix }: { label: string; value: 
         onChange={(e) => onChange(Number(e.target.value) || 0)}
         className="w-full bg-transparent outline-none text-sm font-display font-semibold text-right"
       />
+      {suffix && <span className="text-muted-foreground/50 text-sm">{suffix}</span>}
     </div>
   </div>
 );
