@@ -72,39 +72,35 @@ const buildGBTIEmailHtml = ({
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f5f4f2;font-family:Arial,Helvetica,sans-serif;">
+<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;">
   <div style="max-width:640px;margin:0 auto;background:#ffffff;">
 
     <!-- Header -->
-    <div style="background:#111827;padding:32px 32px 28px;">
-      <div style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">GBTI</div>
-      <div style="font-size:10px;letter-spacing:0.2em;color:#b8956a;margin-top:4px;text-transform:uppercase;">Architectural Configurator</div>
+    <div style="text-align:center;padding:32px 32px 16px;">
+      <img src="${window.location.origin}/gbti-logo.png" alt="GBTI Logo" style="height:70px;width:auto;" />
     </div>
 
-    <!-- Gold accent bar -->
-    <div style="height:4px;background:linear-gradient(90deg,#b8956a,#d4af7a);"></div>
-
     <!-- Body -->
-    <div style="padding:36px 32px;">
-      <h1 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 8px;">Your Home Estimate is Ready</h1>
-      <p style="color:#6b7280;font-size:13px;margin:0 0 28px;">Reference ID: <strong style="color:#111827;">${leadId.slice(0,8).toUpperCase()}</strong></p>
+    <div style="padding:0 32px 36px;">
+      <h1 style="font-size:18px;font-weight:700;color:#003b6d;margin:0 0 4px;">Your Home Estimate is Ready</h1>
+      <p style="color:#6b7280;font-size:13px;margin:0 0 24px;">Reference ID: <strong style="color:#111827;">${leadId.slice(0,8).toUpperCase()}</strong></p>
 
-      <p style="font-size:15px;color:#111827;line-height:1.7;margin:0 0 16px;">Dear ${name},</p>
-      <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px;">Thank you for starting your home dream journey with GBTI.</p>
-      <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px;">We have attached your personalized dream home and cost estimate PDF for your records. We hope this helps you get a clearer picture of your path forward.</p>
-      <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 28px;">You can take the next step toward your goals by starting your formal application here:</p>
+      <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">Dear ${name},</p>
+      <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">Thank you for starting your home dream journey with GBTI.</p>
+      <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">We have attached your personalized dream home and cost estimate PDF for your records. We hope this helps you get a clearer picture of your path forward.</p>
+      <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 24px;">You can take the next step toward your goals by starting your formal application here:</p>
 
       <!-- CTA Button -->
-      <div style="text-align:center;margin:0 0 36px;">
+      <div style="margin:0 0 32px;">
         <a href="${LOAN_APPLICATION_URL}?ref=${leadId}" target="_blank"
-           style="display:inline-block;background:#b8956a;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:16px 40px;border-radius:50px;letter-spacing:0.05em;">
-          Start Your Loan Application →
+           style="display:inline-block;background:#0d65a6;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:4px;">
+          Start Your Loan Application -&gt;
         </a>
       </div>
 
-      <!-- Summary Card -->
-      <div style="background:#faf8f5;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin:0 0 28px;">
-        <div style="font-size:11px;font-weight:700;letter-spacing:0.15em;color:#b8956a;text-transform:uppercase;margin-bottom:16px;">Estimate Summary</div>
+      <!-- Summary -->
+      <div style="margin:0 0 24px;">
+        <div style="font-size:16px;font-weight:700;color:#00a8ad;margin-bottom:12px;">Estimated Summary</div>
         <table style="width:100%;border-collapse:collapse;">
           ${[
             ['Est. Property Price', formatMoney(cost.total)],
@@ -112,28 +108,26 @@ const buildGBTIEmailHtml = ({
             ['Down Payment', formatMoney(downPayment)],
             ['Monthly Repayment', formatMoney(monthlyEMI)],
           ].map(([label, value]) => `
-          <tr style="border-bottom:1px solid #f3f4f6;">
-            <td style="padding:10px 0;font-size:13px;color:#6b7280;">${label}</td>
-            <td style="padding:10px 0;font-size:13px;font-weight:700;color:#111827;text-align:right;">${value}</td>
+          <tr>
+            <td style="padding:6px 0;font-size:13px;color:#374151;">${label}</td>
+            <td style="padding:6px 0;font-size:13px;color:#374151;text-align:right;">${value}</td>
           </tr>`).join('')}
         </table>
-        <p style="font-size:10px;color:#9ca3af;margin:12px 0 0;line-height:1.5;">
+        <p style="font-size:11px;color:#888;font-style:italic;margin:16px 0 0;line-height:1.4;">
           * Solar Panels, Water Tank, and Generator are included in the total estimate but not in the loan amount due to ineligibility for bank financing.
         </p>
       </div>
 
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 28px;">
-
-      <p style="font-size:14px;color:#374151;line-height:1.7;margin:0 0 8px;">Our dedicated team is here to support you at every stage. If you have any questions or need guidance, please don't hesitate to reach out on</p>
-      <p style="font-size:15px;font-weight:700;color:#111827;margin:0 0 28px;">+592 231 4400</p>
-      <p style="font-size:14px;color:#374151;line-height:1.7;margin:0 0 4px;">We look forward to helping you build your future.</p>
-      <p style="font-size:14px;color:#374151;margin:0 0 32px;">Best regards,<br><strong style="color:#111827;">GBTI Architectural Team</strong></p>
+      <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 8px;">Our dedicated team is here to support you at every stage. If you have any questions or need guidance, please don't hesitate to reach out on</p>
+      <p style="font-size:14px;font-weight:700;color:#003b6d;margin:0 0 24px;">+592 231 4400</p>
+      <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 24px;">We look forward to helping you build your future.</p>
+      <p style="font-size:14px;color:#374151;margin:0 0 8px;">Best regards,<br><strong style="color:#003b6d;">GBTI Architectural Team</strong></p>
     </div>
 
     <!-- Footer -->
-    <div style="background:#111827;padding:20px 32px;text-align:center;">
-      <p style="font-size:11px;color:#6b7280;margin:0 0 4px;">GBTI Bank · +592 231 4400</p>
-      <p style="font-size:10px;color:#4b5563;margin:0;">Estimates are indicative. Final pricing confirmed by your architect.</p>
+    <div style="background:#00a8ad;padding:24px 32px;text-align:center;">
+      <p style="font-size:12px;color:#ffffff;margin:0 0 4px;">GBTI Bank - +592 231 4400</p>
+      <p style="font-size:12px;color:#ffffff;margin:0;">Estimates are indicative. Final pricing confirmed by your architect.</p>
     </div>
   </div>
 </body>
