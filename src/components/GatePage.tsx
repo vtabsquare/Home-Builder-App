@@ -56,7 +56,7 @@ export const GatePage = ({ onProceed, onSkip, mode = 'qr' }: GatePageProps) => {
   const { setLead } = useConfig();
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('+592 ');
   const [preferredBranch, setPreferredBranch] = useState('');
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);

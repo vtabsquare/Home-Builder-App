@@ -212,7 +212,7 @@ const initial: ConfigState = {
   finishingQuality: 'standard' as FinishingQuality,
   material: 'modern',
   name: '',
-  phone: '',
+  phone: '+592 ',
   email: '',
   timeline: '',
   preferredBranch: '',

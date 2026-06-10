@@ -27,6 +27,9 @@ const INFOBIP_SENDER_NAME = import.meta.env.VITE_INFOBIP_SENDER_NAME || 'GBTI Ar
 // Tracked loan application link — Supabase increments click count per leadId
 const LOAN_APPLICATION_URL = 'https://gbtibank.com/apply-for-a-loan/';
 
+// GBTI logo hosted on Supabase Storage — publicly accessible, works in all email clients including Gmail
+const GBTI_LOGO_URL = 'https://ekvzvjxwvjlgquvxfkqy.supabase.co/storage/v1/object/public/elevation-images/email-assets/gbti-logo.png';
+
 const schema = z.object({
   name: z.string().trim().min(2, 'Enter your name').max(100),
   phone: z.string().trim().min(6, 'Enter a valid phone').max(30),
@@ -72,12 +75,12 @@ const buildGBTIEmailHtml = ({
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;">
-  <div style="max-width:640px;margin:0 auto;background:#ffffff;">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;">
 
-    <!-- Header -->
-    <div style="text-align:center;padding:32px 32px 16px;">
-      <img src="${window.location.origin}/gbti-logo.png" alt="GBTI Logo" style="height:70px;width:auto;" />
+    <!-- Header with Logo -->
+    <div style="padding:24px 32px 16px;text-align:center;">
+      <img src="${GBTI_LOGO_URL}" alt="GBTI - We see Guyana through your eyes" style="max-width:110px;height:auto;display:block;margin:0 auto;" />
     </div>
 
     <!-- Body -->
@@ -125,9 +128,9 @@ const buildGBTIEmailHtml = ({
     </div>
 
     <!-- Footer -->
-    <div style="background:#00a8ad;padding:24px 32px;text-align:center;">
-      <p style="font-size:12px;color:#ffffff;margin:0 0 4px;">GBTI Bank - +592 231 4400</p>
-      <p style="font-size:12px;color:#ffffff;margin:0;">Estimates are indicative. Final pricing confirmed by your architect.</p>
+    <div style="background:#00a8ad;padding:20px 32px;text-align:center;margin-top:8px;">
+      <p style="font-size:13px;color:#ffffff;margin:0 0 4px;font-weight:600;white-space:nowrap;">GBTI Bank &middot; +592 231 4400</p>
+      <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0;white-space:nowrap;">Estimates are indicative. Final pricing confirmed by your architect.</p>
     </div>
   </div>
 </body>

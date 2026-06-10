@@ -91,13 +91,56 @@
   }
 }
 
-/* Mobile-specific: zoom out so entire page fits the phone screen */
+/* Responsive Mobile Media Queries */
 @media (max-width: 768px) {
-  html {
-    zoom: 0.7;
+  html, body, #root {
+    overflow-x: hidden;
+    width: 100%;
+    margin: 0;
+    padding: 0;
   }
+  
   body {
     background-attachment: scroll;
+  }
+
+  #root {
+    width: 100%;
+  }
+
+  /* Ensure main content containers center their children and don't overflow */
+  main, .min-h-screen {
+    width: 100%;
+    overflow-x: hidden;
+  }
+}
+
+/* Responsive Zoom Levels for Mobile Screens */
+/* Below mobile-s (max-width 319px) */
+@media (max-width: 319.98px) {
+  html {
+    zoom: 0.6;
+  }
+}
+
+/* mobile-s (320px - 375px) */
+@media (min-width: 320px) and (max-width: 374.98px) {
+  html {
+    zoom: 0.65;
+  }
+}
+
+/* mobile-m (375px - 425px) */
+@media (min-width: 375px) and (max-width: 424.98px) {
+  html {
+    zoom: 0.75;
+  }
+}
+
+/* mobile-l (425px - 768px) */
+@media (min-width: 425px) and (max-width: 768px) {
+  html {
+    zoom: 0.8;
   }
 }
 

@@ -223,11 +223,11 @@ const IndexInner = () => {
           }}
         />
 
-      <main className="flex-1 relative">
-        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 md:px-8 py-4 md:py-6 lg:py-8">
-          <div className={`grid gap-8 lg:gap-10 ${[2].includes(step) ? 'max-w-6xl mx-auto w-full' : 'lg:grid-cols-[1fr_400px]'}`}>
+      <main className="flex-1 relative min-w-0 w-full">
+        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 md:px-8 py-4 md:py-6 lg:py-8 min-w-0 w-full">
+          <div className={`grid gap-8 lg:gap-10 min-w-0 w-full ${[2].includes(step) ? 'max-w-6xl mx-auto' : 'lg:grid-cols-[1fr_400px]'}`}>
             {/* Step content */}
-            <div className="min-h-[40vh] md:min-h-[60vh]">
+            <div className="min-h-[40vh] md:min-h-[60vh] min-w-0 w-full">
               <AnimatePresence mode="wait">
                 {renderStep()}
               </AnimatePresence>
@@ -235,7 +235,7 @@ const IndexInner = () => {
 
             {/* Sticky live preview / Cost Sidebar */}
             {![2].includes(step) && (
-              <aside className="lg:sticky lg:top-28 lg:self-start space-y-6 md:space-y-8 pb-12 lg:pb-0">
+              <aside className="lg:sticky lg:top-28 lg:self-start space-y-6 md:space-y-8 pb-12 lg:pb-0 min-w-0 w-full">
                 <AnimatePresence>
                   <motion.div 
                     initial={{ opacity: 0, height: 0, marginBottom: 0 }}

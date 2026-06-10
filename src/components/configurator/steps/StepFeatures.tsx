@@ -56,7 +56,7 @@ export const StepFeatures = () => {
             <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Floor Plan Layout</h3>
             <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold hidden sm:inline-block">Base</span>
           </div>
-          <div className="grid gap-2 md:gap-3 sm:grid-cols-2">
+          <div className="grid gap-2 md:gap-3 grid-cols-2">
             {[
               { id: false, label: 'Bungalow', desc: 'Single-storey home design' },
               { id: true, label: 'Multi-Storey', desc: 'Multi-Storey home design' }
@@ -131,7 +131,7 @@ export const StepFeatures = () => {
         )}
 
         {/* ── Bedrooms & Bathrooms ──────────────────────────── */}
-        <div className="grid gap-2 md:gap-4 sm:grid-cols-2">
+        <div className="grid gap-2 md:gap-4 grid-cols-2">
           <Stepper
             label="Bedrooms"
             value={bedrooms}
@@ -158,7 +158,7 @@ export const StepFeatures = () => {
             <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Spatial Layout</h3>
             <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Options</span>
           </div>
-          <div className="grid gap-2 md:gap-3 sm:grid-cols-2">
+          <div className="grid gap-2 md:gap-3 grid-cols-2">
             {KITCHENS.map((k) => {
               const active = kitchen === k.id;
               return (
@@ -188,7 +188,7 @@ export const StepFeatures = () => {
             <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Enhancements</h3>
             <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Optional</span>
           </div>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 grid-cols-3">
             {(Object.keys(ADDON_META) as AddOn[]).map((id) => {
               const meta = ADDON_META[id];
               const Icon = ADDON_ICON[id];
@@ -200,25 +200,25 @@ export const StepFeatures = () => {
                   key={id}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => toggleAddon(id)}
-                  className={`group relative overflow-hidden flex items-center gap-2 rounded-xl p-2 sm:p-3 text-left transition-all duration-500 border ${
+                  className={`group relative overflow-hidden flex flex-col sm:flex-row items-center sm:items-start gap-1.5 sm:gap-2 rounded-xl p-2 sm:p-3 text-center sm:text-left transition-all duration-500 border ${
                     active 
                       ? 'bg-surface shadow-elev border-clay/30' 
                       : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'
                   }`}
                 >
-                  <div className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-lg border transition-colors duration-500 ${active ? 'bg-clay border-clay text-white shadow-sm' : 'bg-soft-section border-border text-muted-foreground'}`}>
-                    <Icon size={14} strokeWidth={1.25} />
+                  <div className={`relative z-10 flex shrink-0 h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-md sm:rounded-lg border transition-colors duration-500 ${active ? 'bg-clay border-clay text-white shadow-sm' : 'bg-soft-section border-border text-muted-foreground'}`}>
+                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" strokeWidth={1.25} />
                   </div>
-                  <div className="relative z-10 flex-1">
-                    <div className={`font-medium tracking-tight text-sm ${active ? 'text-foreground' : 'text-foreground/80'}`}>{meta.label}{showAsterisk && <span className="text-clay ml-0.5">*</span>}</div>
+                  <div className="relative z-10 flex-1 min-w-0 w-full flex flex-col items-center sm:items-start">
+                    <div className={`font-medium tracking-tight text-[10px] leading-tight sm:text-sm truncate w-full ${active ? 'text-foreground' : 'text-foreground/80'}`}>{meta.label}{showAsterisk && <span className="text-clay ml-0.5">*</span>}</div>
                     {meta.layoutOnly ? (
-                      <div className="text-[10px] uppercase tracking-widest text-muted-foreground/50 mt-1">Layout only</div>
+                      <div className="text-[8px] sm:text-[10px] uppercase tracking-widest text-muted-foreground/50 mt-0.5 sm:mt-1">Layout only</div>
                     ) : (
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-clay num mt-1">+{formatMoney(meta.cost)}</div>
+                      <div className="text-[8px] sm:text-[10px] font-bold uppercase tracking-widest text-clay num mt-0.5 sm:mt-1">+{formatMoney(meta.cost)}</div>
                     )}
                   </div>
                   {active && (
-                    <div className="relative z-10 h-1.5 w-1.5 rounded-full bg-clay" />
+                    <div className="absolute top-1.5 right-1.5 sm:relative sm:top-0 sm:right-0 z-10 h-1.5 w-1.5 rounded-full bg-clay shrink-0" />
                   )}
                 </motion.button>
               );
