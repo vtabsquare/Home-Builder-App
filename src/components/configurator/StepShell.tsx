@@ -23,6 +23,23 @@ export const StepShell = ({
   nextDisabled?: boolean;
   hidePrev?: boolean;
 }) => {
+  const handleNext = () => {
+    // Hit every possible scroll container — CSS zoom makes window.scrollTo unreliable on mobile
+    const scrollToTop = () => {
+      const container = document.getElementById('main-scroll-container');
+      if (container) container.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      window.scrollTo(0, 0);
+    };
+    scrollToTop();
+    onNext?.();
+    // Re-apply after framer-motion starts the exit animation
+    requestAnimationFrame(scrollToTop);
+    setTimeout(scrollToTop, 50);
+    setTimeout(scrollToTop, 200);
+  };
+
   return (
     <>
       <motion.section
@@ -88,7 +105,7 @@ export const StepShell = ({
             <div className="pointer-events-auto flex-1 md:flex-none flex justify-center min-w-0">
               {onNext && (
                 <button
-                  onClick={onNext}
+                  onClick={handleNext}
                   disabled={nextDisabled}
                   className="group relative flex items-center justify-center gap-4 rounded-full bg-primary text-primary-foreground h-12 md:h-14 w-full md:min-w-[340px] md:w-auto px-6 md:px-12 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] shadow-lg transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-30 disabled:hover:brightness-100 disabled:active:scale-100"
                 >

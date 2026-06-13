@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getBuiltInPresetKey, getFamilyDoubleStoreyPackageLookupKeys, useConfig } from '@/store/configurator';
 import { computeCost } from '@/lib/cost';
@@ -25,6 +25,7 @@ const IndexInner = () => {
 
   type AppFlowStep = 'journey' | 'auth' | 'landing' | 'configurator' | 'external_viewer';
   const [flowStep, setFlowStep] = useState<AppFlowStep>('journey');
+  const scrollRef = useRef<HTMLDivElement>(null);
   const pricing = usePricing();
 
   const cost = useMemo(() => computeCostDynamic(config, pricing), [config, pricing]);
@@ -72,6 +73,14 @@ const IndexInner = () => {
       if (customFirstFloorPlan) setCustomFirstFloorPlan(null);
     }
   }, [homeType, isDoubleStorey, customPlan, customFirstFloorPlan, setCustomPlan, setCustomFirstFloorPlan]);
+
+  // Scroll to top when navigating between steps
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [step, flowStep]);
 
   // Prevent body scroll when overlays are active to avoid double scrollbars
   useEffect(() => {
@@ -231,7 +240,7 @@ const IndexInner = () => {
           }}
         />
 
-      <main className="flex-1 relative min-w-0 w-full">
+      <main className="flex-1 relative min-w-0 w-full overflow-y-auto" ref={scrollRef} id="main-scroll-container">
         <div className="mx-auto max-w-[1440px] px-4 sm:px-6 md:px-8 py-4 md:py-6 lg:py-8 min-w-0 w-full">
           <div className={`grid gap-8 lg:gap-10 min-w-0 w-full ${[2].includes(step) ? 'max-w-6xl mx-auto' : 'lg:grid-cols-[1fr_400px]'}`}>
             {/* Step content */}

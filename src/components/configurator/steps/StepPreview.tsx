@@ -584,7 +584,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 ))}
               </div>
 
-              {(view === '2d' || view === 'elevation') && !advancedEditorMode && (
+              {(view === '2d' || view === 'elevation') && !advancedEditorMode && savedPresets.length > 0 && (
                 <div className="inline-flex rounded-xl bg-soft-section/50 p-1 border border-border/50 overflow-x-auto scrollbar-hide">
 
                   {savedPresets.map((savedPresetObj, i) => (

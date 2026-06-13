@@ -94,10 +94,10 @@ const buildGBTIEmailHtml = ({
       <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 24px;">You can take the next step toward your goals by starting your formal application here:</p>
 
       <!-- CTA Button -->
-      <div style="margin:0 0 32px;">
+      <div style="margin:0 0 32px;text-align:center;">
         <a href="${LOAN_APPLICATION_URL}?ref=${leadId}" target="_blank"
            style="display:inline-block;background:#0d65a6;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:4px;">
-          Start Your Loan Application -&gt;
+          Start Your Loan Application
         </a>
       </div>
 

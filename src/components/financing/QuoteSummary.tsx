@@ -64,7 +64,7 @@ export function QuoteSummary({ quote, mortgageEngine }: QuoteSummaryProps) {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {mortgageEngine.loyaltyOptions.map((opt: any) => {
               const isSelected = loyaltyProducts.includes(opt.id);
               return (

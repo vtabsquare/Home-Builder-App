@@ -76,41 +76,52 @@ export async function generateEstimatePDF(params: PDFGenerationParams): Promise<
   const CONTENT_W = PAGE_W - MARGIN * 2;
   let y = 0;
 
+  const logoB64 = await loadImageAsBase64('https://ekvzvjxwvjlgquvxfkqy.supabase.co/storage/v1/object/public/elevation-images/email-assets/gbti-logo.png');
+
   // ── COVER HEADER ─────────────────────────────────────────────────────
-  drawRoundRect(doc, 0, 0, PAGE_W, 52, 0, INK);
-
-  // Logo text
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  doc.text('GBTI', MARGIN, 22);
-
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...GBTI_GOLD);
-  doc.text('ARCHITECTURAL CONFIGURATOR', MARGIN, 28);
+  if (logoB64) {
+    try {
+      const props = doc.getImageProperties(logoB64);
+      const logoW = 35;
+      const logoH = (props.height * logoW) / props.width;
+      doc.addImage(logoB64, 'PNG', PAGE_W / 2 - logoW / 2, 16, logoW, logoH, undefined, 'FAST');
+      y = 16 + logoH + 12;
+    } catch {
+      doc.setTextColor(0, 59, 109);
+      doc.setFontSize(22);
+      doc.setFont('helvetica', 'bold');
+      doc.text('GBTI', PAGE_W / 2, 22, { align: 'center' });
+      y = 35;
+    }
+  } else {
+    doc.setTextColor(0, 59, 109);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('GBTI', PAGE_W / 2, 22, { align: 'center' });
+    y = 35;
+  }
 
   // Reference ID top right
   doc.setFontSize(7);
-  doc.setTextColor(255, 255, 255, 0.5 as any);
-  doc.text(`Ref: ${leadId.slice(0, 8).toUpperCase()}`, PAGE_W - MARGIN, 22, { align: 'right' });
+  doc.setTextColor(...MUTED);
+  doc.text(`Ref: ${leadId.slice(0, 8).toUpperCase()}`, PAGE_W - MARGIN, y, { align: 'right' });
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   doc.setFontSize(7);
-  doc.text(today, PAGE_W - MARGIN, 28, { align: 'right' });
+  doc.text(today, PAGE_W - MARGIN, y + 6, { align: 'right' });
 
   // Hero text
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
+  doc.setTextColor(0, 59, 109);
+  doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('Your Home Estimate', MARGIN, 42);
+  doc.text('Your Home Estimate', MARGIN, y);
 
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...GBTI_GOLD);
-  doc.text('Personalised for ' + c.name, MARGIN, 48);
+  doc.setTextColor(...MUTED);
+  doc.text('Personalised for ' + c.name, MARGIN, y + 6);
 
-  y = 60;
+  y += 18;
 
   // ── PRICE SUMMARY CARDS ───────────────────────────────────────────────
   const cardW = (CONTENT_W - 6) / 4;
@@ -271,28 +282,18 @@ export async function generateEstimatePDF(params: PDFGenerationParams): Promise<
   doc.text(formatMoney(cost.total), col2X + colW, rightY, { align: 'right' });
 
   // ── FOOTER ────────────────────────────────────────────────────────────
-  const footerY = PAGE_H - 22;
-  drawRoundRect(doc, 0, footerY, PAGE_W, 22, 0, INK);
+  const footerY = PAGE_H - 24;
+  drawRoundRect(doc, 0, footerY, PAGE_W, 24, 0, [0, 168, 173]);
 
-  doc.setFontSize(7);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...GBTI_GOLD);
-  doc.text('Ready to proceed?', MARGIN, footerY + 8);
+  doc.setTextColor(255, 255, 255);
+  doc.text('GBTI Bank · +592 231 4400', PAGE_W / 2, footerY + 10, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(255, 255, 255);
-  doc.text('Start your formal loan application at gbtibank.com/apply-for-a-loan', MARGIN, footerY + 14);
-
-  doc.setTextColor(...MUTED);
-  doc.setFontSize(6);
-  doc.text('+592 231 4400  ·  GBTI Architectural Team', PAGE_W - MARGIN, footerY + 14, { align: 'right' });
-
-  doc.setFontSize(5.5);
-  doc.setTextColor(100, 100, 100);
-  doc.text(
-    'Estimates are indicative and subject to change. Final pricing confirmed by your architect. Consult a financial advisor before committing.',
-    PAGE_W / 2, footerY + 19, { align: 'center', maxWidth: CONTENT_W }
-  );
+  doc.setFontSize(8);
+  doc.setTextColor(230, 230, 230);
+  doc.text('Estimates are indicative. Final pricing confirmed by your architect.', PAGE_W / 2, footerY + 16, { align: 'center' });
 
   return doc.output('blob');
 }

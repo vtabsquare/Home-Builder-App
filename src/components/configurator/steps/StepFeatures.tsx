@@ -90,7 +90,7 @@ export const StepFeatures = () => {
               <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Finish Quality</h3>
               <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Quality</span>
             </div>
-            <div className="grid gap-2 md:gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 md:gap-3 grid-cols-2">
               {([
                 { id: 'standard' as FinishingQuality, label: 'Standard', desc: 'Quality finishes at an accessible price point', price: standardCost },
                 { id: 'premium' as FinishingQuality, label: '★ Premium', desc: 'Elevated materials, premium fixtures and refined detailing', price: premiumCost },
