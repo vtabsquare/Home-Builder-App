@@ -56,7 +56,7 @@ function getRoomTabs(plan: Plan): RoomTab[] {
 }
 
 export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
-  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, setKitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset, presetOverrides, elevationImages, addElevationImage, removeElevationImage, garageShutterOpen, setGarageShutterOpen } = useConfig();
+  const { roof, setRoof, material, setMaterial, addons, next, prev, planHistory, addHistoryRecord, removeHistoryRecord, setCustomPlan, customPlan, presetId, setPresetId, homeType, bedrooms, bathrooms, kitchen, setKitchen, advancedEditorMode, setAdvancedEditorMode, isDoubleStorey, setDoubleStorey, activeFloor, setActiveFloor, customFirstFloorPlan, setCustomFirstFloorPlan, savedPresets, packageLayouts, saveAsPreset, loadSavedPreset, loadedPresetId, updateSavedPreset, deleteSavedPreset, savePackageLayout, setPresetOverride, saveBuiltInPreset, presetOverrides, elevationImages, addElevationImage, removeElevationImage, garageShutterOpen, setGarageShutterOpen, layoutStyle, setLayoutStyle } = useConfig();
   const KITCHEN_META = useKitchenMeta();
   const isCustomPreset = presetId === -1;
   const [view, setView] = useState<'2d' | '3d' | 'elevation'>('2d');
@@ -608,27 +608,22 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
               {view === '2d' && !advancedEditorMode && (
                 <>
 
-                  {/*
-                  <button
-                    onClick={() => setAdvancedEditorMode(true)}
-                    className="flex items-center gap-2 h-11 rounded-xl border border-primary/10 bg-primary/5 text-primary px-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary/10 transition-all active:scale-95"
-                  >
-                    <PenTool size={14} strokeWidth={1.5} />
-                    Custom Editor
-                  </button>
-                  <button
-                    onClick={() => {
-                      const nextVal = !advanced;
-                      setAdvanced(nextVal);
-                      if (!nextVal) setIsSelectedAll(false);
-                    }}
-                    className={`h-10 md:h-11 rounded-xl border px-4 md:px-6 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
-                      advanced ? 'border-primary bg-primary text-white shadow-lg' : 'border-border bg-white text-muted-foreground hover:bg-soft-section hover:text-foreground'
-                    }`}
-                  >
-                    {advanced ? 'Advanced' : 'Advanced Mode'}
-                  </button>
-                  */}
+                  <div className="flex items-center gap-2 rounded-xl bg-soft-section p-1 border border-border">
+                    <span className="hidden xl:inline-block text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60 px-2">Configurations:</span>
+                    {(['default', 'open_plan', 'entertainer', 'family_suite'] as const).map(style => (
+                      <button
+                        key={style}
+                        onClick={() => setLayoutStyle(style)}
+                        className={`rounded-lg px-3 md:px-4 py-2 text-[8px] md:text-[10px] font-bold uppercase tracking-[0.1em] transition-all duration-300 ${
+                          layoutStyle === style
+                            ? 'bg-white text-foreground shadow-sm'
+                            : 'text-muted-foreground/60 hover:text-foreground'
+                        }`}
+                      >
+                        {style === 'default' ? 'Standard' : style === 'open_plan' ? 'Open-Plan' : style === 'entertainer' ? 'Entertainer' : 'Family Suite'}
+                      </button>
+                    ))}
+                  </div>
                   <div className="flex items-center gap-1 sm:border-l sm:border-border sm:pl-3 md:pl-4">
                     <button
                       onClick={exportAsPDF}

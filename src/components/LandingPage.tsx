@@ -9,6 +9,7 @@ interface LandingPageProps {
   onExplore?: () => void;
   onTurnkeyBuild?: () => void;
   onYoungProfessionalBuild?: () => void;
+  onPrivatePurchase?: () => void;
 }
 
 const HouseBlueprintSVG = () => (
@@ -107,7 +108,7 @@ const Card = ({ num, title, subtitle, description, img, onClick, disabled, soon,
 );
 
 /* ── Main Component ────────────────────────────────────────── */
-export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfessionalBuild }: LandingPageProps) => {
+export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfessionalBuild, onPrivatePurchase }: LandingPageProps) => {
   const [isBuilding, setIsBuilding] = useState(false);
   const isMobile = useIsMobile();
 
@@ -227,14 +228,14 @@ export const LandingPage = ({ onStart, onExplore, onTurnkeyBuild, onYoungProfess
               onClick={onYoungProfessionalBuild}
             />
 
-            {/* 3. Private Purchase (coming soon) */}
+            {/* 3. Private Purchase */}
             <Card
               num="03."
               title="Private"
               subtitle="Purchase"
               description="Total freedom to own your dream property with a seamless, transparent buying experience for your own private property, backed by trusted GBTI expert guidance."
               img="/private_purchase.png"
-              soon
+              onClick={onPrivatePurchase}
             />
 
             {/* 4. Build Your Own */}

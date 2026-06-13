@@ -4,7 +4,7 @@ import { getBuiltInPresetKey, getFamilyDoubleStoreyPackageLookupKeys, useConfig 
 import { computeCost } from '@/lib/cost';
 import { PricingProvider, usePricing } from '@/hooks/PricingContext';
 import { computeCostDynamic } from '@/hooks/useDynamicPricing';
-import { applyAddOnsToPlan, generatePlan, Plan } from '@/lib/floorplan';
+import { applyAddOnsToPlan, generatePlan, applyLayoutStyle, Plan } from '@/lib/floorplan';
 import { ProgressHeader } from '@/components/configurator/ProgressHeader';
 import { CostPanel } from '@/components/configurator/CostPanel';
 import { FloorPlanCanvas } from '@/components/configurator/FloorPlanCanvas';
@@ -47,7 +47,10 @@ const IndexInner = () => {
   // Skip applyAddOnsToPlan to avoid double-shifting room positions.
   const hasActiveOverride = config.presetId !== -1 && !!presetOverrides[getBuiltInPresetKey(config, config.presetId)]?.ground?.rooms;
   const hasPackageBackedPlan = isFamilyDoubleStoreyPackage && !!selectedPlan?.rooms;
-  const plan = useMemo(() => (hasActiveOverride || hasPackageBackedPlan) ? selectedPlan : applyAddOnsToPlan(selectedPlan, config), [selectedPlan, config.addons, hasActiveOverride, hasPackageBackedPlan]);
+  const plan = useMemo(() => {
+    const p = (hasActiveOverride || hasPackageBackedPlan) ? selectedPlan : applyAddOnsToPlan(selectedPlan, config);
+    return applyLayoutStyle(p, config.layoutStyle, config.kitchen);
+  }, [selectedPlan, config.addons, hasActiveOverride, hasPackageBackedPlan, config.layoutStyle, config.kitchen]);
 
   useEffect(() => {
     config.fetchSavedPresets();
@@ -178,6 +181,11 @@ const IndexInner = () => {
                 config.setHomeType('young_professional');
                 setFlowStep('external_viewer');
               }}
+              onPrivatePurchase={() => {
+                config.setHomeType('private_purchase');
+                setFlowStep('configurator');
+                config.setStep(3);
+              }}
             />
           </motion.div>
         )}
@@ -237,21 +245,23 @@ const IndexInner = () => {
             {![2].includes(step) && (
               <aside className="lg:sticky lg:top-28 lg:self-start space-y-6 md:space-y-8 pb-12 lg:pb-0 min-w-0 w-full">
                 <AnimatePresence>
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                    animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
-                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                    className="relative overflow-hidden rounded-2xl border border-border/40 glass-dark-panel shadow-elev"
-                  >
-                    <div className="h-[240px] md:h-[280px]">
-                      <FloorPlanCanvas plan={plan} minimal={true} onChange={setCustomPlan} />
-                    </div>
-                    <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-ink/60 backdrop-blur-md px-2.5 py-1 text-[9px] font-display font-semibold uppercase tracking-[0.15em] text-white/80 border border-white/5">
-                      Live Overview · {plan?.width || 0}′×{plan?.height || 0}′
-                    </div>
-                    <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_30px_rgba(0,0,0,0.3)] mix-blend-overlay rounded-2xl" />
-                  </motion.div>
+                  {homeType !== 'private_purchase' && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                      animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
+                      exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                      className="relative overflow-hidden rounded-2xl border border-border/40 glass-dark-panel shadow-elev"
+                    >
+                      <div className="h-[240px] md:h-[280px]">
+                        <FloorPlanCanvas plan={plan} minimal={true} onChange={setCustomPlan} />
+                      </div>
+                      <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-ink/60 backdrop-blur-md px-2.5 py-1 text-[9px] font-display font-semibold uppercase tracking-[0.15em] text-white/80 border border-white/5">
+                        Live Overview · {((plan?.width || 0) + (homeType === 'premium' ? 4 : homeType === 'family' ? 6 : 2) * 2)}′×{((plan?.height || 0) + (homeType === 'premium' ? 4 : homeType === 'family' ? 6 : 2) * 2)}′
+                      </div>
+                      <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_30px_rgba(0,0,0,0.3)] mix-blend-overlay rounded-2xl" />
+                    </motion.div>
+                  )}
                 </AnimatePresence>
                   
                   <motion.div

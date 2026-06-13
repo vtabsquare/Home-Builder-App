@@ -124,7 +124,7 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
     return () => ro.disconnect();
   }, []);
 
-  const PLOT_PADDING_FT = 2;
+  const PLOT_PADDING_FT = config.homeType === 'premium' ? 4 : config.homeType === 'family' ? 6 : 2;
   const pad = 60;
   const localW = Math.max(1, localPlan.width || 0);
   const localH = Math.max(1, localPlan.height || 0);

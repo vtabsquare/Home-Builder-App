@@ -361,11 +361,18 @@ export const StepLeadCapture = ({ cost, plan, onReset }: Props) => {
   const [sending, setSending] = useState(false);
   const leadIdRef = useRef<string | null>(null);
   const floorPlanRef = useRef<FloorPlanCanvasHandle>(null);
+  const propertyPrice = c.propertyPrice;
+  const setPropertyPrice = c.setPropertyPrice;
+
+  const isPrivatePurchase = c.homeType === 'private_purchase';
+  const effectiveTotal = isPrivatePurchase ? propertyPrice : cost.total;
+  const effectiveLandCost = isPrivatePurchase ? 0 : cost.landCost;
+  const effectiveLoanableAmount = isPrivatePurchase ? propertyPrice : (cost.total - (cost.nonLoanAddonsCost ?? 0));
 
   const { mortgageEngine, finalQuote } = useQuotationEngine(
-    cost.total,
-    cost.landCost,
-    cost.total - (cost.nonLoanAddonsCost ?? 0)
+    effectiveTotal,
+    effectiveLandCost,
+    effectiveLoanableAmount
   );
 
   // ── Auto-reset countdown ──────────────────────────────────────────────
@@ -645,6 +652,26 @@ export const StepLeadCapture = ({ cost, plan, onReset }: Props) => {
                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 className="max-w-2xl mx-auto"
               >
+                {isPrivatePurchase && (
+                  <div className="mb-8 p-6 rounded-2xl border border-border/40 bg-white/[0.02]">
+                    <label className="block text-sm font-semibold text-foreground mb-3">
+                      Property Price
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">$</span>
+                      <input
+                        type="number"
+                        value={propertyPrice || ''}
+                        onChange={(e) => setPropertyPrice(Number(e.target.value) || 0)}
+                        placeholder="Enter property price"
+                        className="w-full pl-10 pr-4 py-4 rounded-xl border border-border/60 bg-surface text-foreground text-lg focus:outline-none focus:ring-2 focus:ring-clay/50 transition-all"
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Enter the total price of the property you wish to purchase
+                    </p>
+                  </div>
+                )}
                 <QuoteSummary quote={finalQuote} mortgageEngine={mortgageEngine} />
 
                 <div className="mt-8 flex justify-center">

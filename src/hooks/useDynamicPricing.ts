@@ -43,6 +43,7 @@ const DEFAULTS: PricingConfig = {
     premium: { baseCost: 410000, baseArea: 2100 },
     turnkey: { baseCost: 350000, baseArea: 0 },
     young_professional: { baseCost: 180000, baseArea: 0 },
+    private_purchase: { baseCost: 0, baseArea: 0 },
   },
   kitchen_costs: { standard: 0, open: 0, galley: 0 }, // kitchen affects layout only, not pricing
   addon_costs: {
@@ -125,6 +126,7 @@ function mergePricing(saved: any): PricingConfig {
       premium: { ...DEFAULTS.home_types.premium, ...saved.home_types?.premium },
       turnkey: { ...DEFAULTS.home_types.turnkey, ...saved.home_types?.turnkey },
       young_professional: { ...DEFAULTS.home_types.young_professional, ...saved.home_types?.young_professional },
+      private_purchase: { ...DEFAULTS.home_types.private_purchase, ...saved.home_types?.private_purchase },
     },
     kitchen_costs: { standard: 0, open: 0, galley: 0 }, // always 0 — kitchen is layout-only
     addon_costs: { ...DEFAULTS.addon_costs, ...saved.addon_costs },
@@ -163,10 +165,10 @@ export function computeCostDynamic(c: ConfigState, p: PricingConfig, opts: { int
   let landCost = 0;
   let items: { label: string; amount: number }[] = [];
 
-  if (c.homeType === 'turnkey' || c.homeType === 'young_professional') {
+  if (c.homeType === 'turnkey' || c.homeType === 'young_professional' || c.homeType === 'private_purchase') {
     // Fixed price flows
-    baseStructure = c.homeType === 'turnkey' ? p.turnkey_cost : p.young_professional_cost;
-    const label = c.homeType === 'turnkey' ? 'Turnkey Build Package' : 'Young Professional Package';
+    baseStructure = c.homeType === 'turnkey' ? p.turnkey_cost : c.homeType === 'private_purchase' ? c.propertyPrice : p.young_professional_cost;
+    const label = c.homeType === 'turnkey' ? 'Turnkey Build Package' : c.homeType === 'private_purchase' ? 'Private Purchase' : 'Young Professional Package';
     items = [
       { label, amount: baseStructure }
     ];

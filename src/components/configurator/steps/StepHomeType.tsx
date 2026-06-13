@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const TYPES: { id: HomeType; tag: string; desc: string }[] = [
   { id: 'starter', tag: 'Compact + efficient', desc: 'Smart starter footprint with everything essential. Perfect first build.' },
   { id: 'family', tag: 'Most popular', desc: 'The benchmark family layout. Open social spaces, generous bedrooms.' },
-  { id: 'premium', tag: 'Spacious + airy', desc: 'Architectural footprint with multi-zone living and double-height options.' },
+  { id: 'premium', tag: 'Spacious + airy', desc: 'Architectural footprint with multi-zone living and generous double-height options.' },
 ];
 
 const PACKAGE_IDS: { id: Exclude<LandSize, 'custom' | null>; tag: string }[] = [
@@ -118,7 +118,7 @@ export const StepHomeType = () => {
                   <div className={`text-[9px] sm:text-[10px] uppercase tracking-[0.3em] font-bold mb-2 sm:mb-3 ${active ? 'text-clay' : 'text-muted-foreground/40'}`}>{tag}</div>
                   <h3 className="font-display text-lg sm:text-2xl md:text-3xl font-normal tracking-tight text-foreground">{d.label}</h3>
                   <div className="mt-1 sm:mt-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 num">
-                    {d.areaRange[0]}–{d.areaRange[1]} SQ FT · {d.bedrooms} BED
+                    {d.areaRange[0].toLocaleString()}/{d.areaRange[1].toLocaleString()} SQ FT · {d.bedrooms} BED
                   </div>
                   <p className="mt-3 sm:mt-5 text-xs sm:text-sm text-muted-foreground leading-relaxed font-light">
                     {desc}

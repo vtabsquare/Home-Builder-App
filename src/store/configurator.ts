@@ -4,9 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type LandChoice = 'own' | 'need' | null;
 export type LandSize = 'small' | 'medium' | 'large' | 'custom' | null;
-export type HomeType = 'starter' | 'family' | 'premium' | 'turnkey' | 'young_professional';
+export type HomeType = 'starter' | 'family' | 'premium' | 'turnkey' | 'young_professional' | 'private_purchase';
 export type FinishingQuality = 'standard' | 'premium';
 export type KitchenType = 'standard' | 'open' | 'galley';
+export type LayoutStyle = 'default' | 'open_plan' | 'entertainer' | 'family_suite';
 export type AddOn = 'solar' | 'carport' | 'water_tank' | 'smart_home' | 'fence' | 'landscaping';
 export type RoofType = 'gable' | 'flat';
 export type Material = 'budget' | 'modern' | 'luxury';
@@ -136,6 +137,8 @@ export interface ConfigState {
   tenureYears: number;
   // Loyalty
   loyaltyProducts: string[];
+  propertyPrice: number;
+  layoutStyle: LayoutStyle;
 }
 
 export interface ConfigActions {
@@ -162,6 +165,7 @@ export interface ConfigActions {
   setActiveFloor: (f: 0 | 1 | 2) => void;
   setCustomFirstFloorPlan: (p: any | null) => void;
   setPresetOverride: (presetId: number, groundPlan: any, firstFloorPlan: any | null) => void;
+  setPresetOverrides: (overrides: Record<string, { ground: any; first: any | null }>) => void;
   saveBuiltInPreset: (presetId: number, groundPlan: any, firstFloorPlan: any | null) => Promise<void>;
   addHistoryRecord: (record: { label: string; type: string; targetId: string; original: any }) => void;
   removeHistoryRecord: (id: string) => void;
@@ -179,15 +183,18 @@ export interface ConfigActions {
   setInterestRate: (v: number) => void;
   setTenureYears: (v: number) => void;
   toggleLoyaltyProduct: (p: string) => void;
+  setPropertyPrice: (v: number) => void;
+  setLayoutStyle: (s: LayoutStyle) => void;
   reset: () => void;
 }
 
 export const HOME_TYPE_DEFAULTS: Record<HomeType, { bedrooms: number; bathrooms: number; baseArea: number; baseCost: number; label: string; areaRange: [number, number] }> = {
-  starter: { bedrooms: 2, bathrooms: 1, baseArea: 900, baseCost: 135000, label: 'Starter', areaRange: [800, 1000] },
-  family: { bedrooms: 3, bathrooms: 2, baseArea: 1400, baseCost: 245000, label: 'Family', areaRange: [1200, 1600] },
-  premium: { bedrooms: 4, bathrooms: 3, baseArea: 2100, baseCost: 410000, label: 'Premium', areaRange: [1800, 2400] },
+  starter: { bedrooms: 2, bathrooms: 1, baseArea: 900, baseCost: 14700000, label: 'Starter', areaRange: [1200, 2400] },
+  family: { bedrooms: 3, bathrooms: 2, baseArea: 1400, baseCost: 22050000, label: 'Family', areaRange: [1800, 3600] },
+  premium: { bedrooms: 4, bathrooms: 3, baseArea: 2100, baseCost: 25725000, label: 'Executive', areaRange: [2100, 4200] },
   turnkey: { bedrooms: 0, bathrooms: 0, baseArea: 0, baseCost: 350000, label: 'Turn Key', areaRange: [0, 0] },
   young_professional: { bedrooms: 0, bathrooms: 0, baseArea: 0, baseCost: 180000, label: 'Young Professional', areaRange: [0, 0] },
+  private_purchase: { bedrooms: 0, bathrooms: 0, baseArea: 0, baseCost: 0, label: 'Private Purchase', areaRange: [0, 0] },
 };
 
 export const HOME_TYPE_LIMITS: Record<HomeType, { bedrooms: { min: number; max: number }; bathrooms: { min: number; max: number } }> = {
@@ -196,6 +203,7 @@ export const HOME_TYPE_LIMITS: Record<HomeType, { bedrooms: { min: number; max: 
   premium: { bedrooms: { min: 3, max: 4 }, bathrooms: { min: 3, max: 4 } },
   turnkey: { bedrooms: { min: 0, max: 0 }, bathrooms: { min: 0, max: 0 } },
   young_professional: { bedrooms: { min: 0, max: 0 }, bathrooms: { min: 0, max: 0 } },
+  private_purchase: { bedrooms: { min: 0, max: 0 }, bathrooms: { min: 0, max: 0 } },
 };
 
 const initial: ConfigState = {
@@ -234,6 +242,8 @@ const initial: ConfigState = {
   interestRate: 6.5,
   tenureYears: 25,
   loyaltyProducts: [],
+  propertyPrice: 0,
+  layoutStyle: 'default',
 };
 
 export const useConfig = create<ConfigState & ConfigActions>()(
@@ -299,6 +309,7 @@ export const useConfig = create<ConfigState & ConfigActions>()(
           [getBuiltInPresetKey(s, presetId)]: { ground: groundPlan, first: firstFloorPlan },
         },
       })),
+      setPresetOverrides: (presetOverrides) => set({ presetOverrides }),
       saveBuiltInPreset: async (presetId, groundPlan, firstFloorPlan) => {
         const state = get();
         const key = getBuiltInPresetKey(state, presetId);
@@ -483,6 +494,8 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       setDownPaymentPercent: (v) => set({ downPaymentPercent: v }),
       setInterestRate: (v) => set({ interestRate: v }),
       setTenureYears: (v) => set({ tenureYears: v }),
+      setPropertyPrice: (v) => set({ propertyPrice: v }),
+      setLayoutStyle: (layoutStyle) => set({ layoutStyle, customPlan: null, customFirstFloorPlan: null }),
       toggleLoyaltyProduct: (p) => set((state) => ({ loyaltyProducts: state.loyaltyProducts.includes(p) ? state.loyaltyProducts.filter(x => x !== p) : [...state.loyaltyProducts, p] })),
       reset: () => set((state) => ({
         ...initial,
