@@ -252,7 +252,7 @@ const IndexInner = () => {
 
             {/* Sticky live preview / Cost Sidebar */}
             {![2].includes(step) && (
-              <aside className="lg:sticky lg:top-28 lg:self-start space-y-6 md:space-y-8 pb-12 lg:pb-0 min-w-0 w-full">
+              <aside className={`lg:sticky lg:top-28 lg:self-start space-y-6 md:space-y-8 pb-12 lg:pb-0 min-w-0 w-full ${step === 0 ? 'hidden lg:block' : ''}`}>
                 <AnimatePresence>
                   {homeType !== 'private_purchase' && (
                     <motion.div 

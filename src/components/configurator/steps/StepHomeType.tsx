@@ -68,16 +68,16 @@ export const StepHomeType = () => {
       nextDisabled={!canProceed}
       hidePrev
     >
-      <div className="max-w-2xl mx-auto mb-8 text-center text-[11px] sm:text-xs text-muted-foreground leading-relaxed p-4 rounded-xl border border-border/40 bg-white/[0.02]">
+      <div className="hidden sm:block max-w-2xl mx-auto mb-8 text-center text-[11px] sm:text-xs text-muted-foreground leading-relaxed p-4 rounded-xl border border-border/40 bg-white/[0.02]">
         &quot;Estimates provided are for informational purposes only. Please note that construction and market costs fluctuate; this estimate should be used for budgeting purposes only. We recommend using these as a starting point for your planning.&quot;
       </div>
 
       {/* Property Status Segmented Toggle Control */}
-      <div className="flex p-1 bg-soft-section border border-border/60 rounded-full max-w-[280px] mx-auto mb-6 sm:mb-10 shadow-sm">
+      <div className="flex p-1 bg-soft-section border border-border/60 rounded-full max-w-[280px] mx-auto mb-3 sm:mb-10 shadow-sm">
         <button
           type="button"
           onClick={() => setLand('own')}
-          className={`flex-1 rounded-full py-2.5 text-[9px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
+          className={`flex-1 rounded-full py-1.5 sm:py-2.5 text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
             land === 'own'
               ? 'bg-surface text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -88,7 +88,7 @@ export const StepHomeType = () => {
         <button
           type="button"
           onClick={() => setLand('need')}
-          className={`flex-1 rounded-full py-2.5 text-[9px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
+          className={`flex-1 rounded-full py-1.5 sm:py-2.5 text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
             land === 'need'
               ? 'bg-surface text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -101,7 +101,7 @@ export const StepHomeType = () => {
       {/* Collapsible Plot Size footprints grid (REMOVED) */}
 
       {/* Main Home Type cards */}
-      <div className="grid gap-4 sm:gap-6 md:gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-2 sm:gap-6 md:gap-8 sm:grid-cols-2 lg:grid-cols-3">
         {TYPES.map(({ id, tag, desc }, i) => {
           const d = HOME_TYPE_META[id];
           const active = homeType === id;
@@ -113,23 +113,28 @@ export const StepHomeType = () => {
               transition={{ delay: i * 0.1, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
               className="h-full"
             >
-              <SelectableCard selected={active} onClick={() => setHomeType(id)} className="h-full flex flex-col justify-between">
-                <div>
-                  <div className={`text-[9px] sm:text-[10px] uppercase tracking-[0.3em] font-bold mb-2 sm:mb-3 ${active ? 'text-clay' : 'text-muted-foreground/40'}`}>{tag}</div>
-                  <h3 className="font-display text-lg sm:text-2xl md:text-3xl font-normal tracking-tight text-foreground">{d.label}</h3>
-                  <div className="mt-1 sm:mt-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 num">
+              <SelectableCard selected={active} onClick={() => setHomeType(id)} className="h-full flex flex-row sm:flex-col sm:justify-between items-center sm:items-stretch py-2 px-3 sm:p-6">
+                <div className="flex-1 text-left">
+                  <div className={`text-[8px] sm:text-[10px] uppercase tracking-[0.3em] font-bold mb-0.5 sm:mb-3 ${active ? 'text-clay' : 'text-muted-foreground/40'}`}>{tag}</div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-display text-base sm:text-2xl md:text-3xl font-normal tracking-tight text-foreground leading-none">{d.label}</h3>
+                    <div className="sm:hidden text-[9px] font-bold text-muted-foreground/60 px-1.5 py-0.5 rounded bg-muted/20">{d.bedrooms} BED</div>
+                  </div>
+                  <div className="hidden sm:block mt-1 sm:mt-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 num">
                     {d.areaRange[0].toLocaleString()}/{d.areaRange[1].toLocaleString()} SQ FT · {d.bedrooms} BED
                   </div>
-                  <p className="mt-3 sm:mt-5 text-xs sm:text-sm text-muted-foreground leading-relaxed font-light">
+                  <p className="hidden sm:block mt-3 sm:mt-5 text-xs sm:text-sm text-muted-foreground leading-relaxed font-light">
                     {desc}
                   </p>
                 </div>
-                <div className="mt-4 sm:mt-8 pt-4 sm:pt-6 border-t border-border flex items-end justify-between">
-                  <div>
-                    <div className="text-[8px] sm:text-[9px] uppercase tracking-[0.2em] text-muted-foreground/40 mb-1 font-bold">Estimated</div>
-                    <div className="font-display text-lg sm:text-xl font-normal num tracking-tight text-foreground">{formatMoney(d.baseCost)}</div>
+                <div className="mt-0 sm:mt-8 pt-0 sm:pt-6 sm:border-t border-border flex flex-col sm:flex-row items-end justify-between ml-2 sm:ml-0">
+                  <div className="text-right sm:text-left mb-1 sm:mb-0">
+                    <div className="hidden sm:block text-[8px] sm:text-[9px] uppercase tracking-[0.2em] text-muted-foreground/40 mb-1 font-bold">Estimated</div>
+                    <div className="font-display text-[13px] sm:text-xl font-normal num tracking-tight text-foreground">{formatMoney(d.baseCost)}</div>
                   </div>
-                  <MiniSilhouette type={id} active={active} />
+                  <div className="hidden sm:block">
+                    <MiniSilhouette type={id} active={active} />
+                  </div>
                 </div>
               </SelectableCard>
             </motion.div>

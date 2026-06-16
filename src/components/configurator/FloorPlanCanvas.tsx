@@ -428,8 +428,8 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
       )}
       <Stage
         ref={stageRef}
-        width={size.w}
-        height={size.h}
+        width={Math.max(1, size.w)}
+        height={Math.max(1, size.h)}
         scaleX={stageScale}
         scaleY={stageScale}
         x={stagePos.x}
@@ -1162,7 +1162,7 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
               );
             })}
             {(localPlan.rooms || []).map(room => {
-              if (room.id === 'addon-fence') return null; // Don't show dimensions for fence
+              if (room.id === 'addon-fence' || ['living_hall_top', 'living_hall_bottom', 'living_right_mid', 'living_left', 'living_mid'].includes(room.id)) return null;
               return (
                 <Text key={`dim-${room.id}`}
                    text={`${Math.round(room.w)}′ × ${Math.round(room.h)}′`} 
@@ -1634,8 +1634,9 @@ const FurnitureShape = ({ item, roomX, roomY, scale, offsetX, offsetY, draggable
   const w = item.w * scale;
   const h = item.h * scale;
   const rot = item.rotation || 0;
-  const x = offsetX + (roomX + item.x) * scale + (rot !== 0 ? w / 2 : 0);
-  const y = offsetY + (roomY + item.y) * scale + (rot !== 0 ? h / 2 : 0);
+  const isCenterOffset = rot !== 0 || item.flipX;
+  const x = offsetX + (roomX + item.x) * scale + (isCenterOffset ? w / 2 : 0);
+  const y = offsetY + (roomY + item.y) * scale + (isCenterOffset ? h / 2 : 0);
   const colors = getFurnitureColors(item.type);
 
   return (
@@ -1644,8 +1645,9 @@ const FurnitureShape = ({ item, roomX, roomY, scale, offsetX, offsetY, draggable
       x={x}
       y={y}
       rotation={rot}
-      offsetX={rot !== 0 ? w / 2 : 0}
-      offsetY={rot !== 0 ? h / 2 : 0}
+      scaleX={item.flipX ? -1 : 1}
+      offsetX={isCenterOffset ? w / 2 : 0}
+      offsetY={isCenterOffset ? h / 2 : 0}
       draggable={draggable}
       onPointerDown={(e: any) => {
         e.cancelBubble = true;
@@ -1692,6 +1694,261 @@ const FurnitureShape = ({ item, roomX, roomY, scale, offsetX, offsetY, draggable
            <Rect x={3} y={3} width={w-6} height={h*0.25} fill={colors.detail} cornerRadius={3} />
            <Rect x={0} y={0} width={Math.max(4, w*0.15)} height={h} fill={colors.stroke} cornerRadius={3} />
            <Rect x={w - Math.max(4, w*0.15)} y={0} width={Math.max(4, w*0.15)} height={h} fill={colors.stroke} cornerRadius={3} />
+        </Group>
+      )}
+      {item.type === 'sectional_sofa' && (() => {
+        // U-shaped sectional sofa with throw pillows and a round coffee table.
+        // Designed top-down: long back sofa across the top, two arms running
+        // down the left/right, round coffee table centered in the U.
+        const armW = Math.max(10, w * 0.22);          // thickness of each arm
+        const backH = Math.max(10, h * 0.28);         // depth of the back sofa
+        const cornerR = Math.min(armW, backH) * 0.35; // soft rounded corners
+        const cushionInset = 4;
+        const innerCushionColor = colors.detail;
+
+        // Throw pillow palette (warm accents)
+        const pillowColors = ['#f59e0b', '#ef4444', '#0ea5e9', '#10b981'];
+        const pillowCount = Math.max(2, Math.floor((w - armW * 2) / 28));
+        const pillowAreaX = armW + 6;
+        const pillowAreaW = w - armW * 2 - 12;
+        const pillowSize = Math.min(backH * 0.55, pillowAreaW / (pillowCount + 1));
+
+        // Coffee table (round, centered in the open part of the U)
+        const tableCx = w / 2;
+        const tableCy = backH + (h - backH) * 0.55;
+        const tableR = Math.min(w - armW * 2, h - backH) * 0.28;
+
+        return (
+          <Group>
+            {/* Soft area rug under everything for warmth */}
+            <Rect
+              x={armW * 0.4}
+              y={backH * 0.6}
+              width={w - armW * 0.8}
+              height={h - backH * 0.6 - 2}
+              fill="#f1ece4"
+              stroke="#d6cfc2"
+              strokeWidth={1}
+              cornerRadius={Math.min(w, h) * 0.08}
+              dash={[2, 3]}
+              opacity={0.85}
+            />
+
+            {/* Back sofa (top, full width) */}
+            <Group>
+              <Rect
+                width={w}
+                height={backH}
+                fill={colors.fill}
+                stroke={colors.stroke}
+                strokeWidth={1.2}
+                cornerRadius={[cornerR, cornerR, 6, 6]}
+                shadowColor="black"
+                shadowBlur={6}
+                shadowOpacity={0.22}
+                shadowOffsetY={3}
+              />
+              {/* Seat cushions on the back sofa */}
+              <Rect
+                x={armW + cushionInset}
+                y={backH * 0.45}
+                width={w - armW * 2 - cushionInset * 2}
+                height={backH * 0.5}
+                fill={innerCushionColor}
+                cornerRadius={4}
+              />
+              {/* Cushion divider lines */}
+              {Array.from({ length: 2 }).map((_, i) => {
+                const cx = armW + (w - armW * 2) * ((i + 1) / 3);
+                return (
+                  <Line
+                    key={`bdiv-${i}`}
+                    points={[cx, backH * 0.5, cx, backH * 0.92]}
+                    stroke={colors.stroke}
+                    strokeWidth={0.8}
+                    opacity={0.6}
+                  />
+                );
+              })}
+              {/* Throw pillows */}
+              {Array.from({ length: pillowCount }).map((_, i) => {
+                const px =
+                  pillowAreaX +
+                  (pillowAreaW / pillowCount) * i +
+                  (pillowAreaW / pillowCount - pillowSize) / 2;
+                const py = backH * 0.08;
+                return (
+                  <Rect
+                    key={`pillow-${i}`}
+                    x={px}
+                    y={py}
+                    width={pillowSize}
+                    height={pillowSize}
+                    fill={pillowColors[i % pillowColors.length]}
+                    stroke="#00000022"
+                    strokeWidth={0.8}
+                    cornerRadius={pillowSize * 0.25}
+                    shadowColor="black"
+                    shadowBlur={2}
+                    shadowOpacity={0.18}
+                    shadowOffsetY={1}
+                    rotation={i % 2 === 0 ? -6 : 6}
+                    offsetX={-pillowSize / 2}
+                    offsetY={-pillowSize / 2}
+                  />
+                );
+              })}
+            </Group>
+
+            {/* Left arm */}
+            <Group>
+              <Rect
+                x={0}
+                y={backH - cornerR}
+                width={armW}
+                height={h - backH + cornerR}
+                fill={colors.fill}
+                stroke={colors.stroke}
+                strokeWidth={1.2}
+                cornerRadius={[0, 0, cornerR, 6]}
+                shadowColor="black"
+                shadowBlur={5}
+                shadowOpacity={0.18}
+                shadowOffsetY={2}
+              />
+              <Rect
+                x={cushionInset}
+                y={backH + cushionInset}
+                width={armW - cushionInset * 2}
+                height={h - backH - cushionInset * 2}
+                fill={innerCushionColor}
+                cornerRadius={4}
+              />
+            </Group>
+
+            {/* Right arm */}
+            <Group>
+              <Rect
+                x={w - armW}
+                y={backH - cornerR}
+                width={armW}
+                height={h - backH + cornerR}
+                fill={colors.fill}
+                stroke={colors.stroke}
+                strokeWidth={1.2}
+                cornerRadius={[0, 0, 6, cornerR]}
+                shadowColor="black"
+                shadowBlur={5}
+                shadowOpacity={0.18}
+                shadowOffsetY={2}
+              />
+              <Rect
+                x={w - armW + cushionInset}
+                y={backH + cushionInset}
+                width={armW - cushionInset * 2}
+                height={h - backH - cushionInset * 2}
+                fill={innerCushionColor}
+                cornerRadius={4}
+              />
+            </Group>
+
+            {/* Round coffee table */}
+            <Circle
+              x={tableCx}
+              y={tableCy}
+              radius={tableR}
+              fill="#c2a382"
+              stroke="#8a6a4a"
+              strokeWidth={1.5}
+              shadowColor="black"
+              shadowBlur={6}
+              shadowOpacity={0.28}
+              shadowOffsetY={3}
+            />
+            <Circle
+              x={tableCx}
+              y={tableCy}
+              radius={Math.max(2, tableR - 4)}
+              fill="#d8b994"
+              stroke="#a98a68"
+              strokeWidth={0.8}
+            />
+            {/* Decorative item on table */}
+            <Circle
+              x={tableCx}
+              y={tableCy}
+              radius={Math.max(1.5, tableR * 0.28)}
+              fill="#16a34a"
+              stroke="#166534"
+              strokeWidth={0.8}
+            />
+          </Group>
+        );
+      })()}
+      {item.type === 'paw_sofa' && (() => {
+        const mainW = w * 0.8;
+        const mainH = h * 0.6;
+        const toeW = w * 0.35;
+        const toeH = h * 0.5;
+        return (
+          <Group>
+            <Rect x={w*0.05} y={h*0.4} width={toeW} height={toeH} fill={colors.fill} stroke={colors.stroke} strokeWidth={1.5} cornerRadius={Math.min(toeW, toeH)/2} shadowColor="black" shadowBlur={4} shadowOpacity={0.15} shadowOffsetY={1} />
+            <Rect x={w*0.05 + 3} y={h*0.4 + 3} width={toeW - 6} height={toeH - 6} fill={colors.detail} cornerRadius={Math.min(toeW, toeH)/2 - 3} />
+
+            <Rect x={w*0.95 - toeW} y={h*0.4} width={toeW} height={toeH} fill={colors.fill} stroke={colors.stroke} strokeWidth={1.5} cornerRadius={Math.min(toeW, toeH)/2} shadowColor="black" shadowBlur={4} shadowOpacity={0.15} shadowOffsetY={1} />
+            <Rect x={w*0.95 - toeW + 3} y={h*0.4 + 3} width={toeW - 6} height={toeH - 6} fill={colors.detail} cornerRadius={Math.min(toeW, toeH)/2 - 3} />
+
+            <Rect x={(w - mainW)/2} y={h*0.05} width={mainW} height={mainH} fill={colors.fill} stroke={colors.stroke} strokeWidth={1.5} cornerRadius={Math.min(mainW, mainH)/2} shadowColor="black" shadowBlur={5} shadowOpacity={0.2} shadowOffsetY={2} />
+            <Rect x={(w - mainW)/2 + 3} y={h*0.05 + 3} width={mainW - 6} height={mainH - 6} fill={colors.detail} cornerRadius={Math.min(mainW, mainH)/2 - 3} />
+          </Group>
+        );
+      })()}
+      {item.type === 'l_sofa' && (() => {
+        const seatDepth = Math.max(10, Math.min(w, h) * 0.35); // backrest + seat depth
+        const cornerR = 4;
+        return (
+          <Group>
+            {/* Top section */}
+            <Rect width={w} height={seatDepth} fill={colors.fill} stroke={colors.stroke} strokeWidth={1} cornerRadius={cornerR} shadowColor="black" shadowBlur={4} shadowOpacity={0.15} shadowOffsetY={2} />
+            <Rect x={3} y={3} width={w-6} height={seatDepth-6} fill={colors.detail} cornerRadius={2} />
+            {/* Left section (chaise) */}
+            <Rect x={0} y={seatDepth - 2} width={seatDepth} height={h - seatDepth + 2} fill={colors.fill} stroke={colors.stroke} strokeWidth={1} cornerRadius={cornerR} shadowColor="black" shadowBlur={4} shadowOpacity={0.15} shadowOffsetY={2} />
+            <Rect x={3} y={seatDepth} width={seatDepth - 6} height={h - seatDepth - 3} fill={colors.detail} cornerRadius={2} />
+          </Group>
+        );
+      })()}
+      {item.type === 'round_coffee_table' && (() => {
+        const cx = w / 2;
+        const cy = h / 2;
+        const r = Math.min(w, h) / 2;
+        return (
+          <Group>
+            <Circle x={cx} y={cy} radius={r} fill={colors.fill} stroke={colors.stroke} strokeWidth={1.5} shadowColor="black" shadowBlur={6} shadowOpacity={0.2} shadowOffsetY={3} />
+            <Circle x={cx} y={cy} radius={Math.max(2, r - 3)} fill={colors.detail} stroke={colors.stroke} strokeWidth={0.8} />
+          </Group>
+        );
+      })()}
+      {item.type === 'media_console' && (
+        <Group>
+           <Rect width={w} height={h} fill={colors.fill} stroke={colors.stroke} strokeWidth={1} cornerRadius={2} shadowColor="black" shadowBlur={3} shadowOpacity={0.2} shadowOffsetY={2} />
+           <Rect x={2} y={2} width={w-4} height={h-4} fill={colors.detail} cornerRadius={1} />
+        </Group>
+      )}
+      {item.type === 'floor_lamp' && (() => {
+        const cx = w / 2;
+        const cy = h / 2;
+        const r = Math.min(w, h) / 2;
+        return (
+          <Group>
+            <Circle x={cx} y={cy} radius={r * 0.4} fill="#475569" shadowColor="black" shadowBlur={4} shadowOpacity={0.3} shadowOffsetY={2} />
+            <Circle x={cx} y={cy} radius={r * 0.8} fill="#fdfde8" stroke="#fef08a" strokeWidth={2} opacity={0.9} shadowColor="#fef08a" shadowBlur={10} shadowOpacity={0.6} />
+          </Group>
+        );
+      })()}
+      {item.type === 'side_table' && (
+        <Group>
+          <Rect width={w} height={h} fill={colors.fill} stroke={colors.stroke} strokeWidth={1} cornerRadius={4} shadowColor="black" shadowBlur={3} shadowOpacity={0.15} shadowOffsetY={2} />
+          <Rect x={2} y={2} width={w-4} height={h-4} fill={colors.detail} cornerRadius={2} />
         </Group>
       )}
       {item.type === 'dining_table' && (
@@ -1760,6 +2017,15 @@ const FurnitureShape = ({ item, roomX, roomY, scale, offsetX, offsetY, draggable
            <Circle x={w * 0.7} y={h * 0.5} radius={Math.min(w,h) * 0.2} fill={colors.stroke} />
         </Group>
       )}
+      {item.type === 'chair' && (
+        <Group>
+          {/* Office chair: round seat with backrest arc */}
+          <Circle x={w / 2} y={h / 2} radius={Math.min(w, h) * 0.42} fill={colors.fill} stroke={colors.stroke} strokeWidth={1.2} shadowColor="black" shadowBlur={3} shadowOpacity={0.2} shadowOffsetY={2} />
+          <Circle x={w / 2} y={h / 2} radius={Math.min(w, h) * 0.28} fill={colors.detail} />
+          {/* Backrest indicator (small arc on top) */}
+          <Rect x={w * 0.2} y={h * 0.05} width={w * 0.6} height={h * 0.15} fill={colors.stroke} cornerRadius={3} />
+        </Group>
+      )}
       {['counter', 'island', 'desk', 'nightstand', 'bookshelf', 'washing_machine'].includes(item.type) && (
         <Group>
            <Rect width={w} height={h} fill={colors.fill} stroke={colors.stroke} strokeWidth={1} cornerRadius={2} shadowColor="black" shadowBlur={3} shadowOpacity={0.15} shadowOffsetY={1} />
@@ -1785,11 +2051,20 @@ function getFurnitureColors(type: FurnitureItem['type']) {
     island: { fill: '#e7e5e4', stroke: '#d6d3d1', detail: '#f5f5f4' },
     dining_table: { fill: '#c2a382', stroke: '#a38565', detail: '#d1b596' },
     sofa: { fill: '#94a3b8', stroke: '#64748b', detail: '#cbd5e1' },
+    sectional_sofa: { fill: '#7c8896', stroke: '#475569', detail: '#cbd5e1' },
+    paw_sofa: { fill: '#8b5cf6', stroke: '#5b21b6', detail: '#c4b5fd' }, // playful purple color
+    l_sofa: { fill: '#d4c4b4', stroke: '#baa793', detail: '#e0d2c3' }, // neutral beige
     tv: { fill: '#1e293b', stroke: '#0f172a', detail: '#334155' },
     coffee_table: { fill: '#d4c4b4', stroke: '#baa793', detail: '#e0d2c3' },
+    round_coffee_table: { fill: '#c2a382', stroke: '#8a6a4a', detail: '#d8b994' },
+    media_console: { fill: '#cbd5e1', stroke: '#94a3b8', detail: '#f1f5f9' },
+    floor_lamp: { fill: '#fdfde8', stroke: '#fef08a', detail: '#fdfde8' },
+    side_table: { fill: '#d4c4b4', stroke: '#baa793', detail: '#e0d2c3' },
     plant: { fill: '#4ade80', stroke: '#16a34a', detail: '#86efac' },
     rug: { fill: '#f1f5f9', stroke: '#cbd5e1', detail: '#f8fafc' },
     bookshelf: { fill: '#bda78f', stroke: '#a38d75', detail: '#c9b59e' },
+    chair: { fill: '#475569', stroke: '#1e293b', detail: '#64748b' },
+    table: { fill: '#c2a382', stroke: '#a38565', detail: '#d1b596' },
     washing_machine: { fill: '#f8fafc', stroke: '#cbd5e1', detail: '#e2e8f0' },
     generator: { fill: '#6b7280', stroke: '#374151', detail: '#4b5563' },
   };

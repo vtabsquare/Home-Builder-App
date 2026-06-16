@@ -4,12 +4,13 @@ import { computeArea } from './cost';
 export interface FurnitureItem {
   type: 'bed' | 'wardrobe' | 'desk' | 'nightstand' | 'toilet' | 'sink' | 'shower' | 'bathtub' |
   'stove' | 'fridge' | 'counter' | 'island' | 'dining_table' | 'sofa' | 'tv' | 'coffee_table' |
-  'plant' | 'rug' | 'bookshelf' | 'washing_machine' | 'table' | 'chair' | 'generator';
+  'plant' | 'rug' | 'bookshelf' | 'washing_machine' | 'table' | 'chair' | 'generator' | 'sectional_sofa' | 'paw_sofa' | 'l_sofa' | 'round_coffee_table' | 'media_console' | 'floor_lamp' | 'side_table' | 'tv_stand' | 'armchair';
   x: number; // relative to room
   y: number;
   w: number;
   h: number;
   rotation?: number;
+  flipX?: boolean;
   label?: string;
 }
 
@@ -80,7 +81,7 @@ export function resolveStairGeometry(room: { w: number; h: number; stairGeometry
 
 export interface Room {
   id: string;
-  type: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'lounge' | 'dressing' | 'dining' | 'entry' | 'hallway' | 'staircase' | 'balcony' | 'carport' | 'garden' | 'garage' | 'generator';
+  type: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'lounge' | 'study' | 'dressing' | 'dining' | 'entry' | 'hallway' | 'staircase' | 'balcony' | 'carport' | 'garden' | 'garage' | 'generator';
   label: string;
   x: number; // ft
   y: number;
@@ -111,6 +112,7 @@ const COLORS: Record<string, string> = {
   kitchen:  'hsl(28 38% 72%)',
   living:   'hsl(40 30% 87%)',
   lounge:   'hsl(32 28% 85%)',
+  study:    'hsl(48 35% 88%)',
   dressing: 'hsl(28 24% 84%)',
   dining:   'hsl(36 28% 82%)',
   entry:    'hsl(36 18% 76%)',
@@ -126,7 +128,13 @@ const COLORS: Record<string, string> = {
 // ── Furniture helpers (all wall-aligned, walking-space aware) ──────────────
 
 export function regenerateFurniture(room: Room, kitchenType: string = 'open'): FurnitureItem[] {
+  const items = generateRoomFurniture(room, kitchenType);
+  return clearDoorways(items, room);
+}
+
+function generateRoomFurniture(room: Room, kitchenType: string = 'open'): FurnitureItem[] {
   const orient = room.orientation || 0;
+  let items: FurnitureItem[] = [];
   switch (room.type) {
     case 'bedroom':
       return bedroomFurniture(room.w, room.h, room.id === 'bed-0', orient);
@@ -138,9 +146,14 @@ export function regenerateFurniture(room: Room, kitchenType: string = 'open'): F
     case 'kitchen':
       return kitchenFurniture(room.w, room.h, room.kitchenType || kitchenType, orient);
     case 'living':
+      if (room.id === 'combined-living') {
+        return combinedLivingFurniture(room.w, room.h);
+      }
       return livingFurniture(room.w, room.h, orient);
     case 'lounge':
       return loungeFurniture(room.w, room.h, orient);
+    case 'study':
+      return studyFurniture(room.w, room.h, orient);
     case 'dining':
       return diningFurniture(room.w, room.h);
     case 'balcony':
@@ -209,6 +222,146 @@ export function applySmartRotations(items: FurnitureItem[], w: number, h: number
 
     return { ...item, rotation };
   });
+}
+
+// Items that don't really obstruct doorways — never slide/drop these.
+const NON_BLOCKING_FURNITURE: Set<FurnitureItem['type']> = new Set([
+  'rug', 'plant', 'tv',
+]);
+
+// Get the axis-aligned footprint of an item taking 90/270 rotations into account.
+function getFurnitureFootprint(item: FurnitureItem) {
+  const cx = item.x + item.w / 2;
+  const cy = item.y + item.h / 2;
+  const rot = (((item.rotation || 0) % 360) + 360) % 360;
+  const rotated = rot === 90 || rot === 270;
+  const fw = rotated ? item.h : item.w;
+  const fh = rotated ? item.w : item.h;
+  return { x: cx - fw / 2, y: cy - fh / 2, w: fw, h: fh };
+}
+
+function rectIntersectionArea(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number }
+): number {
+  const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+  const iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  return ix * iy;
+}
+
+/**
+ * Remove or slide furniture so it doesn't sit in the way of any door.
+ * Each door produces a clearance strip along its wall (door width + side
+ * padding) extending into the room. Items overlapping the strip are slid
+ * along the wall first; if they still don't fit, they are dropped so the
+ * doorway stays clear.
+ */
+export function clearDoorways(items: FurnitureItem[], room: Room): FurnitureItem[] {
+  const doors = room.doors || [];
+  if (!doors.length) return items;
+
+  const sidePad = 0.6;     // ft of clearance beyond door frame on each side
+  const swingDepth = 3.5;  // ft into room for swinging doors (covers the arc)
+  const archDepth = 2.0;   // ft into room for archways / open doorways
+
+  type Zone = { x: number; y: number; w: number; h: number; wall: 'top' | 'bottom' | 'left' | 'right' };
+  const zones: Zone[] = doors.map((d) => {
+    const depth = d.doorType === 'open' ? archDepth : swingDepth;
+    const dw = d.width + sidePad * 2;
+    if (d.wall === 'top') {
+      const cx = d.position * room.w;
+      return { x: cx - dw / 2, y: 0, w: dw, h: depth, wall: 'top' };
+    } else if (d.wall === 'bottom') {
+      const cx = d.position * room.w;
+      return { x: cx - dw / 2, y: room.h - depth, w: dw, h: depth, wall: 'bottom' };
+    } else if (d.wall === 'left') {
+      const cy = d.position * room.h;
+      return { x: 0, y: cy - dw / 2, w: depth, h: dw, wall: 'left' };
+    } else {
+      const cy = d.position * room.h;
+      return { x: room.w - depth, y: cy - dw / 2, w: depth, h: dw, wall: 'right' };
+    }
+  });
+
+  const fitsRoom = (fp: { x: number; y: number; w: number; h: number }) =>
+    fp.x >= -0.01 &&
+    fp.y >= -0.01 &&
+    fp.x + fp.w <= room.w + 0.01 &&
+    fp.y + fp.h <= room.h + 0.01;
+
+  const conflictZone = (
+    fp: { x: number; y: number; w: number; h: number },
+    threshold = 0.04
+  ): Zone | null => {
+    const itemArea = Math.max(0.01, fp.w * fp.h);
+    for (const z of zones) {
+      if (rectIntersectionArea(fp, z) / itemArea > threshold) return z;
+    }
+    return null;
+  };
+
+  const result: FurnitureItem[] = [];
+  for (const item of items) {
+    if (NON_BLOCKING_FURNITURE.has(item.type)) {
+      result.push(item);
+      continue;
+    }
+
+    const fp = getFurnitureFootprint(item);
+    let conflict = conflictZone(fp);
+    if (!conflict) {
+      result.push(item);
+      continue;
+    }
+
+    // Try sliding the item along the door's wall (parallel to it) so that
+    // it ends up flush against either side of the doorway.
+    let placed = item;
+    let placedFp = fp;
+    let tries = 0;
+    while (conflict && tries < 8) {
+      const z = conflict;
+      const candidates: { dx: number; dy: number }[] = [];
+      if (z.wall === 'top' || z.wall === 'bottom') {
+        // slide along x
+        candidates.push({ dx: z.x - 0.2 - (placedFp.x + placedFp.w), dy: 0 });
+        candidates.push({ dx: z.x + z.w + 0.2 - placedFp.x, dy: 0 });
+      } else {
+        // slide along y
+        candidates.push({ dx: 0, dy: z.y - 0.2 - (placedFp.y + placedFp.h) });
+        candidates.push({ dx: 0, dy: z.y + z.h + 0.2 - placedFp.y });
+      }
+
+      // Prefer the smaller-magnitude shift.
+      candidates.sort(
+        (a, b) => Math.abs(a.dx) + Math.abs(a.dy) - (Math.abs(b.dx) + Math.abs(b.dy))
+      );
+
+      let moved = false;
+      for (const c of candidates) {
+        const newFp = {
+          x: placedFp.x + c.dx,
+          y: placedFp.y + c.dy,
+          w: placedFp.w,
+          h: placedFp.h,
+        };
+        if (!fitsRoom(newFp)) continue;
+        if (conflictZone(newFp)) continue;
+        placed = { ...placed, x: placed.x + c.dx, y: placed.y + c.dy };
+        placedFp = newFp;
+        moved = true;
+        break;
+      }
+      if (!moved) break;
+      conflict = conflictZone(placedFp);
+      tries++;
+    }
+
+    if (!conflict) result.push(placed);
+    // else: drop the item entirely so the doorway stays clear.
+  }
+
+  return result;
 }
 
 
@@ -388,19 +541,26 @@ function livingFurniture(w: number, h: number, orient: number = 0): FurnitureIte
   const G = 0.5;
   const tvW = Math.min(5.5, w * 0.4);
   const sofaW = Math.min(8, w * 0.6);
+  // Coffee table sized relative to the sofa, placed between sofa and TV
+  const ctW = Math.min(4, sofaW * 0.55);
+  const ctH = Math.min(2, h * 0.18);
 
   if (orient === 0) {
     items.push({ type: 'tv', x: (w - tvW) / 2, y: G, w: tvW, h: 1.2, rotation: 0 });
     items.push({ type: 'sofa', x: (w - sofaW) / 2, y: h - 3 - G, w: sofaW, h: 3, rotation: 180 });
+    if (h >= 9) items.push({ type: 'coffee_table', x: (w - ctW) / 2, y: h - 3 - G - ctH - 0.6, w: ctW, h: ctH, rotation: 0 });
   } else if (orient === 1) {
     items.push({ type: 'tv', x: w - G - 0.6 - tvW/2, y: h/2 - 0.6, w: tvW, h: 1.2, rotation: 90 });
     items.push({ type: 'sofa', x: G + 1.5 - sofaW/2, y: h/2 - 1.5, w: sofaW, h: 3, rotation: 270 });
+    if (w >= 9) items.push({ type: 'coffee_table', x: G + 3 + 0.6, y: (h - ctW) / 2, w: ctH, h: ctW, rotation: 0 });
   } else if (orient === 2) {
     items.push({ type: 'tv', x: (w - tvW) / 2, y: h - G - 1.2, w: tvW, h: 1.2, rotation: 180 });
     items.push({ type: 'sofa', x: (w - sofaW) / 2, y: G, w: sofaW, h: 3, rotation: 0 });
+    if (h >= 9) items.push({ type: 'coffee_table', x: (w - ctW) / 2, y: G + 3 + 0.6, w: ctW, h: ctH, rotation: 0 });
   } else if (orient === 3) {
     items.push({ type: 'tv', x: G + 0.6 - tvW/2, y: h/2 - 0.6, w: tvW, h: 1.2, rotation: 270 });
     items.push({ type: 'sofa', x: w - G - 1.5 - sofaW/2, y: h/2 - 1.5, w: sofaW, h: 3, rotation: 90 });
+    if (w >= 9) items.push({ type: 'coffee_table', x: w - G - 3 - 0.6 - ctH, y: (h - ctW) / 2, w: ctH, h: ctW, rotation: 0 });
   } else if (orient === 4) {
     items.push({ type: 'tv', x: (w - tvW) / 2, y: G, w: tvW, h: 1.2, rotation: 0 });
     items.push({ type: 'sofa', x: (w - sofaW) / 2, y: h/2 - 1.5, w: sofaW, h: 3, rotation: 180 });
@@ -409,22 +569,154 @@ function livingFurniture(w: number, h: number, orient: number = 0): FurnitureIte
   return items;
 }
 
-function loungeFurniture(w: number, h: number, orient: number = 0): FurnitureItem[] {
-  const items = livingFurniture(w, h, orient);
-  const tableW = Math.min(4, w * 0.32);
-  const tableH = Math.min(2.2, h * 0.18);
+function studyFurniture(w: number, h: number, orient: number = 0): FurnitureItem[] {
+  // Study room: desk against a wall with an office chair, plus a bookshelf along an adjacent wall.
+  const items: FurnitureItem[] = [];
+  const G = 0.5;
+  const deskW = Math.min(5, w * 0.55);
+  const deskH = 2.2;
+  const chairW = 1.8;
+  const chairH = 1.8;
+  const shelfW = Math.min(4, w * 0.4);
+  const shelfH = 1.2;
 
   if (orient === 0) {
-    items.push({ type: 'coffee_table', x: (w - tableW) / 2, y: Math.max(2.2, h * 0.42), w: tableW, h: tableH, rotation: 0 });
+    // Desk along top wall, chair below desk, bookshelf along bottom wall
+    items.push({ type: 'desk', x: (w - deskW) / 2, y: G, w: deskW, h: deskH, rotation: 0 });
+    items.push({ type: 'chair', x: (w - chairW) / 2, y: G + deskH + 0.4, w: chairW, h: chairH, rotation: 0 });
+    items.push({ type: 'bookshelf', x: (w - shelfW) / 2, y: h - G - shelfH, w: shelfW, h: shelfH, rotation: 0 });
   } else if (orient === 1) {
-    items.push({ type: 'coffee_table', x: Math.max(2.2, w * 0.42), y: (h - tableW) / 2, w: tableH, h: tableW, rotation: 0 });
+    // Desk along right wall
+    items.push({ type: 'desk', x: w - G - deskH, y: (h - deskW) / 2, w: deskH, h: deskW, rotation: 0 });
+    items.push({ type: 'chair', x: w - G - deskH - 0.4 - chairW, y: (h - chairH) / 2, w: chairW, h: chairH, rotation: 0 });
+    items.push({ type: 'bookshelf', x: G, y: (h - shelfW) / 2, w: shelfH, h: shelfW, rotation: 0 });
   } else if (orient === 2) {
-    items.push({ type: 'coffee_table', x: (w - tableW) / 2, y: Math.min(h - tableH - 2.2, h * 0.42), w: tableW, h: tableH, rotation: 0 });
+    items.push({ type: 'desk', x: (w - deskW) / 2, y: h - G - deskH, w: deskW, h: deskH, rotation: 0 });
+    items.push({ type: 'chair', x: (w - chairW) / 2, y: h - G - deskH - 0.4 - chairH, w: chairW, h: chairH, rotation: 0 });
+    items.push({ type: 'bookshelf', x: (w - shelfW) / 2, y: G, w: shelfW, h: shelfH, rotation: 0 });
   } else {
-    items.push({ type: 'coffee_table', x: Math.min(w - tableH - 2.2, w * 0.42), y: (h - tableW) / 2, w: tableH, h: tableW, rotation: 0 });
+    // orient 3: desk along left wall
+    items.push({ type: 'desk', x: G, y: (h - deskW) / 2, w: deskH, h: deskW, rotation: 0 });
+    items.push({ type: 'chair', x: G + deskH + 0.4, y: (h - chairH) / 2, w: chairW, h: chairH, rotation: 0 });
+    items.push({ type: 'bookshelf', x: w - G - shelfH, y: (h - shelfW) / 2, w: shelfH, h: shelfW, rotation: 0 });
+  }
+
+  // Optional decorative plant in a free corner if the room is large enough
+  if (w >= 9 && h >= 9) {
+    items.push({ type: 'plant', x: w - G - 1.4, y: G, w: 1.4, h: 1.4, rotation: 0 });
   }
 
   return items;
+}
+
+function entertainerLoungeFurniture(w: number, totalH: number): FurnitureItem[] {
+  const items: FurnitureItem[] = [];
+  const G = 0.5;
+  const longSide = 10;
+  const shortSide = 6;
+  const ctW = 4;
+  const ctH = 2.5;
+
+  // TV unit on the top wall (flush against top wall)
+  const tvW = 6;
+  const consoleW = 8;
+  const consoleDepth = 1.5;
+  const tvCenterX = w / 2;
+  items.push({ type: 'media_console', x: tvCenterX - consoleW/2, y: 0, w: consoleW, h: consoleDepth, rotation: 0 });
+  items.push({ type: 'tv', x: tvCenterX - tvW/2, y: 0.6, w: tvW, h: 1.2, rotation: 0 });
+
+  // L-shaped sectional sofa centered in the lounge
+  const visualX = (w - longSide) / 2;
+  const visualY = (totalH - shortSide) / 2;
+  
+  // We want the long side running horizontally across the middle, backrest at the bottom (people face top TV)
+  // We want the short side (chaise) on the left side facing the TV.
+  // base l_sofa: backrest TOP, chaise LEFT.
+  // rotation 180: backrest BOTTOM, chaise RIGHT.
+  // rotation 180 + flipX: backrest BOTTOM, chaise LEFT.
+  items.push({ type: 'l_sofa', x: visualX, y: visualY, w: longSide, h: shortSide, rotation: 180, flipX: true });
+
+  // Large rectangular coffee table centered in front of the sofa
+  const nookX = visualX + longSide / 2 - ctW / 2;
+  const nookY = visualY + shortSide / 2 - 1;
+  items.push({ type: 'coffee_table', x: nookX, y: nookY, w: ctW, h: ctH, rotation: 0 });
+
+  // Floor lamp in the bottom-right corner of the lounge
+  items.push({ type: 'floor_lamp', x: w - G - 2, y: totalH - G - 2, w: 2, h: 2, rotation: 0 });
+
+  // Round rug underneath the sofa and coffee table area
+  const rugR = Math.max(longSide, shortSide) * 0.6;
+  items.push({ type: 'rug', x: visualX + longSide/2 - rugR, y: visualY + shortSide/2 - rugR, w: rugR*2, h: rugR*2, rotation: 0 });
+
+  return items;
+}
+
+function combinedLivingFurniture(w: number, h: number): FurnitureItem[] {
+  const items: FurnitureItem[] = [];
+  const G = 0.5;
+  const longSide = 10;
+  const shortSide = 6;
+  const ctR = 1.5;
+
+  // TV on the right side wall, vertically centered
+  const tvCenterY = h / 2;
+  const consoleW = Math.min(8, h * 0.4);
+  const consoleDepth = 1.5;
+  items.push({ type: 'media_console', x: w - G - consoleDepth, y: tvCenterY - consoleW/2, w: consoleDepth, h: consoleW, rotation: 0 });
+  
+  const tvW = Math.min(5.5, consoleW * 0.8);
+  items.push({ type: 'tv', x: w - G - 0.6 - tvW/2, y: tvCenterY - 0.6, w: tvW, h: 1.2, rotation: 90 });
+
+  // Sofa centered in the room
+  // visual width = longSide, visual height = shortSide
+  const visualX = w / 2 - longSide / 2;
+  const visualY = h / 2 - shortSide / 2;
+
+  // L-sofa base: Top edge shortSide, Left edge longSide. Corner Top-Left.
+  // Rotated 270: Long side BOTTOM, Short side LEFT.
+  const sofaX = visualX + longSide/2 - shortSide/2;
+  const sofaY = visualY + shortSide/2 - longSide/2;
+  items.push({ type: 'l_sofa', x: sofaX, y: sofaY, w: shortSide, h: longSide, rotation: 270 });
+
+  // Side table at the left end of the sofa
+  const sideTableW = 2;
+  const sideTableH = 2;
+  items.push({ type: 'side_table', x: visualX, y: visualY - sideTableH - 0.2, w: sideTableW, h: sideTableH, rotation: 0 });
+
+  // Floor lamp in the top-left corner
+  items.push({ type: 'floor_lamp', x: G + 0.5, y: G + 0.5, w: 2, h: 2, rotation: 0 });
+
+  // Round coffee table centered in front of the sofa
+  const nookX = visualX + longSide * 0.55;
+  const nookY = visualY + shortSide * 0.45;
+  items.push({ type: 'round_coffee_table', x: nookX - ctR, y: nookY - ctR, w: ctR*2, h: ctR*2, rotation: 0 });
+
+  // Rug
+  const rugX = visualX - 1;
+  const rugY = visualY - 1;
+  const rugW = longSide + 2;
+  const rugH = shortSide + 2;
+  items.push({ type: 'rug', x: rugX, y: rugY, w: rugW, h: rugH, rotation: 0 });
+
+  return items;
+}
+
+function loungeFurniture(w: number, h: number, orient: number = 0): FurnitureItem[] {
+  // Family Lounge: a single U-shaped sectional sofa with built-in coffee table.
+  // Visually distinct from the simple rectangular sofa used in the Living Room.
+  const margin = 1.5;
+  // Pick bounding box size proportional to room, leaving generous space around it.
+  const bw = Math.max(5, Math.min(w - margin * 2, w * 0.55));
+  const bh = Math.max(4, Math.min(h - margin * 2, h * 0.55));
+
+  return [{
+    type: 'sectional_sofa',
+    x: (w - bw) / 2,
+    y: (h - bh) / 2,
+    w: bw,
+    h: bh,
+    rotation: 0,
+  }];
 }
 
 function diningFurniture(w: number, h: number): FurnitureItem[] {
@@ -1295,7 +1587,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
          
          if (leftover >= 8) {
              finalRooms.push({
-                 id: `dynamic-study-${y}`, type: 'lounge', label: 'STUDY', h: leftover, color: '#fffbe6'
+                 id: `dynamic-study-${y}`, type: 'study', label: 'STUDY', h: leftover, color: '#fffbe6'
              });
          } else if (leftover > 0) {
              const expandableRooms = finalRooms.filter(r => r.type !== 'dressing');
@@ -1464,7 +1756,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
            x: 0, y: 0, w: leftW, h: lH, color: COLORS.living, orientation: 1,
            openWalls: ['bottom'], doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
            windows: [{ wall: 'left', position: 0.5, width: 6 }],
-           furniture: regenerateFurniture({ type: 'living', w: leftW, h: lH, orientation: 1 } as Room, 'open')
+           furniture: entertainerLoungeFurniture(leftW, lH)
          });
 
          newRooms.push({
@@ -1500,58 +1792,40 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
          pack(allPrivate, leftW, startY, rightW, rightH, 'left');
          
       } else if (style === 'family_suite') {
-         const centerW = Math.round(leftW * 0.5);
-         const farLeftW = leftW - centerW;
-         
-         const allPrivate = [...beds, ...baths];
-         let half = Math.ceil(allPrivate.length / 2);
-         if (allPrivate.length <= 3) {
-           half = allPrivate.length; // Pack all on left side to prevent 44ft long rooms
-         }
-         const leftRooms = allPrivate.slice(0, half);
-         const rightRooms = allPrivate.slice(half);
-
-         const livingH = cH; // Must match carport height so L-shape expansion is clean
-         const rightCommunalW = rightRooms.length === 0 ? rightW : 0;
-         const communalW = centerW + rightCommunalW;
+         const kH = Math.round(H * 0.25);
+         const combinedLivingH = H - kH;
          
          newRooms.push({
-           id: 'living', type: 'living', label: 'LIVING ROOM',
-           x: farLeftW, y: 0, w: centerW, h: livingH, color: COLORS.living, orientation: 3,
+           id: 'combined-living', type: 'living', label: 'COMBINED LIVING + FAMILY LOUNGE',
+           x: 0, y: 0, w: leftW, h: combinedLivingH, color: '#fffbe6', orientation: 1,
            openWalls: ['bottom'], doors: [{ wall: 'top', position: 0.5, width: 6, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
-           windows: [],
-           furniture: regenerateFurniture({ type: 'living', w: centerW, h: livingH, orientation: 3 } as Room, 'open')
-         });
-
-         const remainingH = H - livingH;
-         const loungeH = Math.round(remainingH * 0.5);
-         const kH = remainingH - loungeH;
-         
-         newRooms.push({
-           id: 'lounge', type: 'lounge', label: 'FAMILY LOUNGE',
-           x: farLeftW, y: livingH, w: communalW, h: loungeH, color: '#fffbe6', orientation: 3,
-           openWalls: ['top', 'bottom'], doors: [],
-           windows: [],
-           furniture: regenerateFurniture({ type: 'lounge', w: communalW, h: loungeH, orientation: 3 } as Room, 'open')
+           windows: [{ wall: 'left', position: 0.5, width: 6 }],
+           furniture: combinedLivingFurniture(leftW, combinedLivingH)
          });
 
          newRooms.push({
            id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-           x: farLeftW, y: livingH + loungeH, w: communalW, h: kH, color: COLORS.kitchen, orientation: 2,
+           x: 0, y: combinedLivingH, w: leftW, h: kH, color: COLORS.kitchen, orientation: 2,
            openWalls: kitchenType === 'open' ? ['top'] : [], doors: kitchenType === 'open' ? [{ wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' }] : [
              { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' },
-             { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard' }
+             { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'combined-living' }
            ],
-           windows: [],
-           furniture: regenerateFurniture({ type: 'kitchen', w: communalW, h: kH, orientation: 2 } as Room, 'open')
+           windows: [{ wall: 'left', position: 0.5, width: 6 }],
+           furniture: regenerateFurniture({ type: 'kitchen', w: leftW, h: kH, orientation: 2 } as Room, 'open')
          });
-         
-         pack(leftRooms, 0, 0, farLeftW, H, 'right');
-         pack(rightRooms, leftW, cH, rightW, H - cH, 'left');
-         
-         if (leftRooms.length > 0 && leftRooms[0].doors && leftRooms[0].doors.length > 0) {
-           leftRooms[0].doors[0].position = 0.7; // Move door down to avoid TV
+
+         const allPrivate = [...beds, ...baths];
+         let startY = cH;
+         // Reflow carport and garden similarly to entertainer plan
+         if (carport && beds.length === 2 && baths.length === 1) {
+             carport.y = 0;
+             carport.x = offsetX + leftW;
+             const garden = preserved.find(r => r.type === 'garden');
+             if (garden && garden.w > leftW) garden.w = leftW;
+             startY = Math.max(0, carport.y - offsetY + carport.h);
          }
+         const rightH = H - startY;
+         pack(allPrivate, leftW, startY, rightW, rightH, 'left');
       }
 
       // Cleanup invalid windows & shift coords
@@ -1624,24 +1898,47 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
       furniture: regenerateFurniture({ type: 'kitchen', w: kW, h: rearH } as Room, 'open')
     });
 
-    newRooms.push({
-      id: 'living', type: 'living', label: 'ENTERTAINMENT LOUNGE',
-      x: kW, y: 0, w: lW, h: rearH, color: COLORS.living,
-      openWalls: isClosed ? [] : ['left'], doors: [{ wall: 'top', position: 0.5, width: 12, swing: 'out', doorType: 'open' }],
-      windows: [{ wall: 'right', position: 0.5, width: 6 }],
-      furniture: regenerateFurniture({ type: 'living', w: lW, h: rearH } as Room, 'open')
-    });
-
-    // Front 60%: Central hallway
+    // Split the living area into smaller segments to handle partial open walls correctly
     const hallW = 4;
     const sideW = Math.floor((W - hallW) / 2);
-    
+    const bathH = 10;
+    const loungeH = rearH + frontH - bathH; // 34
+
     newRooms.push({
-      id: 'hallway', type: 'hallway', label: 'MAIN HALL',
-      x: sideW, y: rearH, w: hallW, h: frontH, color: COLORS.hallway,
-      openWalls: [], doors: [
-        { wall: 'bottom', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' },
-        { wall: 'top', position: 0.5, width: 4, swing: 'out', doorType: 'standard' }
+      id: 'living_left', type: 'living', label: '',
+      x: kW, y: 0, w: sideW - kW, h: rearH, color: COLORS.living,
+      openWalls: isClosed ? ['right'] : ['left', 'right'], doors: [], windows: [], furniture: []
+    });
+    newRooms.push({
+      id: 'living_mid', type: 'living', label: '',
+      x: sideW, y: 0, w: hallW, h: rearH, color: COLORS.living,
+      openWalls: ['left', 'right', 'bottom'], doors: [], windows: [], furniture: []
+    });
+    newRooms.push({
+      id: 'living', type: 'living', label: 'ENTERTAINMENT LOUNGE',
+      x: sideW + hallW, y: 0, w: W - sideW - hallW, h: rearH, color: COLORS.living,
+      openWalls: ['left', 'bottom'], doors: [{ wall: 'top', position: 0.5, width: 12, swing: 'out', doorType: 'open', label: 'ENTRY' }],
+      windows: [{ wall: 'right', position: 0.5, width: 6 }],
+      furniture: entertainerLoungeFurniture(W - sideW - hallW, loungeH)
+    });
+
+    newRooms.push({
+      id: 'living_hall_top', type: 'living', label: '',
+      x: sideW, y: rearH, w: hallW, h: frontH - bathH, color: COLORS.living,
+      openWalls: ['top', 'bottom', 'right'], doors: [], windows: [], furniture: []
+    });
+    newRooms.push({
+      id: 'living_right_mid', type: 'living', label: '',
+      x: sideW + hallW, y: rearH, w: W - sideW - hallW, h: frontH - bathH, color: COLORS.living,
+      openWalls: ['top', 'left'], doors: [],
+      windows: [{ wall: 'right', position: 0.5, width: 6 }],
+      furniture: []
+    });
+    newRooms.push({
+      id: 'living_hall_bottom', type: 'living', label: '',
+      x: sideW, y: rearH + frontH - bathH, w: hallW, h: bathH, color: COLORS.living,
+      openWalls: ['top'], doors: [
+        { wall: 'bottom', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }
       ],
       windows: [], furniture: []
     });
@@ -1650,7 +1947,10 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
     const allPrivate = [...beds, ...baths];
     const half = Math.ceil(allPrivate.length / 2);
     const leftRooms = allPrivate.slice(0, half);
-    const rightRooms = allPrivate.slice(half);
+    let rightRooms = allPrivate.slice(half);
+
+    // Keep only Common Bath on the right side
+    rightRooms = rightRooms.filter(r => r.type === 'bathroom' || r.id?.includes('bath'));
 
     let leftStartY = rearH;
     let leftH = frontH;
@@ -1664,12 +1964,16 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
         leftH = frontH - carport.h;
     }
 
-    const pack = (rooms: Room[], x: number, y: number, w: number, h: number, doorWall: 'right'|'left') => {
-        packRoomsSmartly(rooms, x, y, w, h, doorWall, 'hallway');
+    const packLeft = (rooms: Room[], x: number, y: number, w: number, h: number, doorWall: 'right'|'left') => {
+        packRoomsSmartly(rooms, x, y, w, h, doorWall, 'living_hall_top');
+    };
+    const packRight = (rooms: Room[], x: number, y: number, w: number, h: number, doorWall: 'right'|'left') => {
+        packRoomsSmartly(rooms, x, y, w, h, doorWall, 'living_hall_bottom');
     };
     
-    pack(leftRooms, 0, leftStartY, sideW, leftH, 'right');
-    pack(rightRooms, sideW + hallW, rearH, W - sideW - hallW, frontH, 'left');
+    packLeft(leftRooms, 0, leftStartY, sideW, leftH, 'right');
+    // Common Bath only takes bathH at the very bottom
+    packRight(rightRooms, sideW + hallW, rearH + frontH - bathH, W - sideW - hallW, bathH, 'left');
 
   } else if (style === 'family_suite') {
     // 3 columns: Left Private, Center Communal, Right Private
@@ -1693,6 +1997,8 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
     const livingH = Math.round(H * 0.4);
     const kH = Math.round(H * 0.25);
     const loungeH = H - livingH - kH;
+    
+    const combinedLivingH = livingH + loungeH;
 
     const pack = (rooms: Room[], x: number, y: number, w: number, h: number, doorWall: 'right'|'left') => {
        packRoomsSmartly(rooms, x, y, w, h, doorWall, undefined, H - kH - 1.75);
@@ -1702,27 +2008,19 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
     pack(rightRooms, hubX + hubW, 0, colW, H, 'left');
 
     newRooms.push({
-      id: 'living', type: 'living', label: 'LIVING ROOM',
-      x: hubX, y: 0, w: hubW, h: livingH, color: COLORS.living, orientation: 1,
+      id: 'combined-living', type: 'living', label: 'COMBINED LIVING + FAMILY LOUNGE',
+      x: hubX, y: 0, w: hubW, h: combinedLivingH, color: '#fffbe6', orientation: 1,
       openWalls: ['bottom'], doors: [{ wall: 'top', position: 0.5, width: 6, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
       windows: [],
-      furniture: regenerateFurniture({ type: 'living', w: hubW, h: livingH, orientation: 1 } as Room, 'open')
-    });
-
-    newRooms.push({
-      id: 'lounge', type: 'lounge', label: 'FAMILY LOUNGE',
-      x: hubX, y: livingH, w: hubW, h: loungeH, color: '#fffbe6', orientation: 1,
-      openWalls: ['top', 'bottom'], doors: [],
-      windows: [],
-      furniture: regenerateFurniture({ type: 'lounge', w: hubW, h: loungeH, orientation: 1 } as Room, 'open')
+      furniture: combinedLivingFurniture(hubW, combinedLivingH)
     });
 
     newRooms.push({
       id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-      x: hubX, y: livingH + loungeH, w: hubW, h: kH, color: COLORS.kitchen, orientation: 2,
+      x: hubX, y: combinedLivingH, w: hubW, h: kH, color: COLORS.kitchen, orientation: 2,
       openWalls: kitchenType === 'open' ? ['top'] : [], doors: kitchenType === 'open' ? [{ wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' }] : [
         { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' },
-        { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'lounge' }
+        { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'combined-living' }
       ],
       windows: [],
       furniture: regenerateFurniture({ type: 'kitchen', w: hubW, h: kH, orientation: 2 } as Room, 'open')
