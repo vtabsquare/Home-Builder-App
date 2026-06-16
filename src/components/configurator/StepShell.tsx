@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 
 export const StepShell = ({
   eyebrow,
@@ -23,22 +23,29 @@ export const StepShell = ({
   nextDisabled?: boolean;
   hidePrev?: boolean;
 }) => {
+  const scrollToTop = () => {
+    const container = document.getElementById('main-scroll-container');
+    if (container) container.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    window.scrollTo(0, 0);
+  };
+
+  useEffect(() => {
+    // When the new step mounts (after the previous step finishes exit animation),
+    // strictly enforce scrolling to top.
+    scrollToTop();
+    const t1 = setTimeout(scrollToTop, 10);
+    const t2 = setTimeout(scrollToTop, 100);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
   const handleNext = () => {
-    // Hit every possible scroll container — CSS zoom makes window.scrollTo unreliable on mobile
-    const scrollToTop = () => {
-      const container = document.getElementById('main-scroll-container');
-      if (container) container.scrollTop = 0;
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-      window.scrollTo(0, 0);
-    };
     scrollToTop();
     onNext?.();
-    // Re-apply after framer-motion starts the exit animation
     requestAnimationFrame(scrollToTop);
-    setTimeout(scrollToTop, 50);
-    setTimeout(scrollToTop, 200);
   };
+
 
   return (
     <>

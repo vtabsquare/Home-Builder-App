@@ -1000,8 +1000,13 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
           {(localPlan.rooms || []).map((room) => (
             <Group key={`dw-${room.id}`}>
               {(room.doors || []).map((d, di) => {
-                // Prevent rendering duplicate doors for connected rooms
-                if (d.connectsTo && room.id > d.connectsTo) return null;
+                // Prevent rendering duplicate doors for connected rooms only if the reciprocal door actually exists
+                if (d.connectsTo && room.id > d.connectsTo) {
+                  const otherRoom = localPlan.rooms?.find(r => r.id === d.connectsTo);
+                  if (otherRoom && otherRoom.doors?.some(od => od.connectsTo === room.id)) {
+                    return null;
+                  }
+                }
 
                 return (
                   <DoorShape 

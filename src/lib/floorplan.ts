@@ -388,13 +388,13 @@ function dressingFurniture(w: number, h: number, orient: number = 0): FurnitureI
   const items: FurnitureItem[] = [];
   const G = 0.4;
   
-  // Single wardrobe to prevent blocking doors (Walk-In Robe doors are typically on the top/bottom walls)
+  // Single wardrobe to prevent blocking doors
   const wardrobeDepth = 2;
   const wardrobeLong = Math.min(Math.max(4, h - 2*G), 8);
   
-  // Place on the left wall to keep the central path clear
-  // To place a rotation:90 item such that its visual top-left is at (X, Y):
-  const targetX = G;
+  // If door is on the left (orient 0), put wardrobe on the right.
+  // If door is on the right (orient 2), put wardrobe on the left.
+  const targetX = (orient === 0) ? w - wardrobeDepth - G : G;
   const targetY = (h - wardrobeLong) / 2;
   
   const x = targetX + wardrobeDepth / 2 - wardrobeLong / 2;
@@ -1565,51 +1565,43 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
       if (roomsToPack.length === 0) return;
       const count = roomsToPack.length;
       const projectedH = h / count;
-      let finalRooms: Partial<Room>[] = [...roomsToPack];
+      let finalRooms: Partial<Room>[] = [];
       
       if (projectedH > 13) {
-         finalRooms = [];
-         roomsToPack.filter(r => r.type === 'bedroom').forEach((r, idx) => {
-            finalRooms.push({ ...r, h: 14 });
-            finalRooms.push({
-              id: `dynamic-dressing-${idx}-${r.id}`, type: 'dressing', label: 'WALK-IN ROBE', h: 5, color: '#e6f2ff'
-            });
-         });
-         roomsToPack.filter(r => r.type !== 'bedroom' && r.type !== 'bathroom').forEach((r) => {
-            finalRooms.push({ ...r, h: 12 });
-         });
-         roomsToPack.filter(r => r.type === 'bathroom').forEach((r) => {
-            finalRooms.push({ ...r, h: 8 });
+         roomsToPack.forEach((r, idx) => {
+             if (r.type === 'bedroom') {
+                finalRooms.push({ ...r, h: 14 });
+                finalRooms.push({
+                  id: `dynamic-dressing-${idx}-${r.id}`, type: 'dressing', label: 'WALK-IN ROBE', h: 5, color: '#e6f2ff'
+                });
+             } else if (r.type === 'bathroom') {
+                finalRooms.push({ ...r, h: 8 });
+             } else {
+                finalRooms.push({ ...r, h: 12 });
+             }
          });
          
          const requested = finalRooms.reduce((sum, r) => sum + (r.h || 0), 0);
          const leftover = h - requested;
          
-         if (leftover >= 8) {
-             finalRooms.push({
-                 id: `dynamic-study-${y}`, type: 'study', label: 'STUDY', h: leftover, color: '#fffbe6'
-             });
-         } else if (leftover > 0) {
-             const expandableRooms = finalRooms.filter(r => r.type !== 'dressing');
-             if (expandableRooms.length > 0) {
-                 const extra = leftover / expandableRooms.length;
-                 expandableRooms.forEach(r => r.h! += extra);
-             }
-         } else if (leftover < 0) {
-             const shrinkableRooms = finalRooms.filter(r => r.type !== 'dressing');
-             if (shrinkableRooms.length > 0) {
-                 const reduction = leftover / shrinkableRooms.length;
-                 shrinkableRooms.forEach(r => r.h! += reduction);
+         if (leftover !== 0) {
+             const expandables = finalRooms.filter(r => r.type !== 'dressing' && r.type !== 'bathroom');
+             if (expandables.length > 0) {
+                 const reduction = leftover / expandables.length;
+                 expandables.forEach(r => r.h! += reduction);
              } else {
                  const reduction = leftover / finalRooms.length;
                  finalRooms.forEach(r => r.h! += reduction);
              }
          }
       } else {
-         finalRooms = [];
-         roomsToPack.filter(r => r.type === 'bedroom').forEach(r => finalRooms.push({ ...r, h: projectedH }));
-         roomsToPack.filter(r => r.type !== 'bedroom' && r.type !== 'bathroom').forEach(r => finalRooms.push({ ...r, h: projectedH }));
-         roomsToPack.filter(r => r.type === 'bathroom').forEach(r => finalRooms.push({ ...r, h: projectedH }));
+         finalRooms = roomsToPack.map(r => ({ ...r, h: r.h || projectedH }));
+         const sumH = finalRooms.reduce((sum, r) => sum + r.h!, 0);
+         const leftover = h - sumH;
+         if (Math.abs(leftover) > 0.01) {
+             const reduction = leftover / finalRooms.length;
+             finalRooms.forEach(r => r.h! += reduction);
+         }
       }
       
       let curY = y;
@@ -1693,6 +1685,115 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
       packRoomsSmartly([...baths, ...beds], xStart, yStart, w, h, doorsOnWall);
   };
 
+  const packEntertainerPrivateWing = (xStart: number, yStart: number, w: number, h: number) => {
+      if (beds.length >= 3 && baths.length >= 2) {
+          // Corridor layout to prevent secondary bedrooms from opening into the Kitchen!
+          const masterBedH = Math.round(h * 0.35);
+          const bathRowH = Math.round(h * 0.18);
+          const remainingH = h - masterBedH - bathRowH;
+          const secondaryBeds = beds.length - 1;
+          const secBedH = Math.round(remainingH / secondaryBeds);
+
+          const hallW = 4;
+          const bedW = w - hallW;
+
+          // Master Bedroom — full width, top
+          const mBed = beds[0];
+          mBed.x = xStart; mBed.y = yStart; mBed.w = w; mBed.h = masterBedH;
+          mBed.doors = [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard' }];
+          mBed.windows = [{ wall: 'right', position: 0.5, width: 6 }];
+          mBed.color = COLORS.bedroom;
+          mBed.furniture = regenerateFurniture({ ...mBed, type: 'bedroom' } as Room, 'open');
+          newRooms.push(mBed);
+
+          // Dedicated Hallway for Bedrooms 2 & 3 to shield them from the Kitchen
+          const hallH = h - masterBedH;
+          newRooms.push({
+              id: 'private-corridor', type: 'hallway', label: 'HALL',
+              x: xStart, y: yStart + masterBedH, w: hallW, h: hallH,
+              color: COLORS.hallway, orientation: 0, openWalls: [],
+              doors: [{ wall: 'left', position: 0.1, width: 3, swing: 'in', doorType: 'standard' }], // Connects to Lounge
+              windows: [], furniture: []
+          });
+
+          // Bathrooms side-by-side
+          const cBath = baths[1]; // Common Bath
+          const mBath = baths[0]; // Master Bath
+          const bathW = Math.round(bedW / 2);
+          
+          if (cBath) {
+              cBath.x = xStart + hallW; cBath.y = yStart + masterBedH; cBath.w = bathW; cBath.h = bathRowH;
+              cBath.color = COLORS.bathroom;
+              cBath.windows = [];
+              cBath.doors = [
+                  { wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'private-corridor' }
+              ];
+              cBath.furniture = regenerateFurniture({ ...cBath, type: 'bathroom' } as Room, 'open');
+              newRooms.push(cBath);
+          }
+          
+          if (mBath) {
+              mBath.x = xStart + hallW + bathW; mBath.y = yStart + masterBedH; mBath.w = bedW - bathW; mBath.h = bathRowH;
+              mBath.color = COLORS.bathroom;
+              mBath.windows = [{ wall: 'right', position: 0.5, width: 4 }];
+              // Master Bath connects ONLY to Master Bedroom (en-suite)
+              mBath.doors = [{ wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: mBed.id }];
+              
+              // Correct door placement for Master Bed
+              const mbCenter = hallW + bathW + (bedW - bathW)/2;
+              mBed.doors.push({ wall: 'bottom', position: mbCenter / w, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: mBath.id });
+              mBath.furniture = regenerateFurniture({ ...mBath, type: 'bathroom' } as Room, 'open');
+              newRooms.push(mBath);
+          }
+
+          // Secondary bedrooms
+          let curY = yStart + masterBedH + bathRowH;
+          for (let i = 1; i < beds.length; i++) {
+              const bed = beds[i];
+              const isLast = (i === beds.length - 1);
+              const bh = isLast ? (yStart + h - curY) : secBedH;
+              bed.x = xStart + hallW; bed.y = curY; bed.w = bedW; bed.h = bh;
+              bed.doors = [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'private-corridor' }];
+              bed.windows = [{ wall: 'right', position: 0.5, width: 6 }];
+              bed.color = COLORS.bedroom;
+              
+              if (i === 1 && cBath) {
+                  bed.doors.push({ wall: 'top', position: 0.25, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: cBath.id });
+                  cBath.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: bed.id });
+              }
+
+              bed.furniture = regenerateFurniture({ ...bed, type: 'bedroom' } as Room, 'open');
+              newRooms.push(bed);
+              curY += bh;
+          }
+      } else {
+          // Simple layout for 2 beds / 2 baths or fewer
+          const allPrivate: Room[] = [];
+          for (let i = 0; i < Math.max(beds.length, baths.length); i++) {
+              if (baths[i]) allPrivate.push(baths[i]);
+              if (beds[i]) allPrivate.push(beds[i]);
+          }
+          packRoomsSmartly(allPrivate, xStart, yStart, w, h, 'left');
+
+          // Master en-suite
+          const mBed = newRooms.find(r => r.id === beds[0]?.id);
+          const mBath = newRooms.find(r => r.id === baths[0]?.id);
+          if (mBed && mBath) {
+              mBath.doors = [];
+              mBed.doors.push({ wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: mBath.id });
+              mBath.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: mBed.id });
+          }
+          for (let i = 1; i < Math.min(beds.length, baths.length); i++) {
+              const bed = newRooms.find(r => r.id === beds[i].id);
+              const bath = newRooms.find(r => r.id === baths[i].id);
+              if (bed && bath) {
+                  bed.doors.push({ wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: bath.id });
+                  bath.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: bed.id });
+              }
+          }
+      }
+  };
+
   const carport = preserved.find(r => r.type === 'carport');
     
   if (carport) {
@@ -1710,14 +1811,15 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
       };
 
       if (style === 'open_plan') {
+         // Keep the left/right split but make it grander
          const lH = Math.round(H * 0.4);
          const dH = Math.round(H * 0.3);
          const kH = H - lH - dH;
          
          newRooms.push({
-           id: 'living', type: 'living', label: 'LIVING ROOM',
+           id: 'living', type: 'living', label: 'GRAND OPEN LIVING',
            x: 0, y: 0, w: leftW, h: lH, color: COLORS.living, orientation: 1,
-           openWalls: ['bottom'], doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
+           openWalls: ['bottom'], doors: [{ wall: 'top', position: 0.5, width: 6, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
            windows: [{ wall: 'left', position: 0.5, width: 6 }],
            furniture: regenerateFurniture({ type: 'living', w: leftW, h: lH, orientation: 1 } as Room, 'open')
          });
@@ -1728,60 +1830,15 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
            furniture: regenerateFurniture({ type: 'dining', w: leftW, h: dH } as Room, 'open')
          });
          newRooms.push({
-           id: 'kitchen', type: 'kitchen', label: 'OPEN KITCHEN',
+           id: 'kitchen', type: 'kitchen', label: 'CHEF KITCHEN',
            x: 0, y: lH + dH, w: leftW, h: kH, color: COLORS.kitchen, orientation: 2,
-           openWalls: ['top'], doors: [{ wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' }], 
+           openWalls: ['top'], doors: [{ wall: 'bottom', position: 0.5, width: 6, swing: 'out', doorType: 'open', connectsTo: 'garden' }], 
            windows: [{ wall: 'left', position: 0.5, width: 6 }, { wall: 'bottom', position: 0.8, width: 6 }],
            furniture: regenerateFurniture({ type: 'kitchen', w: leftW, h: kH, orientation: 2 } as Room, 'open')
          });
 
-           let startY = cH;
-           if (carport) {
-               carport.y = 0;
-               carport.x = offsetX + leftW;
-               const garden = preserved.find(r => r.type === 'garden');
-               if (garden && garden.w > leftW) garden.w = leftW;
-               startY = Math.max(0, carport.y - offsetY + carport.h);
-           }
-           const rightH = H - startY;
-           pack([...beds, ...baths], leftW, startY, rightW, rightH, 'left');
-         
-      } else if (style === 'entertainer') {
-         const lH = Math.round(H * 0.4);
-         const dH = Math.round(H * 0.3);
-         const kH = H - lH - dH;
-         
-         newRooms.push({
-           id: 'living', type: 'living', label: 'ENTERTAINMENT LOUNGE',
-           x: 0, y: 0, w: leftW, h: lH, color: COLORS.living, orientation: 1,
-           openWalls: ['bottom'], doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
-           windows: [{ wall: 'left', position: 0.5, width: 6 }],
-           furniture: entertainerLoungeFurniture(leftW, lH)
-         });
-
-         newRooms.push({
-           id: 'dining', type: 'dining', label: 'DINING AREA',
-           x: 0, y: lH, w: leftW, h: dH, color: COLORS.dining,
-           openWalls: kitchenType === 'open' ? ['top', 'bottom'] : ['top'], doors: [], windows: [{ wall: 'left', position: 0.5, width: 6 }],
-           furniture: regenerateFurniture({ type: 'dining', w: leftW, h: dH } as Room, 'open')
-         });
-         
-         newRooms.push({
-           id: 'kitchen', type: 'kitchen', label: kitchenType === 'open' ? 'OPEN KITCHEN' : 'KITCHEN',
-           x: 0, y: lH + dH, w: leftW, h: kH, color: COLORS.kitchen, orientation: 2,
-           openWalls: kitchenType === 'open' ? ['top'] : [], doors: kitchenType === 'open' ? [
-             { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' }
-           ] : [
-             { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' },
-             { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard' }
-           ],
-           windows: [{ wall: 'left', position: 0.5, width: 6 }],
-           furniture: regenerateFurniture({ type: 'kitchen', w: leftW, h: kH, orientation: 2 } as Room, 'open')
-         });
-         
-         const allPrivate = [...beds, ...baths];
          let startY = cH;
-         if (carport && beds.length === 2 && baths.length === 1) {
+         if (carport) {
              carport.y = 0;
              carport.x = offsetX + leftW;
              const garden = preserved.find(r => r.type === 'garden');
@@ -1789,7 +1846,40 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
              startY = Math.max(0, carport.y - offsetY + carport.h);
          }
          const rightH = H - startY;
-         pack(allPrivate, leftW, startY, rightW, rightH, 'left');
+         pack([...beds, ...baths], leftW, startY, rightW, rightH, 'left');
+         
+      } else if (style === 'entertainer') {
+         const eH = Math.round(H * 0.55);
+         const kH = H - eH;
+         
+         newRooms.push({
+           id: 'lounge', type: 'lounge', label: 'ENTERTAINMENT LOUNGE',
+           x: 0, y: 0, w: leftW, h: eH, color: COLORS.lounge, orientation: 1,
+           openWalls: ['bottom'], 
+           doors: [{ wall: 'top', position: 0.5, width: 6, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
+           windows: [{ wall: 'left', position: 0.3, width: 6 }, { wall: 'left', position: 0.7, width: 6 }],
+           furniture: entertainerLoungeFurniture(leftW, eH)
+         });
+
+         newRooms.push({
+           id: 'kitchen', type: 'kitchen', label: 'GRAND KITCHEN & BAR',
+           x: 0, y: eH, w: leftW, h: kH, color: COLORS.kitchen, orientation: 2,
+           openWalls: ['top'], 
+           doors: [{ wall: 'bottom', position: 0.5, width: 8, swing: 'out', doorType: 'open', connectsTo: 'garden' }],
+           windows: [{ wall: 'left', position: 0.5, width: 6 }, { wall: 'bottom', position: 0.8, width: 6 }],
+           furniture: regenerateFurniture({ type: 'kitchen', w: leftW, h: kH, orientation: 2 } as Room, 'open')
+         });
+         
+         let startY = cH;
+         if (carport) {
+             carport.y = 0;
+             carport.x = offsetX + leftW;
+             const garden = preserved.find(r => r.type === 'garden');
+             if (garden && garden.w > leftW) garden.w = leftW;
+             startY = Math.max(0, carport.y - offsetY + carport.h);
+         }
+         const rightH = H - startY;
+         packEntertainerPrivateWing(leftW, startY, rightW, rightH);
          
       } else if (style === 'family_suite') {
          const kH = Math.round(H * 0.25);
@@ -1806,15 +1896,19 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
          newRooms.push({
            id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
            x: 0, y: combinedLivingH, w: leftW, h: kH, color: COLORS.kitchen, orientation: 2,
-           openWalls: kitchenType === 'open' ? ['top'] : [], doors: kitchenType === 'open' ? [{ wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' }] : [
-             { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' },
-             { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'combined-living' }
+           openWalls: kitchenType === 'open' ? ['top'] : [], doors: kitchenType === 'open' ? [{ wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open' }] : [
+             { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open' },
+             { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard' }
            ],
            windows: [{ wall: 'left', position: 0.5, width: 6 }],
            furniture: regenerateFurniture({ type: 'kitchen', w: leftW, h: kH, orientation: 2 } as Room, 'open')
          });
 
-         const allPrivate = [...beds, ...baths];
+         const allPrivate: Room[] = [];
+         for (let i = 0; i < Math.max(beds.length, baths.length); i++) {
+             if (beds[i]) allPrivate.push(beds[i]);
+             if (baths[i]) allPrivate.push(baths[i]);
+         }
          let startY = cH;
          // Reflow carport and garden similarly to entertainer plan
          if (carport && beds.length === 2 && baths.length === 1) {
@@ -1842,151 +1936,131 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
   }
 
   if (style === 'open_plan') {
-    // Open-Plan Modern: Left 45% is open plan, Right 55% is private
-    const leftW = Math.round(W * 0.45);
-    const rightW = W - leftW;
+    // Grand Split Floor Plan: Central Open Core (50%), flanked by Private Wings (25% each)
+    const midW = Math.round(W * 0.50);
+    const sideW = Math.floor((W - midW) / 2);
+    const rightW = W - sideW - midW;
 
     const lH = Math.round(H * 0.4);
     const dH = Math.round(H * 0.3);
     const kH = H - lH - dH;
 
     newRooms.push({
-      id: 'living', type: 'living', label: 'LIVING ROOM',
-      x: 0, y: 0, w: leftW, h: lH, color: COLORS.living, orientation: 1,
-      openWalls: ['bottom'], doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }], 
-      windows: [{ wall: 'left', position: 0.5, width: 6 }],
-      furniture: regenerateFurniture({ type: 'living', w: leftW, h: lH, orientation: 1 } as Room, 'open')
+      id: 'living', type: 'living', label: 'GRAND LIVING',
+      x: sideW, y: 0, w: midW, h: lH, color: COLORS.living, orientation: 1,
+      openWalls: ['bottom'], doors: [{ wall: 'top', position: 0.5, width: 6, swing: 'in', doorType: 'standard', label: 'ENTRY' }], 
+      windows: [],
+      furniture: regenerateFurniture({ type: 'living', w: midW, h: lH, orientation: 1 } as Room, 'open')
     });
 
     newRooms.push({
-      id: 'dining', type: 'dining', label: 'DINING AREA',
-      x: 0, y: lH, w: leftW, h: dH, color: COLORS.dining,
-      openWalls: ['top', 'bottom'], doors: [], windows: [{ wall: 'left', position: 0.5, width: 6 }],
-      furniture: regenerateFurniture({ type: 'dining', w: leftW, h: dH } as Room, 'open')
+      id: 'dining', type: 'dining', label: 'OPEN DINING',
+      x: sideW, y: lH, w: midW, h: dH, color: COLORS.dining,
+      openWalls: ['top', 'bottom'], doors: [], windows: [],
+      furniture: regenerateFurniture({ type: 'dining', w: midW, h: dH } as Room, 'open')
     });
 
     newRooms.push({
-      id: 'kitchen', type: 'kitchen', label: 'OPEN KITCHEN',
-      x: 0, y: lH + dH, w: leftW, h: kH, color: COLORS.kitchen, orientation: 2,
-      openWalls: ['top'], doors: [{ wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' }], 
-      windows: [{ wall: 'left', position: 0.5, width: 6 }, { wall: 'bottom', position: 0.8, width: 6 }],
-      furniture: regenerateFurniture({ type: 'kitchen', w: leftW, h: kH, orientation: 2 } as Room, 'open')
+      id: 'kitchen', type: 'kitchen', label: 'CHEF KITCHEN',
+      x: sideW, y: lH + dH, w: midW, h: kH, color: COLORS.kitchen, orientation: 2,
+      openWalls: ['top'], doors: [{ wall: 'bottom', position: 0.5, width: 8, swing: 'out', doorType: 'open', connectsTo: 'garden' }], 
+      windows: [{ wall: 'bottom', position: 0.5, width: 6 }],
+      furniture: regenerateFurniture({ type: 'kitchen', w: midW, h: kH, orientation: 2 } as Room, 'open')
     });
 
-    // Right side: Barrier-free private wing (opening directly into open plan)
-    packPrivateRooms(leftW, 0, rightW, H, 'left');
+    const masterRooms = [beds[0], baths[0]].filter(Boolean) as Room[];
+    packRoomsSmartly(masterRooms, 0, 0, sideW, H, 'right');
+
+    const secBeds = beds.slice(1);
+    const secBaths = baths.slice(1);
+    const secondaryRooms: Room[] = [];
+    if (secBeds.length > 0) secondaryRooms.push(secBeds[0]);
+    secondaryRooms.push(...secBaths);
+    if (secBeds.length > 1) secondaryRooms.push(...secBeds.slice(1));
+    // Prevent lower bedroom doors from opening into the kitchen
+    packRoomsSmartly(secondaryRooms, sideW + midW, 0, rightW, H, 'left', undefined, lH + dH - 1.75);
 
   } else if (style === 'entertainer') {
-    // Rear 40% is Living + Kitchen, Front 60% is Private + Hallway
-    const rearH = Math.round(H * 0.4);
-    const frontH = H - rearH;
+    // Grand Split Floor Plan (copied from open_plan): Central Core (50%), flanked by Private Wings (25% each)
+    const midW = Math.round(W * 0.50);
+    const sideW = Math.floor((W - midW) / 2);
+    const rightW = W - sideW - midW;
 
-    const kW = Math.round(W * 0.4);
-    const lW = W - kW;
-    const isClosed = kitchenType === 'standard';
-
-    newRooms.push({
-      id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-      x: 0, y: 0, w: kW, h: rearH, color: COLORS.kitchen,
-      openWalls: isClosed ? [] : ['right'], doors: isClosed ? [
-        { wall: 'top', position: 0.5, width: 8, swing: 'out', doorType: 'open' },
-        { wall: 'right', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'living' }
-      ] : [
-        { wall: 'top', position: 0.5, width: 8, swing: 'out', doorType: 'open' }
-      ],
-      windows: [{ wall: 'left', position: 0.5, width: 6 }],
-      furniture: regenerateFurniture({ type: 'kitchen', w: kW, h: rearH } as Room, 'open')
-    });
-
-    // Split the living area into smaller segments to handle partial open walls correctly
-    const hallW = 4;
-    const sideW = Math.floor((W - hallW) / 2);
-    const bathH = 10;
-    const loungeH = rearH + frontH - bathH; // 34
+    const eH = Math.round(H * 0.7); // Combined Living and Dining
+    const kH = H - eH;
 
     newRooms.push({
-      id: 'living_left', type: 'living', label: '',
-      x: kW, y: 0, w: sideW - kW, h: rearH, color: COLORS.living,
-      openWalls: isClosed ? ['right'] : ['left', 'right'], doors: [], windows: [], furniture: []
-    });
-    newRooms.push({
-      id: 'living_mid', type: 'living', label: '',
-      x: sideW, y: 0, w: hallW, h: rearH, color: COLORS.living,
-      openWalls: ['left', 'right', 'bottom'], doors: [], windows: [], furniture: []
-    });
-    newRooms.push({
-      id: 'living', type: 'living', label: 'ENTERTAINMENT LOUNGE',
-      x: sideW + hallW, y: 0, w: W - sideW - hallW, h: rearH, color: COLORS.living,
-      openWalls: ['left', 'bottom'], doors: [{ wall: 'top', position: 0.5, width: 12, swing: 'out', doorType: 'open', label: 'ENTRY' }],
-      windows: [{ wall: 'right', position: 0.5, width: 6 }],
-      furniture: entertainerLoungeFurniture(W - sideW - hallW, loungeH)
+      id: 'lounge', type: 'lounge', label: 'ENTERTAINMENT LOUNGE',
+      x: sideW, y: 0, w: midW, h: eH, color: COLORS.lounge, orientation: 1,
+      openWalls: ['bottom'], 
+      doors: [{ wall: 'top', position: 0.5, width: 6, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
+      windows: [],
+      furniture: entertainerLoungeFurniture(midW, eH)
     });
 
     newRooms.push({
-      id: 'living_hall_top', type: 'living', label: '',
-      x: sideW, y: rearH, w: hallW, h: frontH - bathH, color: COLORS.living,
-      openWalls: ['top', 'bottom', 'right'], doors: [], windows: [], furniture: []
-    });
-    newRooms.push({
-      id: 'living_right_mid', type: 'living', label: '',
-      x: sideW + hallW, y: rearH, w: W - sideW - hallW, h: frontH - bathH, color: COLORS.living,
-      openWalls: ['top', 'left'], doors: [],
-      windows: [{ wall: 'right', position: 0.5, width: 6 }],
-      furniture: []
-    });
-    newRooms.push({
-      id: 'living_hall_bottom', type: 'living', label: '',
-      x: sideW, y: rearH + frontH - bathH, w: hallW, h: bathH, color: COLORS.living,
-      openWalls: ['top'], doors: [
-        { wall: 'bottom', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }
-      ],
-      windows: [], furniture: []
+      id: 'kitchen', type: 'kitchen', label: 'GRAND KITCHEN & BAR',
+      x: sideW, y: eH, w: midW, h: kH, color: COLORS.kitchen, orientation: 2,
+      openWalls: ['top'], 
+      doors: [{ wall: 'bottom', position: 0.5, width: 8, swing: 'out', doorType: 'open', connectsTo: 'garden' }], 
+      windows: [{ wall: 'bottom', position: 0.5, width: 6 }],
+      furniture: regenerateFurniture({ type: 'kitchen', w: midW, h: kH, orientation: 2 } as Room, 'open')
     });
 
-    // Split beds and baths evenly across left and right wings
-    const allPrivate = [...beds, ...baths];
-    const half = Math.ceil(allPrivate.length / 2);
-    const leftRooms = allPrivate.slice(0, half);
-    let rightRooms = allPrivate.slice(half);
+    const masterRooms = [beds[0], baths[0]].filter(Boolean) as Room[];
+    packRoomsSmartly(masterRooms, 0, 0, sideW, H, 'right');
 
-    // Keep only Common Bath on the right side
-    rightRooms = rightRooms.filter(r => r.type === 'bathroom' || r.id?.includes('bath'));
-
-    let leftStartY = rearH;
-    let leftH = frontH;
-    
-    const carport = preserved.find(r => r.type === 'carport');
-    if (carport) {
-        carport.x = offsetX;
-        carport.y = offsetY + rearH;
-        carport.w = sideW;
-        leftStartY = rearH + carport.h;
-        leftH = frontH - carport.h;
-    }
-
-    const packLeft = (rooms: Room[], x: number, y: number, w: number, h: number, doorWall: 'right'|'left') => {
-        packRoomsSmartly(rooms, x, y, w, h, doorWall, 'living_hall_top');
-    };
-    const packRight = (rooms: Room[], x: number, y: number, w: number, h: number, doorWall: 'right'|'left') => {
-        packRoomsSmartly(rooms, x, y, w, h, doorWall, 'living_hall_bottom');
-    };
-    
-    packLeft(leftRooms, 0, leftStartY, sideW, leftH, 'right');
-    // Common Bath only takes bathH at the very bottom
-    packRight(rightRooms, sideW + hallW, rearH + frontH - bathH, W - sideW - hallW, bathH, 'left');
+    const secBeds = beds.slice(1);
+    const secBaths = baths.slice(1);
+    const secondaryRooms: Room[] = [];
+    if (secBeds.length > 0) secondaryRooms.push(secBeds[0]);
+    secondaryRooms.push(...secBaths);
+    if (secBeds.length > 1) secondaryRooms.push(...secBeds.slice(1));
+    // Prevent lower bedroom doors from opening into the kitchen
+    packRoomsSmartly(secondaryRooms, sideW + midW, 0, rightW, H, 'left', undefined, eH - 1.75);
 
   } else if (style === 'family_suite') {
     // 3 columns: Left Private, Center Communal, Right Private
     const colW = Math.round(W * 0.3);
     const centerW = W - (colW * 2);
     
-    const allPrivate = [...beds, ...baths];
-    let half = Math.ceil(allPrivate.length / 2);
-    if (allPrivate.length <= 3) {
-      half = allPrivate.length; // Pack all on left side to prevent 44ft long rooms
+    const leftRooms: Room[] = [];
+    const rightRooms: Room[] = [];
+    for (let i = 0; i < Math.max(beds.length, baths.length); i++) {
+        const target = (i % 2 === 0) ? leftRooms : rightRooms;
+        if (beds[i]) target.push(beds[i]);
+        if (baths[i]) target.push(baths[i]);
     }
-    const leftRooms = allPrivate.slice(0, half);
-    const rightRooms = allPrivate.slice(half);
+    
+    // Manual proportion override for left wing to clear the kitchen wall
+    if (leftRooms.length === 3) {
+        if (leftRooms[1]?.type === 'bathroom' && leftRooms[2]?.type === 'bathroom') {
+            // 2 Bed / 3 Bath configuration: Split Bath 3 into a Walk-in Robe and Bath 3
+            const robe3: Room = {
+                id: 'dynamic-dressing-bath3',
+                type: 'dressing',
+                label: 'WALK-IN ROBE',
+                x: 0, y: 0, w: 0, h: 6,
+                color: '#e6f2ff',
+                doors: [], windows: [], furniture: []
+            };
+            leftRooms.splice(2, 0, robe3);
+            leftRooms[0].h = 16; // Master Bed
+            leftRooms[1].h = 12; // Master Bath
+            leftRooms[2].h = 12; // Walk-in Robe
+            leftRooms[3].h = 12; // Bath 3
+        } else {
+            // Apply to 3 Bed/2 Bath configurations
+            leftRooms[0].h = 16; // Master Bed
+            leftRooms[1].h = 14; // Master Bath (Reduced)
+            leftRooms[2].h = 22; // Bedroom 3
+        }
+    }
+
+    if (leftRooms.length + rightRooms.length <= 3) {
+        leftRooms.push(...rightRooms);
+        rightRooms.length = 0;
+    }
 
     let hubX = colW;
     let hubW = centerW;
@@ -2001,7 +2075,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
     const combinedLivingH = livingH + loungeH;
 
     const pack = (rooms: Room[], x: number, y: number, w: number, h: number, doorWall: 'right'|'left') => {
-       packRoomsSmartly(rooms, x, y, w, h, doorWall, undefined, H - kH - 1.75);
+       packRoomsSmartly(rooms, x, y, w, h, doorWall, undefined, H - kH - 2.5);
     };
 
     pack(leftRooms, 0, 0, colW, H, 'right');
@@ -2018,9 +2092,9 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
     newRooms.push({
       id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
       x: hubX, y: combinedLivingH, w: hubW, h: kH, color: COLORS.kitchen, orientation: 2,
-      openWalls: kitchenType === 'open' ? ['top'] : [], doors: kitchenType === 'open' ? [{ wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' }] : [
-        { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open', connectsTo: 'garden' },
-        { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'combined-living' }
+      openWalls: kitchenType === 'open' ? ['top'] : [], doors: kitchenType === 'open' ? [{ wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open' }] : [
+        { wall: 'bottom', position: 0.5, width: 4, swing: 'out', doorType: 'open' },
+        { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard' }
       ],
       windows: [],
       furniture: regenerateFurniture({ type: 'kitchen', w: hubW, h: kH, orientation: 2 } as Room, 'open')
@@ -2039,7 +2113,119 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
       r.y += offsetY;
     }
   });
-  
+
+  // Apply precise suite connectivity overrides for Family Suite
+  if (style === 'family_suite') {
+      // LEFT WING: Master Suite (Master Bed -> Walk-in Robe -> Master Bath)
+      const mBed = newRooms.find(r => r.id === beds[0]?.id);
+      const mBath = newRooms.find(r => r.id === baths[0]?.id || r.id === 'gf-bath-master');
+      if (mBed && mBath) {
+          const mRobe = newRooms.find(r => r.type === 'dressing' && r.x < W / 2 && roomsAreAdjacent(mBed, r).shared);
+          if (mRobe) {
+              // Ensure clean connection mBed -> mRobe -> mBath
+              mBed.doors = mBed.doors.filter(d => d.wall !== 'bottom');
+              mRobe.doors = [];
+              mBath.doors = [];
+              
+              mBed.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: mRobe.id });
+              mRobe.doors.push({ wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: mBed.id });
+              
+              mRobe.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: mBath.id });
+              mBath.doors.push({ wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: mRobe.id });
+          } else {
+              mBed.doors = mBed.doors.filter(d => d.wall !== 'bottom');
+              mBath.doors = [];
+              mBed.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: mBath.id });
+              mBath.doors.push({ wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: mBed.id });
+          }
+      }
+      
+      // LEFT WING (Optional): Bathroom 3 standalone (if 2 beds / 3 baths)
+      const bath3Standalone = newRooms.find(r => r.id === baths[2]?.id);
+      const mBedExists = newRooms.find(r => r.id === beds[0]?.id);
+      const bed3Exists = newRooms.find(r => r.id === beds[2]?.id);
+      const robe3Standalone = newRooms.find(r => r.id === 'dynamic-dressing-bath3');
+
+      // Only do this if it's the 3rd room on the left wing (not hooked up as an ensuite to Bed 3)
+      if (!bed3Exists && bath3Standalone && mBedExists && bath3Standalone.x < W / 2) {
+          if (robe3Standalone) {
+              // Add a door from Family Lounge into the Walk-in Robe
+              robe3Standalone.doors = robe3Standalone.doors.filter(d => d.wall !== 'right');
+              robe3Standalone.doors.push({ 
+                  wall: 'right', 
+                  position: 0.5, 
+                  width: 3.5, 
+                  swing: 'in', 
+                  doorType: 'standard',
+                  connectsTo: 'combined-living'
+              });
+              // Ensure Bath 3 has no right wall door, only top door connecting to robe
+              bath3Standalone.doors = bath3Standalone.doors.filter(d => d.wall !== 'right');
+          } else {
+              // Fallback if no robe
+              bath3Standalone.doors = bath3Standalone.doors.filter(d => d.wall !== 'right');
+              bath3Standalone.doors.push({ 
+                  wall: 'right', 
+                  position: 0.15, 
+                  width: 2.5, 
+                  swing: 'in', 
+                  doorType: 'standard',
+                  connectsTo: 'combined-living'
+              });
+          }
+      }
+
+      // LEFT WING (Optional): Bedroom 3 Suite
+      const bed3 = newRooms.find(r => r.id === beds[2]?.id);
+      const bath3 = newRooms.find(r => r.id === baths[2]?.id);
+      if (bed3 && bath3) {
+          const robe3 = newRooms.find(r => r.type === 'dressing' && r.x < W / 2 && roomsAreAdjacent(bed3, r).shared);
+          if (robe3) {
+              bed3.doors = bed3.doors.filter(d => d.wall !== 'bottom');
+              robe3.doors = [];
+              bath3.doors = [];
+              
+              bed3.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: robe3.id });
+              robe3.doors.push({ wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: bed3.id });
+              
+              robe3.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: bath3.id });
+              bath3.doors.push({ wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: robe3.id });
+          } else if (roomsAreAdjacent(bed3, bath3).shared) {
+              bed3.doors = bed3.doors.filter(d => d.wall !== 'bottom');
+              bath3.doors = [];
+              bed3.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: bath3.id });
+              bath3.doors.push({ wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: bed3.id });
+          }
+      }
+
+      // RIGHT WING: Shared Family Bath/Robe (Detached from Bedroom 2, accessed from Family Lounge)
+      const rBed = newRooms.find(r => r.id === beds[1]?.id);
+      const rBath = newRooms.find(r => r.id === baths[1]?.id || r.id === 'gf-bath-common');
+      if (rBed && rBath) {
+          // Move the bedroom door UP to prevent TV intersection
+          const mainDoor = rBed.doors.find(d => d.wall === 'left');
+          if (mainDoor) mainDoor.position = 0.2;
+
+          const rRobe = newRooms.find(r => r.type === 'dressing' && r.x > W / 2 && roomsAreAdjacent(rBed, r).shared);
+          if (rRobe) {
+              // Detach Walk-in Robe from Bedroom 2
+              rBed.doors = rBed.doors.filter(d => d.wall !== 'bottom');
+              rRobe.doors = [];
+              rBath.doors = [];
+              
+              // Give Walk-in Robe a main entrance from Family Lounge (left wall)
+              rRobe.doors.push({ wall: 'left', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard' });
+              
+              // Ensure Common Bath is attached to Walk-in Robe
+              rRobe.doors.push({ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: rBath.id });
+              rBath.doors.push({ wall: 'top', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: rRobe.id });
+          } else {
+              rBed.doors = rBed.doors.filter(d => d.wall !== 'bottom');
+              rBath.doors = [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard' }];
+          }
+      }
+  }
+
   newPlan.rooms = newRooms;
   return newPlan;
 }
