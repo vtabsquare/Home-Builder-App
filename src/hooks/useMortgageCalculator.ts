@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateEMI, generateAmortizationSchedule, AmortizationRow } from '@/utils/finance';
 import { useConfig } from '@/store/configurator';
@@ -139,6 +139,15 @@ export function useMortgageCalculator(totalPropertyPrice: number) {
 
   const loyaltyDiscountRate = loyaltyProducts.reduce((sum, p) => sum + (LOYALTY_DISCOUNTS[p] || 0), 0);
   const effectiveInterestRate = Math.max(0, calculatedBaseRate - loyaltyDiscountRate);
+
+  // Sync effective interest rate into global config so CostPanel (right sidebar) uses the same rate
+  const prevEffectiveRateRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevEffectiveRateRef.current !== effectiveInterestRate) {
+      prevEffectiveRateRef.current = effectiveInterestRate;
+      setInterestRate(effectiveInterestRate);
+    }
+  }, [effectiveInterestRate, setInterestRate]);
 
   const baseEmi = useMemo(() => calculateEMI(loanAmount, calculatedBaseRate, tenureYears), [loanAmount, calculatedBaseRate, tenureYears]);
   const emi = useMemo(() => calculateEMI(loanAmount, effectiveInterestRate, tenureYears), [loanAmount, effectiveInterestRate, tenureYears]);

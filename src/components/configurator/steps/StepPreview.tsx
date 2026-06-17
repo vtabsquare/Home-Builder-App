@@ -63,6 +63,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   const [advanced, setAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [singleStoreyViewMode, setSingleStoreyViewMode] = useState<'exterior' | 'interior'>('exterior');
+  const [is3DLoading, setIs3DLoading] = useState(false);
+  const [loadCountdown, setLoadCountdown] = useState(5);
   const [stagedPlan, setStagedPlan] = useState<Plan | null>(null);
   const [roomCounter, setRoomCounter] = useState(0);
   const [hasCopiedPlan, setHasCopiedPlan] = useState(!!floorPlanClipboard);
@@ -483,6 +485,33 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
   const roomTabs = getRoomTabs(displayPlan);
 
+  // Start a 5-second countdown whenever the 3D view is activated
+  useEffect(() => {
+    if (view !== '3d') return;
+    const TOTAL = 5;
+    setIs3DLoading(true);
+    setLoadCountdown(TOTAL);
+    const interval = setInterval(() => {
+      setLoadCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setIs3DLoading(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [view]);
+
+  // Auto-switch to Interior when Hall or Bedroom is selected
+  const handleTabSelect = (tabId: string) => {
+    setActiveTab(tabId);
+    if (view === '3d' && !isDoubleStorey && (tabId === 'living' || tabId === 'bedroom')) {
+      setSingleStoreyViewMode('interior');
+    }
+  };
+
   // Touch swipe support for tabs
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const handleTouchStart = (e: React.TouchEvent) => setTouchStart(e.touches[0].clientX);
@@ -492,9 +521,9 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     const currentIdx = roomTabs.findIndex((t) => t.id === activeTab);
     if (Math.abs(diff) > 50) {
       if (diff < 0 && currentIdx < roomTabs.length - 1) {
-        setActiveTab(roomTabs[currentIdx + 1].id);
+        handleTabSelect(roomTabs[currentIdx + 1].id);
       } else if (diff > 0 && currentIdx > 0) {
-        setActiveTab(roomTabs[currentIdx - 1].id);
+        handleTabSelect(roomTabs[currentIdx - 1].id);
       }
     }
     setTouchStart(null);
@@ -1030,6 +1059,40 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 <motion.div key={`3d-${activeFloor}`} className="h-full w-full"
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
+
+                  {/* 3D Loading Countdown Overlay */}
+                  <AnimatePresence>
+                    {is3DLoading && (
+                      <motion.div
+                        key="3d-loading"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.4 }}
+                        className="absolute inset-0 z-30 flex flex-col items-center justify-center rounded-2xl"
+                        style={{ background: 'rgba(10,14,20,0.82)', backdropFilter: 'blur(6px)' }}
+                      >
+                        {/* Circular countdown ring */}
+                        <div className="relative flex items-center justify-center mb-5">
+                          <svg width="96" height="96" viewBox="0 0 100 100" className="-rotate-90">
+                            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="7" />
+                            <circle
+                              cx="50" cy="50" r="42" fill="none"
+                              stroke="rgba(255,255,255,0.85)" strokeWidth="7"
+                              strokeLinecap="round"
+                              strokeDasharray={`${2 * Math.PI * 42}`}
+                              strokeDashoffset={`${2 * Math.PI * 42 * (loadCountdown / 5)}`}
+                              style={{ transition: 'stroke-dashoffset 1s linear' }}
+                            />
+                          </svg>
+                          <span className="absolute text-white font-bold text-2xl num">{loadCountdown}</span>
+                        </div>
+                        <p className="text-white/60 text-[10px] font-bold uppercase tracking-[0.35em]">Loading 3D Scene…</p>
+                        <p className="text-white/30 text-[9px] mt-1 tracking-widest">Building your home in 3D</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {!isDoubleStorey && (
                     <>
                       <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-border bg-white/90 backdrop-blur-md p-1 shadow-elev">
@@ -1248,7 +1311,7 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                     return (
                       <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() => handleTabSelect(tab.id)}
                         className={`shrink-0 flex items-center gap-2 md:gap-3 rounded-full px-4 md:px-6 py-2.5 md:py-3 text-[8px] md:text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 ${
                           isActive
                             ? 'text-white shadow-lg scale-105'

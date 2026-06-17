@@ -19,10 +19,16 @@ export function QuoteSummary({ quote, mortgageEngine }: QuoteSummaryProps) {
   // Monthly saving = baseEmi - current effective emi
   const monthlySaving = Math.max(0, mortgageEngine.baseEmi - quote.monthlyEMI);
 
+  // Yearly saving = monthlySaving × 12
+  const yearlySaving = monthlySaving * 12;
+
+  // Loan Lifetime Saving = monthlySaving × total months in loan tenure
+  const loanLifetimeSaving = monthlySaving * quote.tenureYears * 12;
+
   return (
     <div className="space-y-6">
       
-      {/* Top Summary Cards */}
+      {/* Top Summary Cards — order: Est. Property Price | Loan Amount | Down Payment | Monthly Repayment */}
       <div className="flex overflow-x-auto sm:grid sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 pb-2 sm:pb-0 scrollbar-minimal snap-x">
         <Card className="flex-1 min-w-[140px] sm:min-w-0 snap-start shrink-0 p-4 sm:p-5 bg-white border-gray-200 shadow-sm rounded-2xl sm:rounded-3xl">
           <p className="text-[9px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1 truncate">Est. Property Price</p>
@@ -35,17 +41,19 @@ export function QuoteSummary({ quote, mortgageEngine }: QuoteSummaryProps) {
           <h2 className="text-sm sm:text-lg lg:text-xl font-light text-gray-900 tracking-tight leading-tight whitespace-nowrap">{formatMoneyDynamic(quote.loanAmount)}</h2>
           <p className="text-[9px] sm:text-[10px] text-gray-400 mt-1 sm:mt-2 truncate">Principal Financed</p>
         </Card>
-        
-        <Card className="flex-1 min-w-[140px] sm:min-w-0 snap-start shrink-0 p-4 sm:p-5 bg-white border-gray-200 shadow-sm rounded-2xl sm:rounded-3xl">
-          <p className="text-[9px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1 truncate">Monthly Repayment</p>
-          <h2 className="text-sm sm:text-lg lg:text-xl font-semibold text-emerald-600 tracking-tight leading-tight whitespace-nowrap">{formatMoneyDynamic(quote.monthlyEMI)}</h2>
-          <p className="text-[9px] sm:text-[10px] text-gray-400 mt-1 sm:mt-2 truncate">{quote.tenureYears} Years @ {quote.interestRate.toFixed(2)}%</p>
-        </Card>
 
+        {/* Down Payment — moved before Monthly Repayment */}
         <Card className="flex-1 min-w-[140px] sm:min-w-0 snap-start shrink-0 p-4 sm:p-5 bg-[#faf8f5] border-[#b8956a]/20 shadow-sm rounded-2xl sm:rounded-3xl">
           <p className="text-[9px] sm:text-[11px] font-semibold text-[#b8956a] uppercase tracking-wider mb-1 truncate">Down Payment</p>
           <h2 className="text-sm sm:text-lg lg:text-xl font-semibold text-gray-900 tracking-tight leading-tight whitespace-nowrap">{formatMoneyDynamic(quote.downPayment)}</h2>
           <p className="text-[9px] sm:text-[10px] text-gray-500 mt-1 sm:mt-2 truncate">Required Equity</p>
+        </Card>
+
+        {/* Monthly Repayment — moved to last position */}
+        <Card className="flex-1 min-w-[140px] sm:min-w-0 snap-start shrink-0 p-4 sm:p-5 bg-white border-gray-200 shadow-sm rounded-2xl sm:rounded-3xl">
+          <p className="text-[9px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1 truncate">Monthly Repayment</p>
+          <h2 className="text-sm sm:text-lg lg:text-xl font-semibold text-emerald-600 tracking-tight leading-tight whitespace-nowrap">{formatMoneyDynamic(quote.monthlyEMI)}</h2>
+          <p className="text-[9px] sm:text-[10px] text-gray-400 mt-1 sm:mt-2 truncate">{quote.tenureYears} Years @ {quote.interestRate.toFixed(2)}%</p>
         </Card>
       </div>
 
@@ -56,10 +64,18 @@ export function QuoteSummary({ quote, mortgageEngine }: QuoteSummaryProps) {
               <h3 className="text-lg font-semibold text-gray-900">Check Your Loyalty Savings</h3>
               <p className="text-sm text-gray-500 mt-1">Select your existing products to see how much you could save on your interest rate</p>
             </div>
-            {monthlySaving > 0 && (
-              <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 flex flex-col items-end whitespace-nowrap">
-                <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Monthly Saving</span>
-                <span className="text-lg font-bold text-emerald-700">{formatMoneyDynamic(monthlySaving)}</span>
+            {yearlySaving > 0 && (
+              <div className="flex flex-col gap-2 items-end">
+                {/* Yearly Saving */}
+                <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 flex flex-col items-end whitespace-nowrap">
+                  <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Yearly Saving</span>
+                  <span className="text-lg font-bold text-emerald-700">{formatMoneyDynamic(yearlySaving)}</span>
+                </div>
+                {/* Loan Lifetime Saving */}
+                <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 flex flex-col items-end whitespace-nowrap">
+                  <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">Loan Lifetime Saving</span>
+                  <span className="text-base font-bold text-blue-700">{formatMoneyDynamic(loanLifetimeSaving)}</span>
+                </div>
               </div>
             )}
           </div>
