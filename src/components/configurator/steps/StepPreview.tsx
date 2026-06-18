@@ -6,7 +6,7 @@ import { StepShell } from '../StepShell';
 import { FloorPlanCanvas } from '../FloorPlanCanvas';
 import { ElevationCanvas } from '../ElevationCanvas';
 import { CustomEditorCanvas, ROOM_BLOCKS } from '../CustomEditorCanvas';
-import { Plan, splitPlanToFloors, Room, generateEmptyPlan, regenerateFurniture, syncStructuralWalls } from '@/lib/floorplan';
+import { Plan, splitPlanToFloors, applyDoubleStoreyLayoutStyle, Room, generateEmptyPlan, regenerateFurniture, syncStructuralWalls } from '@/lib/floorplan';
 import { fetchElevationImagesByVariant, fetchElevationVariantFamily, normalizeParsedVariantAddons, resolveElevationVariant } from '@/lib/elevationVariants';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -353,25 +353,32 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
   const floors = useMemo(() => {
     if (!isDoubleStorey) return null;
     // Preset override takes priority (user's saved alignment for this addon/storey combo)
-    if (builtInOverride) return builtInOverride;
-    if (familyPackageLayout) return familyPackageLayout;
-    return splitPlanToFloors(plan, homeType, kitchen, bedrooms, bathrooms, addons as string[]);
-  }, [isDoubleStorey, plan, homeType, kitchen, bedrooms, bathrooms, addons, familyPackageLayout, builtInOverride]);
+    let result: { ground: Plan; first: Plan } | null = null;
+    if (builtInOverride) result = builtInOverride;
+    else if (familyPackageLayout) result = familyPackageLayout;
+    else result = splitPlanToFloors(plan, homeType, kitchen, bedrooms, bathrooms, addons as string[], layoutStyle);
+    // Always apply layout-style overrides (cached layouts bypass splitPlanToFloors)
+    return applyDoubleStoreyLayoutStyle(result, layoutStyle);
+  }, [isDoubleStorey, plan, homeType, kitchen, bedrooms, bathrooms, addons, familyPackageLayout, builtInOverride, layoutStyle]);
 
   const isEditingFirstFloor = isDoubleStorey && activeFloor === 1;
   const isFamilyDoubleStoreyPackage = homeType === 'family' && isDoubleStorey && presetId !== -1;
 
   const savedGroundPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return plan;
-    return (isCustomPreset ? customPlan : null) || floors.ground;
-  }, [isDoubleStorey, floors, plan, isCustomPreset, customPlan]);
+    let ground = (isCustomPreset ? customPlan : null) || floors.ground;
+    if (isCustomPreset && customPlan) {
+      ground = applyDoubleStoreyLayoutStyle({ ground, first: floors.first }, layoutStyle).ground;
+    }
+    return ground;
+  }, [isDoubleStorey, floors, plan, isCustomPreset, customPlan, layoutStyle]);
 
   // Fallback: if floors.first is missing (e.g. corrupted DB data), regenerate it
   const regeneratedFirstFloor = useMemo(() => {
     if (!isDoubleStorey) return null;
-    const generated = splitPlanToFloors(plan, homeType, kitchen, bedrooms, bathrooms, addons as string[]);
+    const generated = splitPlanToFloors(plan, homeType, kitchen, bedrooms, bathrooms, addons as string[], layoutStyle);
     return generated.first || null;
-  }, [isDoubleStorey, plan, homeType, kitchen, bedrooms, bathrooms, addons]);
+  }, [isDoubleStorey, plan, homeType, kitchen, bedrooms, bathrooms, addons, layoutStyle]);
 
   const savedFirstFloorPlan = useMemo(() => {
     if (!isDoubleStorey || !floors) return null;

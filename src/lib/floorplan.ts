@@ -2737,7 +2737,7 @@ export function syncStructuralWalls(sourcePlan: Plan, targetPlan: Plan): Plan {
 
 // ── Double Storey Support ─────────────────────────────────────────
 
-function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standard', bedrooms: number = 3, bathrooms: number = 2, addons: string[] = []): { ground: Plan; first: Plan } {
+function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standard', bedrooms: number = 3, bathrooms: number = 2, addons: string[] = [], layoutStyle: string = 'default'): { ground: Plan; first: Plan } {
   // Ground rules for blueprint scale mapping to a standard 40x40 dimension
   // W=40, H=40. Let's arrange them based on relative coordinates from the image.
   
@@ -2944,6 +2944,19 @@ function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standar
     });
   }
   
+  const livingRoom = gRooms.find(r => r.id === 'gf-living');
+  if (livingRoom) {
+    if (layoutStyle === 'family_suite') {
+      livingRoom.label = 'COMBINED LIVING + FAMILY LOUNGE';
+      livingRoom.color = '#fffbe6';
+      livingRoom.furniture = combinedLivingFurniture(livingRoom.w, livingRoom.h);
+    } else if (layoutStyle === 'entertainer') {
+      livingRoom.label = 'ENTERTAINMENT LOUNGE';
+      livingRoom.color = COLORS.lounge;
+      livingRoom.furniture = entertainerLoungeFurniture(livingRoom.w, livingRoom.h);
+    }
+  }
+
   injectAdjacencyDoors(gRooms);
   cleanupDoors(gRooms);
 
@@ -3116,14 +3129,15 @@ export function splitPlanToFloors(
   kitchen: string = 'standard',
   bedrooms: number = 3,
   bathrooms: number = 2,
-  addons: string[] = []
+  addons: string[] = [],
+  layoutStyle: string = 'default'
 ): { ground: Plan; first: Plan } {
   let result: { ground: Plan; first: Plan };
 
   if (homeType === 'family') {
-    result = familyDoubleStorey(plan.width, plan.height, kitchen, bedrooms, bathrooms, addons);
+    result = familyDoubleStorey(plan.width, plan.height, kitchen, bedrooms, bathrooms, addons, layoutStyle);
   } else {
-    result = _splitPlanGeneric(plan);
+    result = _splitPlanGeneric(plan, layoutStyle);
   }
 
   // Apply layout-affecting addons (carport, landscaping) to the ground floor
@@ -3139,8 +3153,39 @@ export function splitPlanToFloors(
   return result;
 }
 
+/**
+ * Apply layout-style overrides (label, color, furniture) to the ground floor
+ * living room of an already-split double-storey result.  This must be called
+ * even on cached / package layouts so that switching between Standard,
+ * Entertainer and Family Suite is always visible.
+ */
+export function applyDoubleStoreyLayoutStyle(
+  floors: { ground: Plan; first: Plan },
+  layoutStyle: string = 'default'
+): { ground: Plan; first: Plan } {
+  if (layoutStyle === 'default' || layoutStyle === 'open_plan') return floors;
+
+  // Deep-clone ground so we never mutate cached data
+  const ground: Plan = JSON.parse(JSON.stringify(floors.ground));
+  const livingRoom = ground.rooms.find(r => r.id === 'gf-living' || r.type === 'living');
+
+  if (livingRoom) {
+    if (layoutStyle === 'family_suite') {
+      livingRoom.label = 'COMBINED LIVING + FAMILY LOUNGE';
+      livingRoom.color = '#fffbe6';
+      livingRoom.furniture = combinedLivingFurniture(livingRoom.w, livingRoom.h);
+    } else if (layoutStyle === 'entertainer') {
+      livingRoom.label = 'ENTERTAINMENT LOUNGE';
+      livingRoom.color = COLORS.lounge;
+      livingRoom.furniture = entertainerLoungeFurniture(livingRoom.w, livingRoom.h);
+    }
+  }
+
+  return { ground, first: floors.first };
+}
+
 // Internal generic double-storey splitter (for non-family home types)
-function _splitPlanGeneric(plan: Plan): { ground: Plan; first: Plan } {
+function _splitPlanGeneric(plan: Plan, layoutStyle: string = 'default'): { ground: Plan; first: Plan } {
   const W = plan.width;
   const H = plan.height;
 
@@ -3227,6 +3272,19 @@ function _splitPlanGeneric(plan: Plan): { ground: Plan; first: Plan } {
     doors: [],
     windows: [],
   });
+
+  const livingRoom = gRooms.find(r => r.id === 'gf-living');
+  if (livingRoom) {
+    if (layoutStyle === 'family_suite') {
+      livingRoom.label = 'COMBINED LIVING + FAMILY LOUNGE';
+      livingRoom.color = '#fffbe6';
+      livingRoom.furniture = combinedLivingFurniture(livingRoom.w, livingRoom.h);
+    } else if (layoutStyle === 'entertainer') {
+      livingRoom.label = 'ENTERTAINMENT LOUNGE';
+      livingRoom.color = COLORS.lounge;
+      livingRoom.furniture = entertainerLoungeFurniture(livingRoom.w, livingRoom.h);
+    }
+  }
 
   injectAdjacencyDoors(gRooms);
   cleanupDoors(gRooms);
