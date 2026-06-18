@@ -19,11 +19,12 @@ export function QuoteSummary({ quote, mortgageEngine }: QuoteSummaryProps) {
   // Monthly saving = baseEmi - current effective emi
   const monthlySaving = Math.max(0, mortgageEngine.baseEmi - quote.monthlyEMI);
 
-  // Yearly saving = monthlySaving × 12
-  const yearlySaving = monthlySaving * 12;
+  // Yearly saving = monthlySaving × 12 (Rounded to match UI display)
+  const yearlySaving = Math.round(monthlySaving * 12);
 
-  // Loan Lifetime Saving = monthlySaving × total months in loan tenure
-  const loanLifetimeSaving = monthlySaving * quote.tenureYears * 12;
+  // Loan Lifetime Saving = yearly saving × total years in loan tenure
+  // This ensures the displayed math (Yearly Saving x Tenure) exactly matches the Lifetime Saving.
+  const loanLifetimeSaving = yearlySaving * quote.tenureYears;
 
   return (
     <div className="space-y-6">
@@ -59,26 +60,28 @@ export function QuoteSummary({ quote, mortgageEngine }: QuoteSummaryProps) {
 
       <div className="max-w-2xl mx-auto">
         <div className="mb-8 p-5 sm:p-6 bg-white border border-gray-200 rounded-3xl shadow-sm">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Check Your Loyalty Savings</h3>
-              <p className="text-sm text-gray-500 mt-1">Select your existing products to see how much you could save on your interest rate</p>
-            </div>
-            {yearlySaving > 0 && (
-              <div className="flex flex-col gap-2 items-end">
-                {/* Yearly Saving */}
-                <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 flex flex-col items-end whitespace-nowrap">
-                  <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Yearly Saving</span>
-                  <span className="text-lg font-bold text-emerald-700">{formatMoneyDynamic(yearlySaving)}</span>
-                </div>
-                {/* Loan Lifetime Saving */}
-                <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 flex flex-col items-end whitespace-nowrap">
-                  <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">Loan Lifetime Saving</span>
-                  <span className="text-base font-bold text-blue-700">{formatMoneyDynamic(loanLifetimeSaving)}</span>
-                </div>
-              </div>
-            )}
+          {/* Title + subtitle row */}
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Check Your Loyalty Savings</h3>
+            <p className="text-sm text-gray-500 mt-1">Select your existing products to see how much you could save on your interest rate</p>
           </div>
+
+          {/* Yearly Saving + Loan Lifetime Saving — side-by-side on all screen sizes */}
+          {yearlySaving > 0 && (
+            <div className="flex items-stretch gap-3 mb-6">
+              {/* Yearly Saving */}
+              <div className="flex-1 bg-emerald-50 px-4 py-3 rounded-xl border border-emerald-100 flex flex-col whitespace-nowrap min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-0.5">Yearly Saving</span>
+                <span className="text-base sm:text-xl font-bold text-emerald-700 truncate">{formatMoneyDynamic(yearlySaving)}</span>
+              </div>
+              {/* Loan Lifetime Saving */}
+              <div className="flex-1 bg-blue-50 px-4 py-3 rounded-xl border border-blue-100 flex flex-col whitespace-nowrap min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-semibold text-blue-600 uppercase tracking-wider mb-0.5">Loan Lifetime Saving</span>
+                <span className="text-base sm:text-xl font-bold text-blue-700 truncate">{formatMoneyDynamic(loanLifetimeSaving)}</span>
+              </div>
+            </div>
+          )}
+
 
           <div className="grid grid-cols-2 gap-3">
             {mortgageEngine.loyaltyOptions.map((opt: any) => {

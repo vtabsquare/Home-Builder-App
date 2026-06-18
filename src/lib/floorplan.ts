@@ -1547,9 +1547,14 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
   const beds = newPlan.rooms.filter(r => r.type === 'bedroom');
   const baths = newPlan.rooms.filter(r => r.type === 'bathroom');
   
-  // Addons shouldn't be touched structurally
+  // Addons shouldn't be touched structurally.
+  // NOTE: We intentionally exclude base-plan garden rooms (e.g. "garden-0" from premiumPresetA)
+  // because those rooms are decorative/positional for the DEFAULT layout only. When a layout
+  // style (open_plan, entertainer, family_suite) regenerates the entire interior, those old
+  // garden rooms would remain at their original coordinates and visually overlap the new rooms.
+  // Only addon- prefixed rooms and hard structural types (garage, carport) are preserved.
   const preserved = newPlan.rooms.filter(r => 
-    r.id.startsWith('addon-') || r.type === 'garage' || r.type === 'carport' || r.type === 'garden'
+    r.id.startsWith('addon-') || r.type === 'garage' || r.type === 'carport'
   );
 
   // We are going to generate NEW rooms for the interior footprint
@@ -1576,6 +1581,8 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
                 });
              } else if (r.type === 'bathroom') {
                 finalRooms.push({ ...r, h: 8 });
+             } else if (r.type === 'carport') {
+                finalRooms.push({ ...r, h: r.h || 11 });
              } else {
                 finalRooms.push({ ...r, h: 12 });
              }
@@ -1585,7 +1592,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
          const leftover = h - requested;
          
          if (leftover !== 0) {
-             const expandables = finalRooms.filter(r => r.type !== 'dressing' && r.type !== 'bathroom');
+             const expandables = finalRooms.filter(r => r.type !== 'dressing' && r.type !== 'bathroom' && r.type !== 'carport');
              if (expandables.length > 0) {
                  const reduction = leftover / expandables.length;
                  expandables.forEach(r => r.h! += reduction);
@@ -2114,8 +2121,8 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
     const sideW = Math.floor((W - midW) / 2);
     const rightW = W - sideW - midW;
 
-    const lH = Math.round(H * 0.4);
-    const dH = Math.round(H * 0.3);
+    const lH = Math.round(H * 0.42);
+    const dH = Math.round(H * 0.33);
     const kH = H - lH - dH;
 
     newRooms.push({
@@ -2142,17 +2149,41 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
       furniture: regenerateFurniture({ type: 'kitchen', w: midW, h: kH, orientation: 2 } as Room, kitchenType)
     });
 
-    const masterRooms = [beds[0], baths[0]].filter(Boolean) as Room[];
+    const carports = preserved.filter(r => r.type === 'carport' && r.x <= offsetX);
+    const hasIntegratedCarport = carports.length > 0;
+    
+    const leftBeds = hasIntegratedCarport && beds.length > 2 ? [beds[2]] : [beds[0]];
+    const rightBeds = hasIntegratedCarport && beds.length > 2 
+        ? [beds[0], beds[1], ...beds.slice(3)] 
+        : beds.slice(1);
+
+    const masterRooms = [...leftBeds, baths[0]].filter(Boolean) as Room[];
+    
+    if (hasIntegratedCarport) {
+        carports.forEach(c => {
+            const pIdx = preserved.findIndex(r => r.id === c.id);
+            if (pIdx !== -1) preserved.splice(pIdx, 1);
+            const nIdx = newRooms.findIndex(r => r.id === c.id);
+            if (nIdx !== -1) newRooms.splice(nIdx, 1);
+        });
+        masterRooms.unshift({
+            id: 'integrated-carport', type: 'carport', label: 'CARPORT',
+            x: 0, y: 0, w: sideW, h: 17, 
+            color: COLORS.carport,
+            furniture: [{ type: 'car', x: 2, y: 2.5, w: 8, h: 12 }], 
+            doors: [], windows: []
+        });
+    }
+
     packRoomsSmartly(masterRooms, 0, 0, sideW, H, 'right');
 
-    const secBeds = beds.slice(1);
     const secBaths = baths.slice(1);
     const secondaryRooms: Room[] = [];
-    if (secBeds.length > 0) secondaryRooms.push(secBeds[0]);
+    if (rightBeds.length > 0) secondaryRooms.push(rightBeds[0]);
     secondaryRooms.push(...secBaths);
-    if (secBeds.length > 1) secondaryRooms.push(...secBeds.slice(1));
+    if (rightBeds.length > 1) secondaryRooms.push(...rightBeds.slice(1));
     // Prevent lower bedroom doors from opening into the kitchen
-    packRoomsSmartly(secondaryRooms, sideW + midW, 0, rightW, H, 'left', undefined, lH + dH - 1.75);
+    packRoomsSmartly(secondaryRooms, sideW + midW, 0, rightW, H, 'left', undefined, lH + dH - 2.5);
 
   } else if (style === 'entertainer') {
     // Grand Split Floor Plan (copied from open_plan): Central Core (50%), flanked by Private Wings (25% each)
@@ -2160,7 +2191,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
     const sideW = Math.floor((W - midW) / 2);
     const rightW = W - sideW - midW;
 
-    const eH = Math.round(H * 0.7); // Combined Living and Dining
+    const eH = Math.round(H * 0.75); // Combined Living and Dining
     const kH = H - eH;
 
     newRooms.push({
@@ -2181,17 +2212,41 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
       furniture: regenerateFurniture({ type: 'kitchen', w: midW, h: kH, orientation: 2 } as Room, kitchenType)
     });
 
-    const masterRooms = [beds[0], baths[0]].filter(Boolean) as Room[];
+    const carports = preserved.filter(r => r.type === 'carport' && r.x <= offsetX);
+    const hasIntegratedCarport = carports.length > 0;
+    
+    const leftBeds = hasIntegratedCarport && beds.length > 2 ? [beds[2]] : [beds[0]];
+    const rightBeds = hasIntegratedCarport && beds.length > 2 
+        ? [beds[0], beds[1], ...beds.slice(3)] 
+        : beds.slice(1);
+
+    const masterRooms = [...leftBeds, baths[0]].filter(Boolean) as Room[];
+    
+    if (hasIntegratedCarport) {
+        carports.forEach(c => {
+            const pIdx = preserved.findIndex(r => r.id === c.id);
+            if (pIdx !== -1) preserved.splice(pIdx, 1);
+            const nIdx = newRooms.findIndex(r => r.id === c.id);
+            if (nIdx !== -1) newRooms.splice(nIdx, 1);
+        });
+        masterRooms.unshift({
+            id: 'integrated-carport', type: 'carport', label: 'CARPORT',
+            x: 0, y: 0, w: sideW, h: 17, 
+            color: COLORS.carport,
+            furniture: [{ type: 'car', x: 2, y: 2.5, w: 8, h: 12 }], 
+            doors: [], windows: []
+        });
+    }
+
     packRoomsSmartly(masterRooms, 0, 0, sideW, H, 'right');
 
-    const secBeds = beds.slice(1);
     const secBaths = baths.slice(1);
     const secondaryRooms: Room[] = [];
-    if (secBeds.length > 0) secondaryRooms.push(secBeds[0]);
+    if (rightBeds.length > 0) secondaryRooms.push(rightBeds[0]);
     secondaryRooms.push(...secBaths);
-    if (secBeds.length > 1) secondaryRooms.push(...secBeds.slice(1));
+    if (rightBeds.length > 1) secondaryRooms.push(...rightBeds.slice(1));
     // Prevent lower bedroom doors from opening into the kitchen
-    packRoomsSmartly(secondaryRooms, sideW + midW, 0, rightW, H, 'left', undefined, eH - 1.75);
+    packRoomsSmartly(secondaryRooms, sideW + midW, 0, rightW, H, 'left', undefined, eH - 2.5);
 
   } else if (style === 'family_suite') {
     // 3 columns: Left Private, Center Communal, Right Private
@@ -2200,10 +2255,37 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
     
     const leftRooms: Room[] = [];
     const rightRooms: Room[] = [];
-    for (let i = 0; i < Math.max(beds.length, baths.length); i++) {
-        const target = (i % 2 === 0) ? leftRooms : rightRooms;
-        if (beds[i]) target.push(beds[i]);
-        if (baths[i]) target.push(baths[i]);
+    
+    const carports = preserved.filter(r => r.type === 'carport' && r.x <= offsetX);
+    const hasIntegratedCarport = carports.length > 0;
+
+    if (hasIntegratedCarport) {
+        carports.forEach(c => {
+            const pIdx = preserved.findIndex(r => r.id === c.id);
+            if (pIdx !== -1) preserved.splice(pIdx, 1);
+            const nIdx = newRooms.findIndex(r => r.id === c.id);
+            if (nIdx !== -1) newRooms.splice(nIdx, 1);
+        });
+        leftRooms.push({
+            id: 'integrated-carport', type: 'carport', label: 'CARPORT',
+            x: 0, y: 0, w: colW, h: 17, 
+            color: COLORS.carport,
+            furniture: [{ type: 'car', x: 2, y: 2.5, w: 8, h: 12 }], 
+            doors: [], windows: []
+        });
+    }
+
+    const leftBeds = hasIntegratedCarport && beds.length > 2 ? [beds[2]] : [beds[0]];
+    const rightBeds = hasIntegratedCarport && beds.length > 2 
+        ? [beds[0], beds[1], ...beds.slice(3)] 
+        : beds.slice(1);
+
+    if (leftBeds.length > 0) leftRooms.push(leftBeds[0]);
+    if (baths[0]) leftRooms.push(baths[0]);
+
+    for (let i = 0; i < rightBeds.length; i++) {
+        if (rightBeds[i]) rightRooms.push(rightBeds[i]);
+        if (baths[i + 1]) rightRooms.push(baths[i + 1]);
     }
     
     // Manual proportion override for left wing to clear the kitchen wall
@@ -2327,22 +2409,24 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
   const H = plan.height;
   const baseRooms = (plan.rooms || []).filter((r) => !ADDON_ROOM_PREFIXES.some((prefix) => r.id.startsWith(prefix)));
 
-  const wantCarport = c.addons.includes('carport');
   const wantTrees = c.addons.includes('landscaping');
   const wantFence = c.addons.includes('fence');
+
+  const hasIntegratedCarport = baseRooms.some(r => r.type === 'carport');
+  const wantCarport = c.addons.includes('carport') && !hasIntegratedCarport;
   const wantSolar = c.addons.includes('solar');
   const wantTank = c.addons.includes('water_tank');
 
-  // ── 1. Reserve perimeter space for ground-level add-ons ──────────────
-  // Carport gets a strip on the LEFT, trees get a strip on the RIGHT + BOTTOM.
-  // Fence, solar, and water tank are visual-only and do not reshape the building.
+  // ── 1. Reserve perimeter space for layout-affecting add-ons ──────────
+  // Only Carport gets a strip on the LEFT and reshapes the building.
+  // Landscaping ("Furniture"), fence, solar and water tank are VISUAL-ONLY:
+  // they do NOT reserve perimeter space and do NOT reshape any rooms.
   const carportStrip = wantCarport ? Math.min(13, Math.max(9, Math.round(W * 0.25))) : 0;
-  const treeStrip = wantTrees ? 4 : 0;
 
   const reserveLeft = carportStrip;
-  const reserveRight = treeStrip;
+  const reserveRight = 0;   // landscaping is no longer layout-affecting
   const reserveTop = 0;
-  const reserveBottom = treeStrip;
+  const reserveBottom = 0;  // landscaping is no longer layout-affecting
 
   const buildX = reserveLeft;
   const buildY = reserveTop;
@@ -2350,10 +2434,14 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
   const buildH = Math.max(8, H - reserveTop - reserveBottom);
 
   // ── 2. Reshape the building rooms to fit inside the build zone ───────
+  // Only carport triggers a reshape (it's the only layout-affecting addon).
   const mainHouse = baseRooms.filter((r) => r.type !== 'garden' && r.type !== 'carport' && r.type !== 'balcony');
-  const needsReshape = (reserveLeft + reserveRight + reserveTop + reserveBottom) > 0 && mainHouse.length > 0;
+  const needsReshape = reserveLeft > 0 && mainHouse.length > 0;
 
   let rooms: Room[];
+  let finalW = W;
+  let finalH = H;
+
   if (needsReshape) {
     const minX = Math.min(...mainHouse.map((r) => r.x));
     const minY = Math.min(...mainHouse.map((r) => r.y));
@@ -2361,8 +2449,11 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
     const maxY = Math.max(...mainHouse.map((r) => r.y + r.h));
     const curW = Math.max(1, maxX - minX);
     const curH = Math.max(1, maxY - minY);
-    const sX = buildW / curW;
-    const sY = buildH / curH;
+    
+    // To preserve square feet, we NO LONGER scale (sX/sY). 
+    // We simply shift rooms right/down by the reserved strip amount.
+    finalW = curW + reserveLeft + reserveRight;
+    finalH = curH + reserveTop + reserveBottom;
 
     rooms = baseRooms
       .filter((r) => {
@@ -2371,25 +2462,16 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
         return true;
       })
       .map((r) => {
-        const nx = Math.round(buildX + (r.x - minX) * sX);
-        const ny = Math.round(buildY + (r.y - minY) * sY);
-        const nw = Math.max(4, Math.round(r.w * sX));
-        const nh = Math.max(4, Math.round(r.h * sY));
-        const newRoom: Room = { ...r, x: nx, y: ny, w: nw, h: nh };
-        if (newRoom.furniture && newRoom.furniture.length > 0) {
-          try {
-            newRoom.furniture = regenerateFurniture(newRoom);
-          } catch {
-            /* keep old furniture if regeneration fails */
-          }
-        }
+        const nx = Math.round(buildX + (r.x - minX));
+        const ny = Math.round(buildY + (r.y - minY));
+        const newRoom: Room = { ...r, x: nx, y: ny };
+        // No need to regenerate furniture since dimensions didn't change
         return newRoom;
       });
   } else {
-    // If no reshape needed, still ensure we filter out unwanted hardcoded exterior types
+    // No reshape needed — keep existing rooms, just filter out stale exterior markers
     rooms = baseRooms.filter((r) => {
       if (r.type === 'carport' && !wantCarport) return false;
-      if (r.type === 'garden' && !wantTrees) return false;
       return true;
     });
   }
@@ -2411,49 +2493,23 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
     });
   }
 
-  if (wantTrees && treeStrip > 0) {
-    // Right-side garden strip
-    rooms.push({
-      id: 'addon-yard-right',
-      type: 'garden',
-      label: 'GARDEN',
-      x: W - treeStrip,
-      y: buildY,
-      w: treeStrip,
-      h: buildH,
-      color: COLORS.garden,
-      furniture: [],
-      doors: [],
-      windows: [],
-    });
-    // Bottom garden strip
-    rooms.push({
-      id: 'addon-yard-bottom',
-      type: 'garden',
-      label: 'GARDEN',
-      x: reserveLeft,
-      y: H - treeStrip,
-      w: W - reserveLeft - reserveRight,
-      h: treeStrip,
-      color: COLORS.garden,
-      furniture: [],
-      doors: [],
-      windows: [],
-    });
-    // Tree markers
+  // Landscaping is visual-only: overlay small garden / tree markers at the plan
+  // perimeter WITHOUT shifting or resizing any rooms.
+  if (wantTrees) {
+    const treeSize = 3;
     const treeSpots = [
-      { id: 'addon-tree-1', x: W - treeStrip + 0.5, y: buildY + 1 },
-      { id: 'addon-tree-2', x: W - treeStrip + 0.5, y: buildY + buildH - 4 },
-      { id: 'addon-tree-3', x: reserveLeft + 1, y: H - treeStrip + 0.5 },
-      { id: 'addon-tree-4', x: W - treeStrip - 4, y: H - treeStrip + 0.5 },
+      { id: 'addon-tree-1', x: W - treeSize - 1, y: 1 },
+      { id: 'addon-tree-2', x: W - treeSize - 1, y: H - treeSize - 1 },
+      { id: 'addon-tree-3', x: 1, y: H - treeSize - 1 },
+      { id: 'addon-tree-4', x: Math.round(W / 2) - treeSize, y: H - treeSize - 1 },
     ];
     treeSpots.forEach((t) => {
       rooms.push({
         ...t,
         type: 'garden',
         label: 'TREE',
-        w: 3,
-        h: 3,
+        w: treeSize,
+        h: treeSize,
         color: 'rgba(34, 197, 94, 0.4)',
         furniture: [],
         doors: [],
@@ -2516,7 +2572,7 @@ export function applyAddOnsToPlan(plan: Plan, c: Pick<ConfigState, 'addons'>): P
     });
   }
 
-  return ensureGarageDoors({ ...plan, rooms, width: W, height: H });
+  return ensureGarageDoors({ ...plan, rooms, width: finalW, height: finalH });
 }
 
 function applyDynamicChanges(plan: Plan, c: ConfigState): Plan {
@@ -2878,47 +2934,8 @@ function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standar
   // BOTTOM ROW (y: y2 to H)
   const wantLandscaping = addons.includes('landscaping');
 
-  if (wantCarport) {
-    gRooms.push({
-      id: 'gf-porch', type: 'carport', label: 'PORCH\n(CAR PARKING)',
-      x: 0, y: y2, w: x1, h: H - y2,
-      color: COLORS.carport,
-      furniture: [],
-      doors: [],
-      windows: []
-    });
-
-    gRooms.push({
-      id: 'gf-sitout', type: wantLandscaping ? 'garden' : 'balcony', 
-      label: wantLandscaping ? 'ENTRY GARDEN' : 'SIT OUT',
-      x: x1, y: y2, w: x2 - x1, h: H - y2,
-      color: wantLandscaping ? COLORS.garden : COLORS.balcony,
-      furniture: wantLandscaping 
-        ? gardenFurniture(x2 - x1, H - y2)
-        : [
-           { type: 'plant', x: 1, y: 1, w: 2, h: 2 },
-           { type: 'plant', x: (x2 - x1) - 3, y: 1, w: 2, h: 2 }
-        ],
-      doors: [
-        { wall: 'left', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard', connectsTo: 'gf-porch' }
-      ],
-      openWalls: ['bottom'], 
-      windows: []
-    });
-
-    gRooms.push({
-      id: 'gf-living', type: 'living', label: 'LIVING',
-      x: x2, y: y2, w: W - x2, h: H - y2,
-      color: COLORS.living,
-      furniture: livingFurniture(W - x2, H - y2, 2),
-      doors: [
-        { wall: 'left', position: 0.5, width: 4, swing: 'in', doorType: 'standard', connectsTo: 'gf-sitout', label: 'MAIN DOOR' },
-        { wall: 'bottom', position: 0.8, width: 3.5, swing: 'in', doorType: 'standard', label: 'OUTSIDE ENTRY' }
-      ],
-      windows: [{ wall: 'bottom', position: 0.3, width: 4 }, { wall: 'right', position: 0.5, width: 4 }]
-    });
-  } else {
-    // No carport: Expand living and provide a nice front sitout / garden
+    // No carport explicitly modeled here. The global applyAddOnsToPlan handles it cleanly.
+    // Expand living and provide a nice front sitout / garden
     const sitoutW = 8;
     gRooms.push({
       id: 'gf-sitout', type: wantLandscaping ? 'garden' : 'balcony', 
@@ -2942,7 +2959,6 @@ function familyDoubleStorey(W: number, H: number, kitchenType: string = 'standar
       ],
       windows: [{ wall: 'bottom', position: 0.2, width: 4 }, { wall: 'bottom', position: 0.8, width: 4 }, { wall: 'right', position: 0.5, width: 4 }]
     });
-  }
   
   const livingRoom = gRooms.find(r => r.id === 'gf-living');
   if (livingRoom) {
@@ -3140,13 +3156,19 @@ export function splitPlanToFloors(
     result = _splitPlanGeneric(plan, layoutStyle);
   }
 
-  // Apply layout-affecting addons (carport, landscaping) to the ground floor
-  const layoutAddons = addons.filter(a => a === 'carport' || a === 'landscaping');
+  // Only carport is layout-affecting (it physically shifts and resizes rooms).
+  // Landscaping ("Furniture") is visual-only — applying it here would change room
+  // dimensions every time the customer selects Furniture, which must not happen.
+  const layoutAddons = addons.filter(a => a === 'carport');
   if (layoutAddons.length > 0) {
     const groundWithAddons = applyAddOnsToPlan(result.ground, { addons: layoutAddons as any[] });
-    // Sync first floor dimensions to match ground floor (keep structural alignment)
-    const first = { ...result.first, width: groundWithAddons.width, height: groundWithAddons.height };
-    result = { ground: groundWithAddons, first };
+    // Apply addons to the first floor too so the rooms shift rightward and stay structurally aligned
+    const firstWithAddons = applyAddOnsToPlan(result.first, { addons: layoutAddons as any[] });
+    
+    // We don't want a carport room generated on the first floor, so remove it if it exists
+    firstWithAddons.rooms = firstWithAddons.rooms.filter(r => r.type !== 'carport');
+    
+    result = { ground: groundWithAddons, first: firstWithAddons };
   }
 
   result.ground = ensureGarageDoors(result.ground);

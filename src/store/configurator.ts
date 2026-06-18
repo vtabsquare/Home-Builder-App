@@ -16,7 +16,10 @@ const BUILT_IN_PRESET_PREFIX = '__builtin_floor_plan__';
 const ELEVATION_PRESET_PREFIX = '__elevation_variant__';
 export const ELEVATION_VARIANT_VERSION = 'v1';
 const ELEVATION_VISUAL_ADDONS: AddOn[] = ['carport', 'landscaping', 'fence', 'solar', 'water_tank'];
-const FAMILY_DOUBLE_STOREY_LAYOUT_ADDONS: AddOn[] = ['carport', 'landscaping'];
+// Only carport physically reshapes the floor plan. Landscaping ("Furniture") is visual-only
+// and must NOT be treated as a layout-affecting addon — doing so changes the floor plan
+// when the customer selects Furniture, which should not happen.
+const FAMILY_DOUBLE_STOREY_LAYOUT_ADDONS: AddOn[] = ['carport'];
 
 export const getElevationVisualAddons = (addons: AddOn[] = []) =>
   [...addons].filter((addon) => ELEVATION_VISUAL_ADDONS.includes(addon)).sort();
@@ -25,9 +28,9 @@ export const getFamilyDoubleStoreyLayoutAddons = (addons: AddOn[] = []) =>
   [...addons].filter((addon) => FAMILY_DOUBLE_STOREY_LAYOUT_ADDONS.includes(addon)).sort();
 
 export const getBuiltInPresetKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>, presetId: number) => {
-  // Exclude visual-only addons from the key (smart_home, solar, water_tank, fence)
-  // Only layout-affecting addons (carport, landscaping) should trigger different preset overrides
-  const layoutAffectingAddons = (state.addons || []).filter(a => a === 'carport' || a === 'landscaping');
+  // Only carport is layout-affecting and should trigger different preset overrides.
+  // Landscaping ("Furniture"), solar, water_tank, fence, smart_home are visual-only.
+  const layoutAffectingAddons = (state.addons || []).filter(a => a === 'carport');
   return `${BUILT_IN_PRESET_PREFIX}${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}_addons_${layoutAffectingAddons.sort().join('-') || 'none'}_${presetId}`;
 };
 
@@ -283,12 +286,13 @@ export const useConfig = create<ConfigState & ConfigActions>()(
       }),
       toggleAddon: (a) => set((s) => {
         const newAddons = s.addons.includes(a) ? s.addons.filter((x) => x !== a) : [...s.addons, a];
-        // presetOverrides are keyed per addon combination, so no need to clear them.
-        // Each addon combo (e.g. with-carport vs without) has its own saved layout.
+        // Only carport physically reshapes the floor plan — clear the custom plan so the
+        // correct layout is regenerated. All other addons (including landscaping / "Furniture",
+        // solar, water_tank, fence, smart_home) are visual-only and must NOT reset the layout.
+        const isLayoutAffecting = a === 'carport';
         return {
           addons: newAddons,
-          customPlan: null,
-          customFirstFloorPlan: null,
+          ...(isLayoutAffecting ? { customPlan: null, customFirstFloorPlan: null } : {}),
         };
       }),
       setRoof: (roof) => set({ roof }),

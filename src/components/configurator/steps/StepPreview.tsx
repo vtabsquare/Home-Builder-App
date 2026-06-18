@@ -511,13 +511,34 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
     return () => clearInterval(interval);
   }, [view]);
 
-  // Auto-switch to Interior when Hall or Bedroom is selected
+  // Auto-switch Exterior/Interior when Hall or Bedroom is selected in 3D view.
+  // Fires on tab click regardless of storey type — ElevationCanvas gates the
+  // actual camera behaviour via !isDoubleStorey so double-storey is safe.
   const handleTabSelect = (tabId: string) => {
     setActiveTab(tabId);
-    if (view === '3d' && !isDoubleStorey && (tabId === 'living' || tabId === 'bedroom')) {
-      setSingleStoreyViewMode('interior');
+    if (view === '3d') {
+      if (tabId === 'living' || tabId === 'bedroom') {
+        // Entering an interior room — switch to Interior mode
+        setSingleStoreyViewMode('interior');
+      } else if (tabId === 'overview' || tabId === 'garden' || tabId === 'bathroom') {
+        // Returning to an exterior / overview tab — switch back to Exterior
+        setSingleStoreyViewMode('exterior');
+      }
+      // Other tabs (kitchen, dining…) keep whatever mode is currently set
     }
   };
+
+  // Also auto-switch when the user jumps straight to 3D view while Hall or
+  // Bedroom tab is already selected (the tab click handler wouldn't fire).
+  useEffect(() => {
+    if (view !== '3d') return;
+    if (activeTab === 'living' || activeTab === 'bedroom') {
+      setSingleStoreyViewMode('interior');
+    } else if (activeTab === 'overview' || activeTab === 'garden') {
+      setSingleStoreyViewMode('exterior');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]); // Only run when the view changes, not on every activeTab change
 
   // Touch swipe support for tabs
   const [touchStart, setTouchStart] = useState<number | null>(null);

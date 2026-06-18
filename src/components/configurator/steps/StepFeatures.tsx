@@ -56,7 +56,7 @@ export const StepFeatures = () => {
             <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Floor Plan Layout</h3>
             <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold hidden sm:inline-block">Base</span>
           </div>
-          <div className="grid gap-2 md:gap-3 grid-cols-2">
+          <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2">
             {[
               { id: false, label: 'Bungalow', desc: 'Single-storey home design' },
               { id: true, label: 'Multi-Storey', desc: 'Multi-Storey home design' }
@@ -90,7 +90,7 @@ export const StepFeatures = () => {
               <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Finish Quality</h3>
               <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Quality</span>
             </div>
-            <div className="grid gap-2 md:gap-3 grid-cols-2">
+            <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2">
               {([
                 { id: 'standard' as FinishingQuality, label: 'Standard', desc: 'Quality finishes at an accessible price point', price: standardCost },
                 { id: 'premium' as FinishingQuality, label: '★ Premium', desc: 'Elevated materials, premium fixtures and refined detailing', price: premiumCost },
@@ -131,7 +131,7 @@ export const StepFeatures = () => {
         )}
 
         {/* ── Bedrooms & Bathrooms ──────────────────────────── */}
-        <div className="grid gap-2 md:gap-4 grid-cols-2">
+        <div className="grid gap-2 sm:gap-4 grid-cols-1 sm:grid-cols-2">
           <Stepper
             label="Bedrooms"
             value={bedrooms}
@@ -158,7 +158,7 @@ export const StepFeatures = () => {
             <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Spatial Layout</h3>
             <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Options</span>
           </div>
-          <div className="grid gap-2 md:gap-3 grid-cols-2">
+          <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2">
             {KITCHENS.map((k) => {
               const active = kitchen === k.id;
               return (
@@ -188,7 +188,7 @@ export const StepFeatures = () => {
             <h3 className="font-display text-xl font-normal tracking-tight text-foreground/80">Enhancements</h3>
             <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/40 font-bold">Optional</span>
           </div>
-          <div className="grid gap-2 grid-cols-3">
+          <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {(Object.keys(ADDON_META) as AddOn[]).map((id) => {
               const meta = ADDON_META[id];
               const Icon = ADDON_ICON[id];
