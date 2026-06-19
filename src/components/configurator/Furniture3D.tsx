@@ -244,6 +244,188 @@ export const Furniture3D = ({ item, isNight }: Props) => {
     }
 
     // ══════════════════════════════════════════════════════════
+    case 'l_sofa':
+    case 'sectional_sofa': {
+      const fabric = sharedGreyFabric();
+      const fabricN = sharedLinenNormal();
+      const accent = sharedBeigeFabric();
+      const navyF = sharedNavyFabric();
+      const wood = sharedWood();
+
+      const seatD = Math.min(3.0, w * 0.6, h * 0.6); 
+      const mainX = -w/2 + seatD/2;
+      const shortW = w - seatD;
+      const shortX = -w/2 + seatD + shortW/2;
+      const shortZ = -h/2 + seatD/2;
+
+      return (
+        <group>
+          {/* Main long section (Left side) */}
+          <group position={[mainX, 0, 0]}>
+            {/* Hardwood plinth base */}
+            <mesh position={[0, 0.12, 0]} castShadow>
+              <boxGeometry args={[seatD - 0.14, 0.24, h - 0.14]} />
+              <meshStandardMaterial color="#1e160e" roughness={0.75} />
+            </mesh>
+            {/* Legs */}
+            {[[-seatD/2+0.25, -h/2+0.25], [seatD/2-0.25, -h/2+0.25], [-seatD/2+0.25, h/2-0.25], [seatD/2-0.25, h/2-0.25]].map(([lx, lz], i) => (
+              <mesh key={`leg-m-${i}`} position={[lx, 0.18, lz]} castShadow>
+                <cylinderGeometry args={[0.07, 0.12, 0.36, 8]} />
+                <meshStandardMaterial color="#2a1c0e" map={wood} roughness={0.42} envMapIntensity={0.5} />
+              </mesh>
+            ))}
+            {/* Seat box */}
+            <mesh position={[0, 0.88, 0]} castShadow receiveShadow>
+              <boxGeometry args={[seatD, 1.14, h]} />
+              <meshStandardMaterial color="#6e7580" map={fabric} normalMap={fabricN} normalScale={new THREE.Vector2(0.55, 0.55)} roughness={0.96} />
+            </mesh>
+            {/* Backrest (Left side) */}
+            <mesh position={[-seatD/2 + 0.46, 2.12, 0]} castShadow receiveShadow>
+              <boxGeometry args={[0.92, 1.98, h]} />
+              <meshStandardMaterial color="#6e7580" map={fabric} normalMap={fabricN} roughness={0.96} />
+            </mesh>
+            {/* Armrest (Bottom edge) */}
+            <mesh position={[0, 1.62, h/2 - 0.42]} castShadow receiveShadow>
+              <boxGeometry args={[seatD, 1.72, 0.84]} />
+              <meshStandardMaterial color="#6e7580" map={fabric} normalMap={fabricN} roughness={0.96} />
+            </mesh>
+            {/* Armrest top cap */}
+            <mesh position={[0, 2.5, h/2 - 0.42]} castShadow>
+              <boxGeometry args={[seatD - 0.04, 0.16, 0.86]} />
+              <meshStandardMaterial color="#82888e" roughness={0.9} />
+            </mesh>
+            {/* Seat cushions */}
+            {(() => {
+              const count = Math.max(2, Math.round(h / 2.5));
+              const ch = (h - 0.84) / count;
+              return Array.from({ length: count }).map((_, i) => {
+                const cz = -h/2 + ch/2 + i * ch;
+                return (
+                  <group key={`seat-m-${i}`}>
+                    <mesh position={[0.1, 1.6, cz]} castShadow receiveShadow>
+                      <boxGeometry args={[seatD - 0.2, 0.58, ch - 0.08]} />
+                      <meshStandardMaterial color="#7a8090" map={fabric} normalMap={fabricN} roughness={0.94} />
+                    </mesh>
+                    <mesh position={[0.1, 1.9, cz]}>
+                      <boxGeometry args={[seatD - 0.21, 0.04, ch - 0.09]} />
+                      <meshStandardMaterial color="#5e6468" roughness={0.98} />
+                    </mesh>
+                  </group>
+                );
+              });
+            })()}
+          </group>
+
+          {/* Short chaise section (Top side) */}
+          <group position={[shortX, 0, shortZ]}>
+            {/* Hardwood plinth */}
+            <mesh position={[0, 0.12, 0]} castShadow>
+              <boxGeometry args={[shortW - 0.14, 0.24, seatD - 0.14]} />
+              <meshStandardMaterial color="#1e160e" roughness={0.75} />
+            </mesh>
+            {/* Legs */}
+            {[[shortW/2-0.25, -seatD/2+0.25], [shortW/2-0.25, seatD/2-0.25]].map(([lx, lz], i) => (
+              <mesh key={`leg-s-${i}`} position={[lx, 0.18, lz]} castShadow>
+                <cylinderGeometry args={[0.07, 0.12, 0.36, 8]} />
+                <meshStandardMaterial color="#2a1c0e" map={wood} roughness={0.42} envMapIntensity={0.5} />
+              </mesh>
+            ))}
+            {/* Seat box */}
+            <mesh position={[0, 0.88, 0]} castShadow receiveShadow>
+              <boxGeometry args={[shortW, 1.14, seatD]} />
+              <meshStandardMaterial color="#6e7580" map={fabric} normalMap={fabricN} normalScale={new THREE.Vector2(0.55, 0.55)} roughness={0.96} />
+            </mesh>
+            {/* Backrest (Top side) */}
+            <mesh position={[0, 2.12, -seatD/2 + 0.46]} castShadow receiveShadow>
+              <boxGeometry args={[shortW, 1.98, 0.92]} />
+              <meshStandardMaterial color="#6e7580" map={fabric} normalMap={fabricN} roughness={0.96} />
+            </mesh>
+            {/* Armrest (Right edge) */}
+            <mesh position={[shortW/2 - 0.42, 1.62, 0]} castShadow receiveShadow>
+              <boxGeometry args={[0.84, 1.72, seatD]} />
+              <meshStandardMaterial color="#6e7580" map={fabric} normalMap={fabricN} roughness={0.96} />
+            </mesh>
+            {/* Armrest top cap */}
+            <mesh position={[shortW/2 - 0.42, 2.5, 0]} castShadow>
+              <boxGeometry args={[0.86, 0.16, seatD - 0.04]} />
+              <meshStandardMaterial color="#82888e" roughness={0.9} />
+            </mesh>
+            {/* Seat cushions */}
+            {(() => {
+              const count = Math.max(1, Math.round(shortW / 2.5));
+              const cw = (shortW - 0.84) / count;
+              return Array.from({ length: count }).map((_, i) => {
+                const cx = -shortW/2 + cw/2 + i * cw;
+                return (
+                  <group key={`seat-s-${i}`}>
+                    <mesh position={[cx, 1.6, 0.1]} castShadow receiveShadow>
+                      <boxGeometry args={[cw - 0.08, 0.58, seatD - 0.2]} />
+                      <meshStandardMaterial color="#7a8090" map={fabric} normalMap={fabricN} roughness={0.94} />
+                    </mesh>
+                    <mesh position={[cx, 1.9, 0.1]}>
+                      <boxGeometry args={[cw - 0.09, 0.04, seatD - 0.21]} />
+                      <meshStandardMaterial color="#5e6468" roughness={0.98} />
+                    </mesh>
+                  </group>
+                );
+              });
+            })()}
+          </group>
+
+          {/* Back cushions */}
+          {(() => {
+             // Main left side back cushions
+             const countM = Math.max(2, Math.round((h - seatD) / 2.5));
+             const chM = (h - seatD) / countM;
+             const backCushions = Array.from({ length: countM }).map((_, i) => {
+               const cz = seatD/2 + chM/2 + i * chM;
+               return (
+                 <mesh key={`back-m-${i}`} position={[-w/2 + 0.9, 2.22, cz]} castShadow receiveShadow>
+                   <boxGeometry args={[0.85, 1.6, chM - 0.1]} />
+                   <meshStandardMaterial color="#78808a" map={fabric} normalMap={fabricN} roughness={0.94} />
+                 </mesh>
+               );
+             });
+             // Short top side back cushions
+             const countS = Math.max(1, Math.round(shortW / 2.5));
+             const cwS = (shortW - 0.84) / countS;
+             backCushions.push(...Array.from({ length: countS }).map((_, i) => {
+               const cx = shortX - shortW/2 + cwS/2 + i * cwS;
+               return (
+                 <mesh key={`back-s-${i}`} position={[cx, 2.22, -h/2 + 0.9]} castShadow receiveShadow>
+                   <boxGeometry args={[cwS - 0.1, 1.6, 0.85]} />
+                   <meshStandardMaterial color="#78808a" map={fabric} normalMap={fabricN} roughness={0.94} />
+                 </mesh>
+               );
+             }));
+             // Corner back cushion
+             backCushions.push(
+               <mesh key="back-corner" position={[-w/2 + 0.95, 2.22, -h/2 + 0.95]} rotation={[0, -Math.PI/4, 0]} castShadow receiveShadow>
+                 <boxGeometry args={[1.2, 1.6, 0.85]} />
+                 <meshStandardMaterial color="#78808a" map={fabric} normalMap={fabricN} roughness={0.94} />
+               </mesh>
+             );
+             return backCushions;
+          })()}
+
+          {/* Throw pillows */}
+          <mesh position={[-w/2 + seatD - 0.2, 2.32, -h/2 + seatD - 0.2]} rotation={[0, 0.78, 0]} castShadow>
+            <boxGeometry args={[1.05, 1.05, 0.34]} />
+            <meshStandardMaterial color="#2a3a52" map={navyF} normalMap={fabricN} roughness={0.95} />
+          </mesh>
+          <mesh position={[-w/2 + seatD/2, 2.32, h/2 - 1.2]} rotation={[0, -0.2, 0.1]} castShadow>
+            <boxGeometry args={[1.05, 1.05, 0.34]} />
+            <meshStandardMaterial color="#c0a882" map={accent} normalMap={fabricN} roughness={0.95} />
+          </mesh>
+          <mesh position={[w/2 - 1.2, 2.32, -h/2 + seatD/2]} rotation={[0, -1.3, 0.1]} castShadow>
+            <boxGeometry args={[1.05, 1.05, 0.34]} />
+            <meshStandardMaterial color="#c0a882" map={accent} normalMap={fabricN} roughness={0.95} />
+          </mesh>
+        </group>
+      );
+    }
+
+    // ══════════════════════════════════════════════════════════
     case 'dining_table': {
       const wood = sharedWood();
       const woodN = sharedWoodNormal();
@@ -1282,6 +1464,96 @@ export const Furniture3D = ({ item, isNight }: Props) => {
           ))}
         </group>
       );
+
+    case 'round_coffee_table': {
+      const wood = sharedWood();
+      const marble = sharedMarble();
+      return (
+        <group>
+          {/* Base */}
+          <mesh position={[0, 0.6, 0]} castShadow>
+            <cylinderGeometry args={[w * 0.25, w * 0.35, 1.2, 24]} />
+            <meshStandardMaterial color="#2a1c0e" map={wood} roughness={0.4} />
+          </mesh>
+          {/* Top */}
+          <mesh position={[0, 1.25, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[w / 2, w / 2, 0.1, 32]} />
+            <meshStandardMaterial color="#ede9e0" map={marble} roughness={0.12} metalness={0.04} envMapIntensity={1.8} />
+          </mesh>
+        </group>
+      );
+    }
+
+    case 'media_console': {
+      const wood = sharedWood();
+      return (
+        <group>
+          <mesh position={[0, 0.9, 0]} castShadow receiveShadow>
+            <boxGeometry args={[w, 1.5, h]} />
+            <meshStandardMaterial color="#2a1c10" map={wood} normalMap={sharedWoodNormal()} roughness={0.42} envMapIntensity={0.6} />
+          </mesh>
+          {/* Legs */}
+          {[[-w/2+0.1, -h/2+0.1], [w/2-0.1, -h/2+0.1], [-w/2+0.1, h/2-0.1], [w/2-0.1, h/2-0.1]].map(([px, pz], i) => (
+            <mesh key={`mc-leg-${i}`} position={[px, 0.15, pz]} castShadow>
+              <cylinderGeometry args={[0.04, 0.06, 0.3, 8]} />
+              <meshStandardMaterial {...MATTE_BLACK} />
+            </mesh>
+          ))}
+          {/* Details (doors/slats) */}
+          {[-w/4, w/4].map((px, i) => (
+            <mesh key={`mc-door-${i}`} position={[px, 0.9, h/2 + 0.02]} castShadow>
+              <boxGeometry args={[w/2 - 0.04, 1.4, 0.04]} />
+              <meshStandardMaterial color="#2e1f13" map={wood} roughness={0.45} />
+            </mesh>
+          ))}
+        </group>
+      );
+    }
+
+    case 'side_table': {
+      const wood = sharedWood();
+      return (
+        <group>
+          <mesh position={[0, 1.6, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[w/2, w/2, 0.1, 24]} />
+            <meshStandardMaterial color="#4a3018" map={wood} normalMap={sharedWoodNormal()} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, 0.8, 0]} castShadow>
+            <cylinderGeometry args={[0.06, 0.06, 1.5, 12]} />
+            <meshStandardMaterial {...MATTE_BLACK} />
+          </mesh>
+          <mesh position={[0, 0.05, 0]} castShadow>
+            <cylinderGeometry args={[w * 0.3, w * 0.35, 0.1, 24]} />
+            <meshStandardMaterial {...MATTE_BLACK} />
+          </mesh>
+        </group>
+      );
+    }
+
+    case 'floor_lamp': {
+      return (
+        <group>
+          {/* Base */}
+          <mesh position={[0, 0.05, 0]} castShadow>
+            <cylinderGeometry args={[w * 0.4, w * 0.4, 0.1, 24]} />
+            <meshStandardMaterial {...BRASS} />
+          </mesh>
+          {/* Pole */}
+          <mesh position={[0, 2.5, 0]} castShadow>
+            <cylinderGeometry args={[0.03, 0.03, 4.9, 12]} />
+            <meshStandardMaterial {...BRASS} />
+          </mesh>
+          {/* Shade */}
+          <mesh position={[0, 5.0, 0]}>
+            <cylinderGeometry args={[w/2, w/2, 1.0, 24]} />
+            <meshStandardMaterial color="#fdfbf7" map={sharedLinen()} roughness={0.9} />
+          </mesh>
+          {isNight && (
+            <pointLight position={[0, 4.8, 0]} intensity={3} distance={12} color="#ffeedd" decay={2} />
+          )}
+        </group>
+      );
+    }
 
     // ══════════════════════════════════════════════════════════
     default:
