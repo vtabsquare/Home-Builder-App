@@ -1260,10 +1260,25 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                           {images.map((img, idx) => (
                             <div key={idx} className="group relative aspect-[4/3] rounded-2xl overflow-hidden border border-border bg-soft-section shadow-soft transition-all hover:shadow-elev">
                               <img src={img} alt={`Elevation ${idx + 1}`} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                                <a 
+                                  href={img} 
+                                  download={`elevation-${idx + 1}.jpg`} 
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="h-10 w-10 flex items-center justify-center rounded-xl bg-white text-ink shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform hover:bg-surface"
+                                  title="Download Image"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Download size={18} />
+                                </a>
                                 <button 
-                                  onClick={() => remoteImages.length > 0 ? handleElevationDelete(presetKey, idx) : removeElevationImage(presetKey, idx)}
-                                  className="h-10 w-10 flex items-center justify-center rounded-xl bg-red-500 text-white shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    remoteImages.length > 0 ? handleElevationDelete(presetKey, idx) : removeElevationImage(presetKey, idx);
+                                  }}
+                                  className="h-10 w-10 flex items-center justify-center rounded-xl bg-red-500 text-white shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform hover:bg-red-600"
+                                  title="Delete Image"
                                 >
                                   <Trash size={18} />
                                 </button>
