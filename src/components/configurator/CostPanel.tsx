@@ -78,8 +78,14 @@ export const CostPanel = ({ cost, compact }: Props) => {
 };
 
 const Stat = ({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) => (
-  <div className={`relative h-full flex flex-col rounded-xl px-2 py-3 border transition-colors ${highlight ? 'bg-soft-section border-clay/20 text-clay' : 'bg-white border-border text-muted-foreground'}`}>
-    <div className={`text-[8px] font-bold uppercase tracking-[0.2em] mb-1 flex-1 flex flex-col justify-end ${highlight ? 'text-clay/80' : 'text-muted-foreground/50'}`}>{label}</div>
-    <div className={`font-display text-xs md:text-[13px] num font-medium ${highlight ? 'text-clay' : 'text-foreground'}`}>{value}</div>
+  <div className={`relative h-full flex flex-col rounded-xl px-2 py-2.5 border transition-colors min-w-0 overflow-hidden ${highlight ? 'bg-soft-section border-clay/20 text-clay' : 'bg-white border-border text-muted-foreground'}`}>
+    <div className={`text-[7px] font-bold uppercase tracking-[0.15em] mb-1 flex-1 flex flex-col justify-end leading-tight ${highlight ? 'text-clay/80' : 'text-muted-foreground/50'}`}>{label}</div>
+    <div
+      title={value}
+      className={`font-display text-[9px] md:text-[11px] num font-semibold break-all leading-snug ${highlight ? 'text-clay' : 'text-foreground'}`}
+    >
+      {value}
+    </div>
   </div>
 );
+
