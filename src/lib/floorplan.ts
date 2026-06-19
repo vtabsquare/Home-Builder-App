@@ -629,16 +629,15 @@ function entertainerLoungeFurniture(w: number, totalH: number): FurnitureItem[] 
   const visualX = (w - longSide) / 2;
   const visualY = (totalH - shortSide) / 2;
   
-  // We want the long side running horizontally across the middle, backrest at the bottom (people face top TV)
-  // We want the short side (chaise) on the left side facing the TV.
-  // base l_sofa: backrest TOP, chaise LEFT.
-  // rotation 180: backrest BOTTOM, chaise RIGHT.
-  // rotation 180 + flipX: backrest BOTTOM, chaise LEFT.
-  items.push({ type: 'l_sofa', x: visualX, y: visualY, w: longSide, h: shortSide, rotation: 180, flipX: true });
+  // entertainer_sofa at rotation 0 has backrest at top, chaise on the right.
+  // rotation 180 puts backrest at bottom (facing TV at top), chaise on the left.
+  items.push({ type: 'entertainer_sofa', x: visualX, y: visualY, w: longSide, h: shortSide, rotation: 180 });
 
   // Large rectangular coffee table centered in front of the sofa
-  const nookX = visualX + longSide / 2 - ctW / 2;
-  const nookY = visualY + shortSide / 2 - 1;
+  // Since sofa faces Top, the nook (inside the L) is on the right side.
+  // The chaise is on the left. So the coffee table should be placed to the right of the chaise.
+  const nookX = visualX + longSide / 2 + 1; 
+  const nookY = visualY + shortSide / 2 - 1.5;
   items.push({ type: 'coffee_table', x: nookX, y: nookY, w: ctW, h: ctH, rotation: 0 });
 
   // Floor lamp in the bottom-right corner of the lounge
