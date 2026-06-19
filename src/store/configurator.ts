@@ -509,6 +509,15 @@ export const useConfig = create<ConfigState & ConfigActions>()(
         elevationImages: state.elevationImages,
       })),
     }),
-    { name: 'gbti-configurator' }
+    {
+      name: 'gbti-configurator',
+      // Exclude packageLayouts from localStorage so it always fetches fresh
+      // from Supabase on every page load. This prevents stale cache conflicts
+      // between local dev and deployed environments.
+      partialize: (state) => {
+        const { packageLayouts, ...rest } = state;
+        return rest;
+      },
+    }
   )
 );

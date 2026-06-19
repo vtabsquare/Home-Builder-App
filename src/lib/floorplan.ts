@@ -1139,6 +1139,7 @@ function starterPresetA(c: ConfigState): Plan {
     openWalls: ['left'],
     furniture: [],
     doors: [
+      { wall: 'left', position: 9/36, width: 3.5, swing: 'in', doorType: 'standard', connectsTo: 'living' },
       { wall: 'left', position: 23/36, width: 3.5, swing: 'out', doorType: 'open', connectsTo: 'dining' },
       { wall: 'right', position: 8/36, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'bed-0' },
       { wall: 'right', position: 20/36, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'bath-common-1' },
@@ -1520,8 +1521,98 @@ id: 'bath-attached-bed-1', type: 'bathroom', label: 'ENSUITE 2',
 
 import { LayoutStyle } from '@/store/configurator';
 
+/**
+ * Ensures that every bedroom and bathroom room has at least one door
+ * connecting it to an adjacent hallway (or living/dining as fallback).
+ * This is a post-processing fix that runs after any layout is applied so
+ * that saved/cached plans with missing doors are automatically repaired.
+ */
+function ensureBedBathHallwayDoors(rooms: Room[]): void {
+  const hallway = rooms.find(r => r.type === 'hallway');
+  if (!hallway) return; // No hallway to connect to
+
+  const hallwayId = hallway.id;
+
+  for (const room of rooms) {
+    if (room.type !== 'bedroom' && room.type !== 'bathroom') continue;
+
+    // Check if room already has a door connecting to this hallway (or any hallway)
+    const hasHallwayDoor = (room.doors || []).some(d =>
+      !d.connectsTo || // doors without connectsTo are standalone (always render)
+      d.connectsTo === hallwayId ||
+      rooms.find(r => r.id === d.connectsTo)?.type === 'hallway'
+    );
+    if (hasHallwayDoor) continue;
+
+    // Determine which wall faces the hallway (based on x/y overlap)
+    const roomCenterX = room.x + room.w / 2;
+    const roomCenterY = room.y + room.h / 2;
+    const hallCenterX = hallway.x + hallway.w / 2;
+    const hallCenterY = hallway.y + hallway.h / 2;
+
+    // Check adjacency: hallway is to the left/right/top/bottom of room
+    const leftAdj  = Math.abs(room.x - (hallway.x + hallway.w)) < 1.5;
+    const rightAdj = Math.abs(room.x + room.w - hallway.x) < 1.5;
+    const topAdj   = Math.abs(room.y - (hallway.y + hallway.h)) < 1.5;
+    const botAdj   = Math.abs(room.y + room.h - hallway.y) < 1.5;
+
+    let doorWall: 'left' | 'right' | 'top' | 'bottom' | null = null;
+    let doorPos = 0.5;
+
+    if (leftAdj) {
+      doorWall = 'left';
+      // Position door at overlap center
+      const overlapTop    = Math.max(room.y, hallway.y);
+      const overlapBottom = Math.min(room.y + room.h, hallway.y + hallway.h);
+      if (overlapBottom > overlapTop) {
+        doorPos = ((overlapTop + overlapBottom) / 2 - room.y) / room.h;
+      }
+    } else if (rightAdj) {
+      doorWall = 'right';
+      const overlapTop    = Math.max(room.y, hallway.y);
+      const overlapBottom = Math.min(room.y + room.h, hallway.y + hallway.h);
+      if (overlapBottom > overlapTop) {
+        doorPos = ((overlapTop + overlapBottom) / 2 - room.y) / room.h;
+      }
+    } else if (topAdj) {
+      doorWall = 'top';
+      const overlapLeft  = Math.max(room.x, hallway.x);
+      const overlapRight = Math.min(room.x + room.w, hallway.x + hallway.w);
+      if (overlapRight > overlapLeft) {
+        doorPos = ((overlapLeft + overlapRight) / 2 - room.x) / room.w;
+      }
+    } else if (botAdj) {
+      doorWall = 'bottom';
+      const overlapLeft  = Math.max(room.x, hallway.x);
+      const overlapRight = Math.min(room.x + room.w, hallway.x + hallway.w);
+      if (overlapRight > overlapLeft) {
+        doorPos = ((overlapLeft + overlapRight) / 2 - room.x) / room.w;
+      }
+    }
+
+    if (!doorWall) continue; // Not adjacent to hallway
+
+    const doorWidth = room.type === 'bedroom' ? 3 : 2.5;
+    doorPos = Math.max(0.15, Math.min(0.85, doorPos));
+
+    room.doors = room.doors || [];
+    room.doors.push({
+      wall: doorWall,
+      position: doorPos,
+      width: doorWidth,
+      swing: 'in',
+      doorType: 'standard',
+    } as DoorInfo);
+  }
+}
+
 export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 'standard' | 'open' | 'galley' = 'standard'): Plan {
-  if (style === 'default') return plan;
+  if (style === 'default') {
+    // Even for default style, fix up missing bed/bath → hallway doors
+    const fixed: Plan = JSON.parse(JSON.stringify(plan));
+    ensureBedBathHallwayDoors(fixed.rooms);
+    return fixed;
+  }
   
   const newPlan: Plan = JSON.parse(JSON.stringify(plan));
   
@@ -1810,299 +1901,310 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
     
     // Only apply this special logic if the carport intrudes into the top-right of our bounds
     if (cX > 0 && cH > 0) {
-      const leftW = cX;
-      const rightW = W - leftW;
+      // ── Shared geometry (Architectural 3-Column Grid) ─────────────────────────
+      const carportW  = carport.w;
+      const livingW   = W - carportW;       // full left column width for top area
+      const lowerH    = H - cH;             // height of the zone below the carport
 
-      const pack = (rooms: Room[], x: number, y: number, w: number, h: number, doorWall: 'left'|'right'|'top'|'bottom') => {
-          packRoomsSmartly(rooms, x, y, w, h, doorWall);
-      };
+      // 3-Column Grid for the lower half
+      const col3W = carportW;               // Right column (Baths/Beds)
+      const col2W = 10;                     // Middle column (Hallway/Bed 2)
+      const col1W = W - col3W - col2W;      // Left column (Kitchen/Dining)
+
+      // X-coordinates
+      const col1X = 0;
+      const col2X = col1W;
+      const col3X = col1W + col2W;
+
+      // Position carport at top-right
+      carport.x = offsetX + col3X;
+      carport.y = offsetY + 0;
+
+      // Adjust garden width so it doesn't overlap the carport
+      const garden = preserved.find(r => r.type === 'garden');
+      if (garden) garden.w = W - carportW;
+
+      // Extract preserved private rooms
+      const mBed = beds.length > 0 ? beds[0] : null;
+      const sBed = beds.length > 1 ? beds[1] : null;
+      const cBath = baths.length > 0 ? baths[0] : null;
+
+      // Heights to match reference architecture (proportional to lowerH = 19 based on image)
+      const hallH = Math.round(lowerH * (10/19));
+      const bed2H = lowerH - hallH;
+      const kitH  = hallH;
+      const dinH  = bed2H;
+      const bathH = Math.round(lowerH * (6/19));
+      const masterH = lowerH - bathH;
+
+      // ════════════════════════════════════════════════════════════════════════
+      // STYLE BRANCHES
+      // ════════════════════════════════════════════════════════════════════════
 
       if (style === 'open_plan') {
-         // Massive Right-Side Communal Architecture
-         const pW1 = 9; // Beds
-         const fW = 4; // Corridor
-         const pW2 = 7; // Baths
-         const pW = pW1 + fW + pW2; // 20
-         
-         const numBeds = beds.length;
-         const bedH = H / numBeds;
-         for (let i = 0; i < numBeds; i++) {
-             const hVal = (i === numBeds - 1) ? H - (i * bedH) : bedH;
-             const bedDoors: any[] = [{ wall: 'right', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard' }];
-             const bedWindows: any[] = [{ wall: 'left', position: 0.5, width: 4 }];
-             newRooms.push({ ...beds[i], x: 0, y: i * bedH, w: pW1, h: hVal, doors: bedDoors, windows: bedWindows, furniture: regenerateFurniture({ ...beds[i], w: pW1, h: hVal, doors: bedDoors, windows: bedWindows } as Room, 'open') });
-         }
-         
-         // Vertical Corridor
-         newRooms.push({
-           id: 'private-hallway', type: 'hallway', label: 'CORRIDOR',
-           x: pW1, y: 0, w: fW, h: H, color: '#f5f5dc', orientation: 1,
-           openWalls: ['top', 'bottom', 'right'], doors: [], windows: [], furniture: []
-         });
-         
-         // Baths and Horizontal Cut-through
-         const hallY = 14;
-         const hallH = 4;
-         
-         if (baths[0]) {
-             const bathDoors: any[] = [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard' }];
-             newRooms.push({ ...baths[0], x: pW1 + fW, y: 0, w: pW2, h: hallY, doors: bathDoors, windows: [], furniture: regenerateFurniture({ ...baths[0], w: pW2, h: hallY, doors: bathDoors, windows: [] } as Room, 'open') });
-         }
-         
-         newRooms.push({
-           id: 'connecting-hallway', type: 'hallway', label: '',
-           x: pW1 + fW, y: hallY, w: pW2, h: hallH, color: '#f5f5dc', orientation: 1,
-           openWalls: ['left', 'right'], doors: [], windows: [], furniture: []
-         });
-         
-         const remBaths = baths.slice(1);
-         if (remBaths.length > 0) {
-             const remH = H - (hallY + hallH);
-             const bathH = remH / remBaths.length;
-             for (let i = 0; i < remBaths.length; i++) {
-                 const yPos = hallY + hallH + (i * bathH);
-                 const hVal = (i === remBaths.length - 1) ? H - yPos : bathH;
-                 const bathDoors: any[] = [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard' }];
-                 newRooms.push({ ...remBaths[i], x: pW1 + fW, y: yPos, w: pW2, h: hVal, doors: bathDoors, windows: [], furniture: regenerateFurniture({ ...remBaths[i], w: pW2, h: hVal, doors: bathDoors, windows: [] } as Room, 'open') });
-             }
-         }
-         
-         const cX = pW;
-         const cW = W - cX;
-         
-         let startY = cH;
-         if (carport) {
-             carport.y = 0;
-             carport.x = W - carport.w;
-             const garden = preserved.find(r => r.type === 'garden');
-             if (garden) garden.w = carport.x;
-             startY = Math.max(0, carport.y - offsetY + carport.h);
-         }
-         
-         const topCommW = W - carport!.w - cX;
-         
-         newRooms.push({
-           id: 'entry-foyer', type: 'entry', label: 'FOYER',
-           x: cX, y: 0, w: topCommW, h: startY, color: '#fafafa', orientation: 1,
-           openWalls: ['bottom', 'left'], doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }], windows: [], furniture: []
-         });
-         
-         const bH = H - startY;
-         const lH = Math.round(bH * 0.5);
-         const dkH = bH - lH;
-         const dW = Math.round(cW * 0.5);
-         const kW = cW - dW;
-         
-         newRooms.push({
-           id: 'living', type: 'living', label: 'GRAND OPEN LIVING',
-           x: cX, y: startY, w: cW, h: lH, color: COLORS.living, orientation: 1,
-           openWalls: ['top', 'bottom', 'left'], doors: [],
-           windows: [{ wall: 'right', position: 0.5, width: 6 }],
-           furniture: regenerateFurniture({ type: 'living', w: cW, h: lH, orientation: 1 } as Room, 'open')
-         });
-         newRooms.push({
-           id: 'dining', type: 'dining', label: 'DINING AREA',
-           x: cX, y: startY + lH, w: dW, h: dkH, color: COLORS.dining,
-           openWalls: ['top', 'right'], doors: [], windows: [{ wall: 'bottom', position: 0.5, width: 6 }],
-           furniture: regenerateFurniture({ type: 'dining', w: dW, h: dkH } as Room, 'open')
-         });
-         newRooms.push({
-           id: 'kitchen', type: 'kitchen', label: 'CHEF KITCHEN',
-           x: cX + dW, y: startY + lH, w: kW, h: dkH, color: COLORS.kitchen, orientation: 2,
-           openWalls: kitchenType === 'open' ? ['top', 'left'] : [], 
-           doors: kitchenType === 'open' ? [{ wall: 'bottom', position: 0.5, width: 6, swing: 'out', doorType: 'open', connectsTo: 'garden' }] : [{ wall: 'bottom', position: 0.5, width: 6, swing: 'out', doorType: 'open', connectsTo: 'garden' }, { wall: 'left', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard' }], 
-           windows: [{ wall: 'right', position: 0.5, width: 4 }],
-           furniture: regenerateFurniture({ type: 'kitchen', w: kW, h: dkH, orientation: 2 } as Room, kitchenType)
-         });
-         
+        // ── OPEN PLAN ──────────────────────────────────────────────────────────
+        // TOP:    [ OPEN LIVING (col1+2)            |  CARPORT (col3) ]
+        // BOTTOM: [ OPEN KITCHEN/DINING (col1) | HALLWAY (col2) | BATHS/BEDS (col3) ]
+        // ──────────────────────────────────────────────────────────────────────
+
+        // Top-Left: Living Room
+        newRooms.push({
+          id: 'living', type: 'living', label: 'OPEN LIVING',
+          x: 0, y: 0, w: livingW, h: cH,
+          color: COLORS.living, orientation: 1,
+          openWalls: ['bottom'], // Open to Kitchen/Dining and Hallway below
+          doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
+          windows: [{ wall: 'left', position: 0.5, width: 5 }],
+          furniture: regenerateFurniture({ type: 'living', w: livingW, h: cH, orientation: 1 } as Room, 'open')
+        });
+
+        // Bottom-Left: Kitchen (top) & Dining (bottom)
+        newRooms.push({
+          id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
+          x: col1X, y: cH, w: col1W, h: kitH,
+          color: COLORS.kitchen, orientation: 2,
+          openWalls: ['top', 'bottom', 'right'],
+          doors: [],
+          windows: [{ wall: 'left', position: 0.5, width: 3 }],
+          furniture: regenerateFurniture({ type: 'kitchen', w: col1W, h: kitH, orientation: 2 } as Room, kitchenType)
+        });
+
+        newRooms.push({
+          id: 'dining', type: 'dining', label: 'OPEN DINING',
+          x: col1X, y: cH + kitH, w: col1W, h: dinH,
+          color: COLORS.dining, orientation: 1,
+          openWalls: ['top', 'right'],
+          doors: [{ wall: 'bottom', position: 0.5, width: 6, swing: 'out', doorType: 'open', connectsTo: 'garden' }],
+          windows: [{ wall: 'left', position: 0.5, width: 4 }],
+          furniture: regenerateFurniture({ type: 'dining', w: col1W, h: dinH } as Room, 'open')
+        });
+
+        // Middle: Hallway
+        // In open plan, bedroom 2 is still private
+        newRooms.push({
+          id: 'hallway', type: 'hallway', label: 'HALLWAY',
+          x: col2X, y: cH, w: col2W, h: sBed ? hallH : lowerH,
+          color: COLORS.hallway, orientation: 1,
+          openWalls: ['top', 'left'],
+          doors: [], windows: [], furniture: []
+        });
+
+        if (sBed) {
+          newRooms.push({
+            ...sBed,
+            x: col2X, y: cH + hallH, w: col2W, h: bed2H,
+            doors: [{ wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'hallway' }],
+            windows: [],
+            furniture: regenerateFurniture({ ...sBed, w: col2W, h: bed2H } as Room, 'open')
+          });
+        }
+
       } else if (style === 'entertainer') {
-         // Massive Right-Side Communal Architecture
-         const pW1 = 9; // Beds
-         const fW = 4; // Corridor
-         const pW2 = 7; // Baths
-         const pW = pW1 + fW + pW2; // 20
-         
-         const numBeds = beds.length;
-         const bedH = H / numBeds;
-         for (let i = 0; i < numBeds; i++) {
-             const hVal = (i === numBeds - 1) ? H - (i * bedH) : bedH;
-             const bedDoors: any[] = [{ wall: 'right', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard' }];
-             const bedWindows: any[] = [{ wall: 'left', position: 0.5, width: 4 }];
-             newRooms.push({ ...beds[i], x: 0, y: i * bedH, w: pW1, h: hVal, doors: bedDoors, windows: bedWindows, furniture: regenerateFurniture({ ...beds[i], w: pW1, h: hVal, doors: bedDoors, windows: bedWindows } as Room, 'open') });
-         }
-         
-         // Vertical Corridor
-         newRooms.push({
-           id: 'private-hallway', type: 'hallway', label: 'CORRIDOR',
-           x: pW1, y: 0, w: fW, h: H, color: '#f5f5dc', orientation: 1,
-           openWalls: ['top', 'bottom', 'right'], doors: [], windows: [], furniture: []
-         });
-         
-         // Baths and Horizontal Cut-through
-         const hallY = 14;
-         const hallH = 4;
-         
-         if (baths[0]) {
-             const bathDoors: any[] = [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard' }];
-             newRooms.push({ ...baths[0], x: pW1 + fW, y: 0, w: pW2, h: hallY, doors: bathDoors, windows: [], furniture: regenerateFurniture({ ...baths[0], w: pW2, h: hallY, doors: bathDoors, windows: [] } as Room, 'open') });
-         }
-         
-         newRooms.push({
-           id: 'connecting-hallway', type: 'hallway', label: '',
-           x: pW1 + fW, y: hallY, w: pW2, h: hallH, color: '#f5f5dc', orientation: 1,
-           openWalls: ['left', 'right'], doors: [], windows: [], furniture: []
-         });
-         
-         const remBaths = baths.slice(1);
-         if (remBaths.length > 0) {
-             const remH = H - (hallY + hallH);
-             const bathH = remH / remBaths.length;
-             for (let i = 0; i < remBaths.length; i++) {
-                 const yPos = hallY + hallH + (i * bathH);
-                 const hVal = (i === remBaths.length - 1) ? H - yPos : bathH;
-                 const bathDoors: any[] = [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard' }];
-                 newRooms.push({ ...remBaths[i], x: pW1 + fW, y: yPos, w: pW2, h: hVal, doors: bathDoors, windows: [], furniture: regenerateFurniture({ ...remBaths[i], w: pW2, h: hVal, doors: bathDoors, windows: [] } as Room, 'open') });
-             }
-         }
-         
-         const cX = pW;
-         
-         let startY = cH;
-         if (carport) {
-             carport.y = 0;
-             carport.x = W - carport.w;
-             const garden = preserved.find(r => r.type === 'garden');
-             if (garden) garden.w = carport.x;
-             startY = Math.max(0, carport.y - offsetY + carport.h);
-         }
-         
-         const topCommW = W - carport!.w - cX;
-         
-         newRooms.push({
-           id: 'entry-foyer', type: 'entry', label: 'FOYER',
-           x: cX, y: 0, w: topCommW, h: startY, color: '#fafafa', orientation: 1,
-           openWalls: ['bottom', 'left'], doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }], windows: [], furniture: []
-         });
-         
-         const rightWingW = W - pW;
-         const cH2 = H - startY; // Space below carport
-         
-         const eH = Math.round(cH2 * 0.55);
-         const kH = cH2 - eH;
-         
-         newRooms.push({
-           id: 'lounge', type: 'lounge', label: 'ENTERTAINMENT LOUNGE',
-           x: cX, y: startY, w: rightWingW, h: eH, color: COLORS.lounge, orientation: 1,
-           openWalls: kitchenType === 'open' ? ['bottom', 'left', 'top'] : ['left', 'top'], 
-           doors: kitchenType === 'open' ? [] : [{ wall: 'bottom', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard' }],
-           windows: [{ wall: 'right', position: 0.5, width: 6 }],
-           furniture: entertainerLoungeFurniture(rightWingW, eH)
-         });
+        // ── ENTERTAINER ────────────────────────────────────────────────────────
+        // TOP:    [ ENTERTAINMENT LOUNGE (col1+2)   |  CARPORT (col3) ]
+        // BOTTOM: [ KITCHEN & DINING (col1) | HALLWAY & BED2 (col2) | BATHS/BEDS (col3) ]
+        // ──────────────────────────────────────────────────────────────────────
 
-         newRooms.push({
-           id: 'kitchen', type: 'kitchen', label: 'GRAND KITCHEN & BAR',
-           x: cX, y: startY + eH, w: rightWingW, h: kH, color: COLORS.kitchen, orientation: 2,
-           openWalls: kitchenType === 'open' ? ['top'] : [], 
-           doors: kitchenType === 'open' ? [{ wall: 'bottom', position: 0.5, width: 8, swing: 'out', doorType: 'open', connectsTo: 'garden' }] : [{ wall: 'bottom', position: 0.5, width: 8, swing: 'out', doorType: 'open', connectsTo: 'garden' }, { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard' }], 
-           windows: [{ wall: 'right', position: 0.5, width: 6 }],
-           furniture: regenerateFurniture({ type: 'kitchen', w: rightWingW, h: kH, orientation: 2 } as Room, kitchenType)
-         });
-         
+        // Top-Left: Entertainment Lounge
+        newRooms.push({
+          id: 'lounge', type: 'lounge', label: 'ENTERTAINMENT LOUNGE',
+          x: 0, y: 0, w: livingW, h: cH,
+          color: COLORS.lounge, orientation: 1,
+          openWalls: ['bottom'], // Open to Dining and Hallway
+          doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
+          windows: [{ wall: 'left', position: 0.5, width: 4 }],
+          furniture: regenerateFurniture({ type: 'lounge', w: livingW, h: cH, orientation: 1 } as Room, 'open')
+        });
+
+        // Bottom-Left: Kitchen (top) & Dining (bottom)
+        newRooms.push({
+          id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
+          x: col1X, y: cH, w: col1W, h: kitH,
+          color: COLORS.kitchen, orientation: 2,
+          openWalls: ['top', 'bottom', 'right'], // Open to lounge above, dining below, hallway right
+          doors: [],
+          windows: [{ wall: 'left', position: 0.5, width: 3 }],
+          furniture: regenerateFurniture({ type: 'kitchen', w: col1W, h: kitH, orientation: 2 } as Room, kitchenType)
+        });
+
+        newRooms.push({
+          id: 'dining', type: 'dining', label: 'DINING',
+          x: col1X, y: cH + kitH, w: col1W, h: dinH,
+          color: COLORS.dining, orientation: 1,
+          openWalls: ['top', 'right'], // Open to kitchen above, bed2 right
+          doors: [{ wall: 'bottom', position: 0.5, width: 6, swing: 'out', doorType: 'open', connectsTo: 'garden' }],
+          windows: [{ wall: 'left', position: 0.5, width: 4 }],
+          furniture: regenerateFurniture({ type: 'dining', w: col1W, h: dinH } as Room, 'open')
+        });
+
+        // Middle: Hallway (top) & Bedroom 2 (bottom)
+        newRooms.push({
+          id: 'hallway', type: 'hallway', label: 'HALLWAY',
+          x: col2X, y: cH, w: col2W, h: sBed ? hallH : lowerH,
+          color: COLORS.hallway, orientation: 1,
+          openWalls: ['top', 'left'],
+          doors: [], windows: [], furniture: []
+        });
+
+        if (sBed) {
+          newRooms.push({
+            ...sBed,
+            x: col2X, y: cH + hallH, w: col2W, h: bed2H,
+            doors: [{ wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'hallway' }],
+            windows: [],
+            furniture: regenerateFurniture({ ...sBed, w: col2W, h: bed2H } as Room, 'open')
+          });
+        }
+
       } else if (style === 'family_suite') {
-         // Massive Right-Side Communal Architecture
-         const pW1 = 9; // Beds
-         const fW = 4; // Corridor
-         const pW2 = 7; // Baths
-         const pW = pW1 + fW + pW2; // 20
-         
-         const numBeds = beds.length;
-         const bedH = H / numBeds;
-         for (let i = 0; i < numBeds; i++) {
-             const hVal = (i === numBeds - 1) ? H - (i * bedH) : bedH;
-             const bedDoors: any[] = [{ wall: 'right', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard' }];
-             const bedWindows: any[] = [{ wall: 'left', position: 0.5, width: 4 }];
-             newRooms.push({ ...beds[i], x: 0, y: i * bedH, w: pW1, h: hVal, doors: bedDoors, windows: bedWindows, furniture: regenerateFurniture({ ...beds[i], w: pW1, h: hVal, doors: bedDoors, windows: bedWindows } as Room, 'open') });
-         }
-         
-         // Vertical Corridor
-         newRooms.push({
-           id: 'private-hallway', type: 'hallway', label: 'CORRIDOR',
-           x: pW1, y: 0, w: fW, h: H, color: '#f5f5dc', orientation: 1,
-           openWalls: ['top', 'bottom', 'right'], doors: [], windows: [], furniture: []
-         });
-         
-         // Baths and Horizontal Cut-through
-         const hallY = 14;
-         const hallH = 4;
-         
-         if (baths[0]) {
-             const bathDoors: any[] = [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard' }];
-             newRooms.push({ ...baths[0], x: pW1 + fW, y: 0, w: pW2, h: hallY, doors: bathDoors, windows: [], furniture: regenerateFurniture({ ...baths[0], w: pW2, h: hallY, doors: bathDoors, windows: [] } as Room, 'open') });
-         }
-         
-         newRooms.push({
-           id: 'connecting-hallway', type: 'hallway', label: '',
-           x: pW1 + fW, y: hallY, w: pW2, h: hallH, color: '#f5f5dc', orientation: 1,
-           openWalls: ['left', 'right'], doors: [], windows: [], furniture: []
-         });
-         
-         const remBaths = baths.slice(1);
-         if (remBaths.length > 0) {
-             const remH = H - (hallY + hallH);
-             const bathH = remH / remBaths.length;
-             for (let i = 0; i < remBaths.length; i++) {
-                 const yPos = hallY + hallH + (i * bathH);
-                 const hVal = (i === remBaths.length - 1) ? H - yPos : bathH;
-                 const bathDoors: any[] = [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard' }];
-                 newRooms.push({ ...remBaths[i], x: pW1 + fW, y: yPos, w: pW2, h: hVal, doors: bathDoors, windows: [], furniture: regenerateFurniture({ ...remBaths[i], w: pW2, h: hVal, doors: bathDoors, windows: [] } as Room, 'open') });
-             }
-         }
-         
-         const cX = pW;
-         
-         let startY = cH;
-         if (carport) {
-             carport.y = 0;
-             carport.x = W - carport.w;
-             const garden = preserved.find(r => r.type === 'garden');
-             if (garden) garden.w = carport.x;
-             startY = Math.max(0, carport.y - offsetY + carport.h);
-         }
-         
-         const topCommW = W - carport!.w - cX;
-         
-         newRooms.push({
-           id: 'entry-foyer', type: 'entry', label: 'FOYER',
-           x: cX, y: 0, w: topCommW, h: startY, color: '#fafafa', orientation: 1,
-           openWalls: ['bottom', 'left'], doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }], windows: [], furniture: []
-         });
-         
-         const rightWingW = W - pW;
-         const cH2 = H - startY; // Space below carport
-         
-         const kH = Math.round(cH2 * 0.25);
-         const combinedLivingH = cH2 - kH;
-         
-         newRooms.push({
-           id: 'combined-living', type: 'living', label: 'COMBINED LIVING + FAMILY LOUNGE',
-           x: cX, y: startY, w: rightWingW, h: combinedLivingH, color: '#fffbe6', orientation: 1,
-           openWalls: kitchenType === 'open' ? ['bottom', 'left', 'top'] : ['left', 'top'], 
-           doors: kitchenType === 'open' ? [] : [{ wall: 'bottom', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard' }],
-           windows: [{ wall: 'right', position: 0.5, width: 6 }],
-           furniture: combinedLivingFurniture(rightWingW, combinedLivingH)
-         });
+        // ── FAMILY SUITE ───────────────────────────────────────────────────────
+        // TOP:    [ COMBINED LIVING + FAMILY LOUNGE |  CARPORT ]
+        // BOTTOM: [ GRAND KITCHEN | HALLWAY & BED2 | BATHS/BEDS ]
+        // ──────────────────────────────────────────────────────────────────────
 
-         newRooms.push({
-           id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
-           x: cX, y: startY + combinedLivingH, w: rightWingW, h: kH, color: COLORS.kitchen, orientation: 2,
-           openWalls: kitchenType === 'open' ? ['top'] : [], 
-           doors: kitchenType === 'open' ? [{ wall: 'bottom', position: 0.5, width: 8, swing: 'out', doorType: 'open', connectsTo: 'garden' }] : [{ wall: 'bottom', position: 0.5, width: 8, swing: 'out', doorType: 'open', connectsTo: 'garden' }, { wall: 'top', position: 0.5, width: 3.5, swing: 'out', doorType: 'standard' }], 
-           windows: [{ wall: 'right', position: 0.5, width: 6 }],
-           furniture: regenerateFurniture({ type: 'kitchen', w: rightWingW, h: kH, orientation: 2 } as Room, kitchenType)
-         });
+        // Top-Left: Combined Living + Family Lounge
+        newRooms.push({
+          id: 'living', type: 'living', label: 'COMBINED LIVING +\nFAMILY LOUNGE',
+          x: 0, y: 0, w: livingW, h: cH,
+          color: 'hsl(36 32% 84%)',
+          orientation: 1,
+          openWalls: [],
+          doors: [
+            { wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' },
+            { wall: 'bottom', position: (col1W / 2) / livingW, width: 3, swing: 'out', doorType: 'standard', connectsTo: 'kitchen' },
+            { wall: 'bottom', position: (col1W + col2W / 2) / livingW, width: 3, swing: 'out', doorType: 'standard', connectsTo: 'hallway' }
+          ],
+          windows: [{ wall: 'left', position: 0.3, width: 4 }, { wall: 'left', position: 0.7, width: 4 }],
+          furniture: regenerateFurniture({ type: 'living', w: livingW, h: cH, orientation: 1 } as Room, 'open')
+        });
+
+        // Bottom-Left: Kitchen (full height)
+        newRooms.push({
+          id: 'kitchen', type: 'kitchen', label: 'GRAND KITCHEN',
+          x: col1X, y: cH, w: col1W, h: lowerH,
+          color: COLORS.kitchen, orientation: 2,
+          openWalls: ['right'], // Open to hallway
+          doors: [{ wall: 'bottom', position: 0.5, width: 6, swing: 'out', doorType: 'open', connectsTo: 'garden' }],
+          windows: [{ wall: 'left', position: 0.5, width: 3 }],
+          furniture: regenerateFurniture({ type: 'kitchen', w: col1W, h: lowerH, orientation: 2 } as Room, kitchenType)
+        });
+
+        // Middle: Hallway (top) & Bedroom 2 (bottom)
+        newRooms.push({
+          id: 'hallway', type: 'hallway', label: 'HALLWAY',
+          x: col2X, y: cH, w: col2W, h: sBed ? hallH : lowerH,
+          color: COLORS.hallway, orientation: 1,
+          openWalls: ['left'],
+          doors: [], windows: [], furniture: []
+        });
+
+        if (sBed) {
+          newRooms.push({
+            ...sBed,
+            x: col2X, y: cH + hallH, w: col2W, h: bed2H,
+            doors: [{ wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'hallway' }],
+            windows: [],
+            furniture: regenerateFurniture({ ...sBed, w: col2W, h: bed2H } as Room, 'open')
+          });
+        }
+
+      } else {
+        // ── STANDARD (default) ────────────────────────────────────────────────
+        // TOP:    [ HALL + LIVING ROOM (left)  |  CARPORT (right) ]
+        // BOTTOM: [ KITCHEN (top), DINING (btm) | HALLWAY/BED2 | BATH/MASTER ]
+        // ──────────────────────────────────────────────────────────────────────
+
+        // TOP-LEFT: Hall + Living Room
+        newRooms.push({
+          id: 'living', type: 'living', label: 'HALL + LIVING ROOM',
+          x: 0, y: 0, w: livingW, h: cH,
+          color: COLORS.living, orientation: 1,
+          openWalls: [],
+          doors: [
+            { wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }
+          ],
+          windows: [{ wall: 'left', position: 0.5, width: 4 }],
+          furniture: regenerateFurniture({ type: 'living', w: livingW, h: cH, orientation: 1 } as Room, 'open')
+        });
+
+        // BOTTOM-LEFT: Kitchen
+        newRooms.push({
+          id: 'kitchen', type: 'kitchen', label: 'KITCHEN',
+          x: col1X, y: cH, w: col1W, h: kitH,
+          color: COLORS.kitchen, orientation: 2,
+          openWalls: kitchenType === 'open' ? ['bottom'] : [],
+          doors: kitchenType === 'open' 
+            ? [{ wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'living' }] 
+            : [
+                { wall: 'bottom', position: 0.5, width: 3, swing: 'out', doorType: 'standard' },
+                { wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'living' }
+              ],
+          windows: [{ wall: 'left', position: 0.5, width: 3 }],
+          furniture: regenerateFurniture({ type: 'kitchen', w: col1W, h: kitH, orientation: 2 } as Room, kitchenType)
+        });
+
+        // BOTTOM-LEFT: Dining
+        newRooms.push({
+          id: 'dining', type: 'dining', label: 'DINING',
+          x: col1X, y: cH + kitH, w: col1W, h: dinH,
+          color: COLORS.dining, orientation: 1,
+          openWalls: kitchenType === 'open' ? ['top'] : [],
+          doors: [{ wall: 'bottom', position: 0.5, width: 6, swing: 'out', doorType: 'open', connectsTo: 'garden' }],
+          windows: [{ wall: 'left', position: 0.5, width: 4 }],
+          furniture: regenerateFurniture({ type: 'dining', w: col1W, h: dinH } as Room, 'open')
+        });
+
+        // Middle: Hallway (top) & Bedroom 2 (bottom)
+        newRooms.push({
+          id: 'hallway', type: 'hallway', label: 'HALLWAY',
+          x: col2X, y: cH, w: col2W, h: sBed ? hallH : lowerH,
+          color: COLORS.hallway, orientation: 1,
+          openWalls: [],
+          doors: [{ wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'living' }],
+          windows: [], furniture: []
+        });
+
+        if (sBed) {
+          newRooms.push({
+            ...sBed,
+            x: col2X, y: cH + hallH, w: col2W, h: bed2H,
+            doors: [{ wall: 'top', position: 0.5, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'hallway' }],
+            windows: [],
+            furniture: regenerateFurniture({ ...sBed, w: col2W, h: bed2H } as Room, 'open')
+          });
+        }
       }
 
-      // Cleanup invalid windows & shift coords
+      // COMMON BATH & MASTER BEDROOM for ALL layouts (Right Column)
+      if (cBath) {
+        newRooms.push({
+          ...cBath,
+          x: col3X, y: cH, w: col3W, h: bathH,
+          doors: [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in', doorType: 'standard', connectsTo: 'hallway' }],
+          windows: [{ wall: 'right', position: 0.5, width: 3 }],
+          furniture: regenerateFurniture({ ...cBath, w: col3W, h: bathH } as Room, 'open')
+        });
+      }
+
+      if (mBed) {
+        const sharedLen = hallH - bathH;
+        let doorPos = 0.5;
+        if (sharedLen >= 3) {
+           doorPos = (sharedLen / 2) / masterH; 
+        } else {
+           doorPos = 0.2;
+        }
+
+        newRooms.push({
+          ...mBed,
+          x: col3X, y: cH + bathH, w: col3W, h: masterH,
+          doors: [{ wall: 'left', position: doorPos, width: 3, swing: 'in', doorType: 'standard', connectsTo: 'hallway' }],
+          windows: [{ wall: 'right', position: 0.5, width: 4 }],
+          furniture: regenerateFurniture({ ...mBed, w: col3W, h: masterH } as Room, 'open')
+        });
+      }
+
+      // ── Cleanup & shift to world coordinates ────────────────────────────────
       newRooms.forEach(r => {
         if (r.windows) r.windows = r.windows.filter(w => w.width > 0);
         if (!preserved.some(p => p.id === r.id)) {
@@ -2111,8 +2213,10 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
         }
       });
       newPlan.rooms = newRooms;
+      ensureBedBathHallwayDoors(newPlan.rooms);
       return newPlan;
     }
+
   }
 
   if (style === 'open_plan') {
@@ -2373,6 +2477,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
 
 
   newPlan.rooms = newRooms;
+  ensureBedBathHallwayDoors(newPlan.rooms);
   return newPlan;
 }
 
