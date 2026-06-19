@@ -332,8 +332,8 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
 
   // Double storey floor splitting
   const canDoubleStorey = homeType === 'family' || homeType === 'premium';
-  const familyPackageKey = useMemo(() => getFamilyDoubleStoreyPackageKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }), [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons]);
-  const familyPackageLookupKeys = useMemo(() => getFamilyDoubleStoreyPackageLookupKeys({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons }), [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons]);
+  const familyPackageKey = useMemo(() => getFamilyDoubleStoreyPackageKey({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, layoutStyle }), [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, layoutStyle]);
+  const familyPackageLookupKeys = useMemo(() => getFamilyDoubleStoreyPackageLookupKeys({ homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, layoutStyle }), [homeType, bedrooms, bathrooms, kitchen, isDoubleStorey, addons, layoutStyle]);
   const familyPackageLayout = useMemo(() => {
     if (!(homeType === 'family' && isDoubleStorey && presetId !== -1)) return null;
     for (const key of familyPackageLookupKeys) {
@@ -683,6 +683,13 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                   </div>
                   <div className="flex items-center gap-1 sm:border-l sm:border-border sm:pl-3 md:pl-4">
                     <button
+                      onClick={() => { setView('2d'); setAdvancedEditorMode(true); setIsSelectedAll(false); }}
+                      className="flex items-center justify-center h-9 md:h-11 rounded-xl bg-primary text-white px-3 md:px-4 text-[8px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:brightness-110 transition-all active:scale-95"
+                      title="Open custom editor mode"
+                    >
+                      <PenTool size={14} className="mr-1 sm:mr-2" /> Advanced
+                    </button>
+                    <button
                       onClick={exportAsPDF}
                       className="flex items-center justify-center h-9 md:h-11 rounded-xl border border-border bg-white text-muted-foreground px-3 md:px-4 text-[8px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section hover:text-foreground transition-all active:scale-95"
                       title="Export as PDF"
@@ -721,13 +728,45 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 <span className="text-[9px] text-muted-foreground/60 uppercase tracking-[0.2em] mt-0.5">Architectural Drafting · Level {activeFloor + 1}</span>
               </div>
             </div>
-            <button
-              onClick={() => setAdvancedEditorMode(false)}
-              className="flex items-center gap-2 h-11 rounded-xl bg-white border border-border text-foreground px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section transition-all active:scale-95"
-            >
-              <X size={16} />
-              Exit Editor
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  const committed = commitStagedPlan();
+                  if (!committed) {
+                    setAdvancedEditorMode(false);
+                    return;
+                  }
+                  try {
+                    if (isFamilyDoubleStoreyPackage) {
+                      await savePackageLayout(familyPackageKey, committed.newGround, committed.newFirst);
+                    } else if (presetId === -1 && loadedPresetId) {
+                      await updateSavedPreset(committed.newGround, committed.newFirst);
+                    } else if (presetId === 0) {
+                      await saveBuiltInPreset(presetId, committed.newGround, committed.newFirst);
+                    } else if (!isCustomPreset) {
+                      setPresetOverride(presetId, committed.newGround, committed.newFirst);
+                    }
+                    toast({ title: 'Layout saved', description: 'Your floor plan layout has been saved.' });
+                    setStagedPlan(null);
+                    setAdvancedEditorMode(false);
+                  } catch (error) {
+                    console.error('Failed to save custom editor layout', error);
+                    toast({ title: 'Save failed', description: 'Could not save the floor plan layout. Please try again.', variant: 'destructive' });
+                  }
+                }}
+                className="flex items-center gap-2 h-11 rounded-xl bg-primary text-white px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:brightness-110 transition-all active:scale-95"
+              >
+                <Save size={16} />
+                Save Layout
+              </button>
+              <button
+                onClick={() => setAdvancedEditorMode(false)}
+                className="flex items-center gap-2 h-11 rounded-xl bg-white border border-border text-foreground px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-soft-section transition-all active:scale-95"
+              >
+                <X size={16} />
+                Exit Editor
+              </button>
+            </div>
           </div>
         )}
 
@@ -973,51 +1012,22 @@ export const StepPreview = ({ plan, onChange, onResetPlan }: Props) => {
                 <motion.div key="editor" className="h-full w-full"
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
-                  <CustomEditorCanvas
-                    homeType={homeType}
+                  <FloorPlanCanvas
+                    ref={floorPlanRef}
+                    plan={stagedPlan || displayPlan}
+                    advanced={true}
+                    hideZoomHelper={true}
+                    floorLevel={isDoubleStorey ? activeFloor : undefined}
+                    isSelectedAll={isSelectedAll}
+                    onSelectedAllChange={setIsSelectedAll}
                     onChange={(editorPlan) => {
+                      setStagedPlan(editorPlan);
                       if (isEditingFirstFloor) {
                         setCustomFirstFloorPlan(editorPlan);
                       } else if (isCustomPreset) {
                         setCustomPlan(editorPlan);
                       }
                     }}
-                    onSave={async (editorPlan) => {
-                      const newGround = isEditingFirstFloor
-                        ? savedGroundPlan
-                        : editorPlan;
-                      // Ensure first floor is never null — fall back to regenerated plan
-                      const newFirst = isEditingFirstFloor
-                        ? editorPlan
-                        : (savedFirstFloorPlan || regeneratedFirstFloor);
-
-                      try {
-                        if (isFamilyDoubleStoreyPackage) {
-                          await savePackageLayout(familyPackageKey, newGround, newFirst);
-                        } else if (!isCustomPreset && presetId === 0) {
-                          await saveBuiltInPreset(presetId, newGround, newFirst);
-                        } else if (isCustomPreset && loadedPresetId) {
-                          await updateSavedPreset(newGround, newFirst);
-                        } else if (!isCustomPreset) {
-                          setPresetOverride(presetId, newGround, newFirst);
-                        }
-                        toast({ title: 'Layout saved', description: 'Your floor plan layout has been saved.' });
-                      } catch (error) {
-                        console.error('Failed to save custom editor layout', error);
-                        toast({ title: 'Save failed', description: 'Could not save the floor plan layout. Please try again.' });
-                        return;
-                      }
-
-                      if (isCustomPreset && isEditingFirstFloor) {
-                        setCustomFirstFloorPlan(newFirst);
-                      } else if (isCustomPreset) {
-                        setCustomPlan(newGround);
-                      }
-
-                      setAdvancedEditorMode(false);
-                    }}
-                    initialPlan={isEditingFirstFloor ? savedFirstFloorPlan : savedGroundPlan}
-                    floorLevel={isDoubleStorey ? activeFloor : undefined}
                   />
                 </motion.div>
               ) : view === '2d' ? (

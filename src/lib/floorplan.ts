@@ -1606,10 +1606,91 @@ function ensureBedBathHallwayDoors(rooms: Room[]): void {
 }
 
 export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 'standard' | 'open' | 'galley' = 'standard'): Plan {
-  if (style === 'default') {
-    // Even for default style, fix up missing bed/bath → hallway doors
+  if (['default', 'open_plan', 'entertainer', 'family_suite'].includes(style)) {
+    // Fix up missing bed/bath → hallway doors
     const fixed: Plan = JSON.parse(JSON.stringify(plan));
     ensureBedBathHallwayDoors(fixed.rooms);
+    
+    // Update kitchen furniture based on kitchenType
+    const k = fixed.rooms.find(r => r.type === 'kitchen');
+    if (k) {
+       k.furniture = kitchenFurniture(k.w, k.h, kitchenType, k.doors.length + k.windows.length);
+    }
+    
+    if (['open_plan', 'entertainer', 'family_suite'].includes(style)) {
+       const openRooms = ['living', 'kitchen', 'dining', 'lounge', 'hallway'];
+
+
+       const getSharedWall = (a: Room, b: Room): { wall: DoorInfo['wall'], overlapRatio: number } | null => {
+         const aRight = a.x + a.w;
+         const aBottom = a.y + a.h;
+         const bRight = b.x + b.w;
+         const bBottom = b.y + b.h;
+         const overlapX = Math.min(aRight, bRight) - Math.max(a.x, b.x);
+         const overlapY = Math.min(aBottom, bBottom) - Math.max(a.y, b.y);
+         if (overlapY > 0 && Math.abs(aRight - b.x) < 0.5) return { wall: 'right', overlapRatio: overlapY / a.h };
+         if (overlapY > 0 && Math.abs(bRight - a.x) < 0.5) return { wall: 'left', overlapRatio: overlapY / a.h };
+         if (overlapX > 0 && Math.abs(aBottom - b.y) < 0.5) return { wall: 'bottom', overlapRatio: overlapX / a.w };
+         if (overlapX > 0 && Math.abs(bBottom - a.y) < 0.5) return { wall: 'top', overlapRatio: overlapX / a.w };
+         return null;
+       };
+
+       fixed.rooms.forEach(room => {
+          if (style === 'entertainer' && (room.type === 'living' || room.type === 'lounge')) {
+             room.doors.forEach(door => {
+                if (door.wall === 'top') {
+                   door.position = 0.85; // Move door to the right, away from the centrally placed TV
+                }
+             });
+          }
+
+          if (!openRooms.includes(room.type)) return;
+
+          // Convert existing connecting doors to wide open archways
+          room.doors.forEach(door => {
+             if (door.connectsTo) {
+                const target = fixed.rooms.find(r => r.id === door.connectsTo);
+                if (target && openRooms.includes(target.type)) {
+                   door.doorType = 'open';
+                   door.width = 5;
+                }
+             }
+          });
+
+          // Also find adjacent social rooms and mark shared walls as openWalls
+          fixed.rooms.forEach(other => {
+             if (other.id === room.id) return;
+             if (!openRooms.includes(other.type)) return;
+             const shared = getSharedWall(room, other);
+             // Only open the wall if the adjacent room covers a significant portion of it
+             if (shared && shared.overlapRatio > 0.6) {
+                const wall = shared.wall;
+                if (!room.openWalls) room.openWalls = [];
+                // Only mark wall as fully open if there's no existing 'open'-type door already
+                // handling this transition (avoids floating archways without a wall)
+                const hasOpenDoor = room.doors.some(d => d.wall === wall && d.doorType === 'open' && d.connectsTo === other.id);
+                if (!hasOpenDoor && !room.openWalls.includes(wall)) room.openWalls.push(wall);
+                // Remove any standard door between them (wall is fully open now)
+                room.doors = room.doors.filter(d => d.connectsTo !== other.id || d.doorType === 'open');
+             }
+          });
+       });
+    }
+
+    // Apply specific label/color/furniture updates for entertainer and family_suite
+    const livingRoom = fixed.rooms.find(r => r.id === 'gf-living' || r.type === 'living');
+    if (livingRoom) {
+      if (style === 'family_suite') {
+        livingRoom.label = 'COMBINED LIVING + FAMILY LOUNGE';
+        livingRoom.color = '#fffbe6';
+        livingRoom.furniture = combinedLivingFurniture(livingRoom.w, livingRoom.h);
+      } else if (style === 'entertainer') {
+        livingRoom.label = 'ENTERTAINMENT LOUNGE';
+        livingRoom.color = COLORS.lounge;
+        livingRoom.furniture = entertainerLoungeFurniture(livingRoom.w, livingRoom.h);
+      }
+    }
+    
     return fixed;
   }
   
@@ -1952,7 +2033,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
           x: 0, y: 0, w: livingW, h: cH,
           color: COLORS.living, orientation: 1,
           openWalls: ['bottom'], // Open to Kitchen/Dining and Hallway below
-          doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
+          doors: [{ wall: 'top', position: 0.85, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
           windows: [{ wall: 'left', position: 0.5, width: 5 }],
           furniture: regenerateFurniture({ type: 'living', w: livingW, h: cH, orientation: 1 } as Room, 'open')
         });
@@ -2010,7 +2091,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
           x: 0, y: 0, w: livingW, h: cH,
           color: COLORS.lounge, orientation: 1,
           openWalls: ['bottom'], // Open to Dining and Hallway
-          doors: [{ wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
+          doors: [{ wall: 'top', position: 0.85, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' }],
           windows: [{ wall: 'left', position: 0.5, width: 4 }],
           furniture: regenerateFurniture({ type: 'lounge', w: livingW, h: cH, orientation: 1 } as Room, 'open')
         });
@@ -2067,11 +2148,9 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
           x: 0, y: 0, w: livingW, h: cH,
           color: 'hsl(36 32% 84%)',
           orientation: 1,
-          openWalls: [],
+          openWalls: ['bottom'], // Fully open to kitchen + hallway below
           doors: [
             { wall: 'top', position: 0.5, width: 4, swing: 'in', doorType: 'standard', label: 'ENTRY' },
-            { wall: 'bottom', position: (col1W / 2) / livingW, width: 3, swing: 'out', doorType: 'standard', connectsTo: 'kitchen' },
-            { wall: 'bottom', position: (col1W + col2W / 2) / livingW, width: 3, swing: 'out', doorType: 'standard', connectsTo: 'hallway' }
           ],
           windows: [{ wall: 'left', position: 0.3, width: 4 }, { wall: 'left', position: 0.7, width: 4 }],
           furniture: regenerateFurniture({ type: 'living', w: livingW, h: cH, orientation: 1 } as Room, 'open')
@@ -2082,7 +2161,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
           id: 'kitchen', type: 'kitchen', label: 'GRAND KITCHEN',
           x: col1X, y: cH, w: col1W, h: lowerH,
           color: COLORS.kitchen, orientation: 2,
-          openWalls: ['right'], // Open to hallway
+          openWalls: ['right', 'top'], // Open to hallway on right, open to living above
           doors: [{ wall: 'bottom', position: 0.5, width: 6, swing: 'out', doorType: 'open', connectsTo: 'garden' }],
           windows: [{ wall: 'left', position: 0.5, width: 3 }],
           furniture: regenerateFurniture({ type: 'kitchen', w: col1W, h: lowerH, orientation: 2 } as Room, kitchenType)
@@ -2093,7 +2172,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
           id: 'hallway', type: 'hallway', label: 'HALLWAY',
           x: col2X, y: cH, w: col2W, h: sBed ? hallH : lowerH,
           color: COLORS.hallway, orientation: 1,
-          openWalls: ['left'],
+          openWalls: ['left', 'top'], // Open to kitchen on left, open to living above
           doors: [], windows: [], furniture: []
         });
 
@@ -2301,7 +2380,7 @@ export function applyLayoutStyle(plan: Plan, style: LayoutStyle, kitchenType: 's
       id: 'lounge', type: 'lounge', label: 'ENTERTAINMENT LOUNGE',
       x: sideW, y: 0, w: midW, h: eH, color: COLORS.lounge, orientation: 1,
       openWalls: kitchenType === 'open' ? ['bottom'] : [], 
-      doors: kitchenType === 'open' ? [{ wall: 'top', position: 0.5, width: 6, swing: 'in', doorType: 'standard', label: 'ENTRY' }] : [{ wall: 'top', position: 0.5, width: 6, swing: 'in', doorType: 'standard', label: 'ENTRY' }, { wall: 'bottom', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard' }],
+      doors: kitchenType === 'open' ? [{ wall: 'top', position: 0.85, width: 6, swing: 'in', doorType: 'standard', label: 'ENTRY' }] : [{ wall: 'top', position: 0.85, width: 6, swing: 'in', doorType: 'standard', label: 'ENTRY' }, { wall: 'bottom', position: 0.5, width: 3.5, swing: 'in', doorType: 'standard' }],
       windows: [],
       furniture: entertainerLoungeFurniture(midW, eH)
     });
@@ -3289,11 +3368,58 @@ export function applyDoubleStoreyLayoutStyle(
   floors: { ground: Plan; first: Plan },
   layoutStyle: string = 'default'
 ): { ground: Plan; first: Plan } {
-  if (layoutStyle === 'default' || layoutStyle === 'open_plan') return floors;
+  if (layoutStyle === 'default') return floors;
 
   // Deep-clone ground so we never mutate cached data
   const ground: Plan = JSON.parse(JSON.stringify(floors.ground));
   const livingRoom = ground.rooms.find(r => r.id === 'gf-living' || r.type === 'living');
+
+  if (['open_plan', 'entertainer', 'family_suite'].includes(layoutStyle)) {
+     const openRooms = ['living', 'kitchen', 'dining', 'lounge', 'hallway'];
+
+     // Helper to detect which wall of roomA faces roomB
+     const getSharedWall = (a: Room, b: Room): DoorInfo['wall'] | null => {
+       const aRight = a.x + a.w;
+       const aBottom = a.y + a.h;
+       const bRight = b.x + b.w;
+       const bBottom = b.y + b.h;
+       const overlapX = Math.min(aRight, bRight) - Math.max(a.x, b.x);
+       const overlapY = Math.min(aBottom, bBottom) - Math.max(a.y, b.y);
+       if (overlapY > 0 && Math.abs(aRight - b.x) < 0.5) return 'right';   // a is left of b
+       if (overlapY > 0 && Math.abs(bRight - a.x) < 0.5) return 'left';    // a is right of b
+       if (overlapX > 0 && Math.abs(aBottom - b.y) < 0.5) return 'bottom'; // a is above b
+       if (overlapX > 0 && Math.abs(bBottom - a.y) < 0.5) return 'top';    // a is below b
+       return null;
+     };
+
+     ground.rooms.forEach(room => {
+        if (!openRooms.includes(room.type)) return;
+
+        // Convert existing connecting doors to wide open archways
+        room.doors.forEach(door => {
+           if (door.connectsTo) {
+              const target = ground.rooms.find(r => r.id === door.connectsTo);
+              if (target && openRooms.includes(target.type)) {
+                 door.doorType = 'open';
+                 door.width = 5;
+              }
+           }
+        });
+
+        // Also find adjacent social rooms and mark shared walls as openWalls
+        ground.rooms.forEach(other => {
+           if (other.id === room.id) return;
+           if (!openRooms.includes(other.type)) return;
+           const wall = getSharedWall(room, other);
+           if (wall) {
+              if (!room.openWalls) room.openWalls = [];
+              if (!room.openWalls.includes(wall)) room.openWalls.push(wall);
+              // Remove any standard door between them (wall is fully open now)
+              room.doors = room.doors.filter(d => d.connectsTo !== other.id || d.doorType === 'open');
+           }
+        });
+     });
+  }
 
   if (livingRoom) {
     if (layoutStyle === 'family_suite') {
@@ -3610,6 +3736,9 @@ export function ensureGarageDoors(plan: Plan): Plan {
 
   return { ...plan, rooms };
 }
+
+
+
 
 
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHand
 import { Stage, Layer, Rect, Text, Line, Group, Arc, Circle, Transformer, Path } from 'react-konva';
 import { Plan, Room, FurnitureItem, DoorInfo, WindowInfo, regenerateFurniture, resolveStairGeometry, applySmartRotations } from '@/lib/floorplan';
 import { useConfig } from '@/store/configurator';
-import { RotateCw, Plus, Trash2, Maximize } from 'lucide-react';
+import { RotateCw, Plus, Trash2, Maximize, BedDouble, Bath, CookingPot, Sofa, UtensilsCrossed, Move, Waypoints, Car, Trees, Fence, Zap } from 'lucide-react';
 import Konva from 'konva';
 
 export interface FloorPlanCanvasHandle {
@@ -19,6 +19,25 @@ interface Props {
   onSelectedAllChange?: (val: boolean) => void;
   onChange?: (plan: Plan) => void;
 }
+
+const ROOM_BLOCKS: { type: Room['type']; label: string; icon: any; defaultW: number; defaultH: number; color: string; kitchenType?: Room['kitchenType']; idHint?: string }[] = [
+  { type: 'bedroom', label: 'Bedroom', icon: BedDouble, defaultW: 12, defaultH: 10, color: 'hsl(33 35% 82%)' },
+  { type: 'living', label: 'Hall/Living', icon: Sofa, defaultW: 16, defaultH: 14, color: 'hsl(40 30% 87%)' },
+  { type: 'lounge', label: 'Entertainment Lounge', icon: Sofa, defaultW: 16, defaultH: 14, color: 'hsl(32 28% 85%)', idHint: 'entertainment-lounge' },
+  { type: 'living', label: 'Combined Family Lounge', icon: Sofa, defaultW: 18, defaultH: 14, color: '#fffbe6', idHint: 'combined-living' },
+  { type: 'lounge', label: 'Lounge', icon: Sofa, defaultW: 14, defaultH: 12, color: 'hsl(32 28% 85%)' },
+  { type: 'dining', label: 'Dining', icon: UtensilsCrossed, defaultW: 10, defaultH: 10, color: 'hsl(36 28% 82%)' },
+  { type: 'kitchen', label: 'Standard Kitchen', icon: CookingPot, defaultW: 12, defaultH: 10, color: 'hsl(28 38% 72%)', kitchenType: 'standard' },
+  { type: 'kitchen', label: 'Open Kitchen', icon: CookingPot, defaultW: 12, defaultH: 10, color: 'hsl(28 38% 72%)', kitchenType: 'open' },
+  { type: 'bathroom', label: 'Bathroom', icon: Bath, defaultW: 7, defaultH: 7, color: 'hsl(200 30% 82%)' },
+  { type: 'hallway', label: 'Hallway', icon: Move, defaultW: 10, defaultH: 4, color: 'hsl(38 20% 88%)' },
+  { type: 'staircase', label: 'Staircase', icon: Waypoints, defaultW: 10, defaultH: 8, color: 'hsl(38 20% 88%)' },
+  { type: 'balcony', label: 'Balcony', icon: Fence, defaultW: 12, defaultH: 4, color: 'hsl(120 18% 78%)' },
+  { type: 'carport', label: 'Carport', icon: Car, defaultW: 12, defaultH: 14, color: 'hsl(0 0% 82%)' },
+  { type: 'garage', label: 'Car Garage', icon: Car, defaultW: 22, defaultH: 24, color: 'hsl(0 0% 78%)' },
+  { type: 'garden', label: 'Garden', icon: Trees, defaultW: 10, defaultH: 10, color: 'hsl(120 30% 72%)' },
+  { type: 'generator', label: 'Generator', icon: Zap, defaultW: 8, defaultH: 6, color: 'hsl(0 0% 65%)' },
+];
 
 const CADCar2D = ({ w, h }: { w: number; h: number }) => {
   return (
@@ -190,6 +209,42 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
     commitLocalPlan({ ...localPlan, rooms: updatedRooms });
   };
 
+  const handleAddRoomBlock = (blockIndex: number) => {
+    const block = ROOM_BLOCKS[blockIndex];
+    if (!block) return;
+
+    const existingCount = (localPlan.rooms || []).filter((r) => r.type === block.type || (block.idHint && r.id.includes(block.idHint))).length;
+    const id = `custom-${block.idHint || block.type}-${Date.now()}`;
+    let label = block.label.toUpperCase();
+    if (block.type === 'bedroom') label = existingCount === 0 ? 'MASTER BEDROOM' : `BEDROOM ${existingCount + 1}`;
+    else if (existingCount > 0 && !block.idHint) label = `${block.label.toUpperCase()} ${existingCount + 1}`;
+
+    const roomW = Math.min(block.defaultW, localPlan.width);
+    const roomH = Math.min(block.defaultH, localPlan.height);
+    const room: Room = {
+      id,
+      type: block.type,
+      label,
+      x: Math.max(0, Math.round((localPlan.width - roomW) / 2)),
+      y: Math.max(0, Math.round((localPlan.height - roomH) / 2)),
+      w: roomW,
+      h: roomH,
+      color: block.color,
+      kitchenType: block.kitchenType,
+      furniture: [],
+      doors: [],
+      windows: [],
+    };
+    room.furniture = regenerateFurniture(room, config.kitchen);
+
+    const updated = { ...localPlan, rooms: [...(localPlan.rooms || []), room] };
+    commitLocalPlan(updated);
+    setSelectedRoomId(id);
+    setSelectedFurniture(null);
+    setSelectedDoor(null);
+    setSelectedWindow(null);
+  };
+
   const handleAddDoor = (roomId: string) => {
     const updated: Plan = {
       ...localPlan,
@@ -220,6 +275,30 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
       rooms: (localPlan.rooms || []).map((r) => {
         if (r.id !== roomId) return r;
         return { ...r, windows: [] };
+      }),
+    };
+    commitLocalPlan(updated);
+    setSelectedWindow(null);
+  };
+
+  const handleDeleteDoor = (roomId: string, doorIndex: number) => {
+    const updated: Plan = {
+      ...localPlan,
+      rooms: (localPlan.rooms || []).map((r) => {
+        if (r.id !== roomId) return r;
+        return { ...r, doors: (r.doors || []).filter((_, idx) => idx !== doorIndex) };
+      }),
+    };
+    commitLocalPlan(updated);
+    setSelectedDoor(null);
+  };
+
+  const handleDeleteWindow = (roomId: string, windowIndex: number) => {
+    const updated: Plan = {
+      ...localPlan,
+      rooms: (localPlan.rooms || []).map((r) => {
+        if (r.id !== roomId) return r;
+        return { ...r, windows: (r.windows || []).filter((_, idx) => idx !== windowIndex) };
       }),
     };
     commitLocalPlan(updated);
@@ -339,13 +418,32 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
 
   return (
     <div ref={wrapRef} className="relative h-full w-full overflow-hidden rounded-2xl bg-transparent shadow-inner">
+      {advanced && (
+        <div className="absolute left-3 right-3 top-3 z-20 flex items-center gap-2 overflow-x-auto whitespace-nowrap rounded-2xl border border-border bg-white/95 p-1.5 shadow-xl backdrop-blur-md scrollbar-hide">
+          <span className="shrink-0 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Add Block</span>
+          {ROOM_BLOCKS.map((block, index) => {
+            const Icon = block.icon;
+            return (
+              <button
+                key={`${block.label}-${index}`}
+                onClick={() => handleAddRoomBlock(index)}
+                className="flex shrink-0 h-9 items-center gap-2 rounded-xl border border-border bg-white px-3 text-[9px] font-bold uppercase tracking-wider text-ink hover:bg-surface transition-all active:scale-95"
+                style={{ borderLeftColor: block.color, borderLeftWidth: 3 }}
+              >
+                <Icon size={12} />
+                {block.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {advanced && selectedFurniture && (() => {
         const room = (localPlan.rooms || []).find((r) => r.id === selectedFurniture.roomId);
         const item = room?.furniture?.[selectedFurniture.furnitureIndex];
         if (!room || !item) return null;
 
         return (
-          <div className="absolute left-1/2 top-4 z-10 flex w-[95%] max-w-fit overflow-x-auto whitespace-nowrap scrollbar-hide -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
+          <div className="absolute left-1/2 top-16 z-30 flex w-[95%] max-w-fit overflow-x-auto whitespace-nowrap scrollbar-hide -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
             <span className="px-3 text-xs font-bold uppercase tracking-wider text-ink">
               {item.type.replace(/_/g, ' ')}
             </span>
@@ -361,8 +459,24 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, Props>(({ plan,
           </div>
         );
       })()}
-      {advanced && selectedRoomId && !selectedFurniture && (
-        <div className="absolute left-1/2 top-4 z-10 flex w-[95%] max-w-fit overflow-x-auto whitespace-nowrap scrollbar-hide -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
+      {advanced && (selectedDoor || selectedWindow) && !selectedRoomId && !selectedFurniture && (
+        <div className="absolute left-1/2 top-16 z-30 flex w-[95%] max-w-fit overflow-x-auto whitespace-nowrap scrollbar-hide -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
+          <span className="px-3 text-xs font-bold uppercase tracking-wider text-ink">
+            {selectedDoor ? 'Door Selected' : 'Window Selected'}
+          </span>
+          <div className="h-6 w-px bg-border" />
+          <button
+            onClick={() => selectedDoor ? handleDeleteDoor(selectedDoor.roomId, selectedDoor.doorIndex) : selectedWindow && handleDeleteWindow(selectedWindow.roomId, selectedWindow.windowIndex)}
+            className="flex shrink-0 h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-red-600 hover:bg-red-50 transition-all active:scale-95"
+            title={selectedDoor ? 'Delete selected door' : 'Delete selected window'}
+          >
+            <Trash2 size={14} className="text-red-500" />
+            {selectedDoor ? 'Delete Door' : 'Delete Window'}
+          </button>
+        </div>
+      )}
+      {advanced && selectedRoomId && !selectedFurniture && !selectedDoor && !selectedWindow && (
+        <div className="absolute left-1/2 top-16 z-30 flex w-[95%] max-w-fit overflow-x-auto whitespace-nowrap scrollbar-hide -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
           <button
             onClick={() => handleRotateRoom(selectedRoomId)}
             className="flex shrink-0 h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold uppercase tracking-wider text-ink hover:bg-surface transition-all active:scale-95"

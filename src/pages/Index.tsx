@@ -37,7 +37,7 @@ const IndexInner = () => {
     return generatePlan(config);
   }, [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.addons, config.presetId, config.land, config.landSize, config.customLandArea, config.roof, config.material, config.isDoubleStorey, config.activeFloor, presetOverrides]);
 
-  const familyPackageLookupKeys = useMemo(() => getFamilyDoubleStoreyPackageLookupKeys(config), [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.isDoubleStorey, config.addons]);
+  const familyPackageLookupKeys = useMemo(() => getFamilyDoubleStoreyPackageLookupKeys(config), [config.homeType, config.bedrooms, config.bathrooms, config.kitchen, config.isDoubleStorey, config.addons, config.layoutStyle]);
   const isFamilyDoubleStoreyPackage = config.presetId !== -1;
   const packageLayout = familyPackageLookupKeys.map((key) => packageLayouts[key]).find(Boolean) || null;
   const selectedPlan = (config.presetId === -1 ? customPlan : null) || packageLayout?.ground || basePlan || { width: 0, height: 0, rooms: [] };

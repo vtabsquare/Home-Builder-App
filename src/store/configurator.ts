@@ -65,16 +65,23 @@ export const getElevationLookupKeys = (state: Pick<ConfigState, 'homeType' | 'be
 export const getLegacyFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey'>) =>
   `${FAMILY_DOUBLE_STOREY_PACKAGE_KEY}_${state.homeType}_${state.bedrooms}bed_${state.bathrooms}bath_${state.kitchen}_${state.isDoubleStorey ? 'double' : 'single'}`;
 
-export const getFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>) => {
+export const getFamilyDoubleStoreyPackageKey = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons' | 'layoutStyle'>) => {
   const layoutAddons = getFamilyDoubleStoreyLayoutAddons(state.addons || []);
-  return `${getLegacyFamilyDoubleStoreyPackageKey(state)}_addons_${layoutAddons.join('-') || 'none'}`;
+  return `${getLegacyFamilyDoubleStoreyPackageKey(state)}_style_${state.layoutStyle || 'default'}_addons_${layoutAddons.join('-') || 'none'}`;
 };
 
-export const getFamilyDoubleStoreyPackageLookupKeys = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons'>) =>
-  // Only use the kitchen+addon-specific key. The legacy shared fallback was
-  // intentionally removed so each kitchen variant resolves to its own saved
-  // layout and does not leak edits across kitchen types.
-  [getFamilyDoubleStoreyPackageKey(state)].filter((key, index, keys) => key && keys.indexOf(key) === index);
+export const getFamilyDoubleStoreyPackageLookupKeys = (state: Pick<ConfigState, 'homeType' | 'bedrooms' | 'bathrooms' | 'kitchen' | 'isDoubleStorey' | 'addons' | 'layoutStyle'>) => {
+  const currentKey = getFamilyDoubleStoreyPackageKey(state);
+  const layoutAddons = getFamilyDoubleStoreyLayoutAddons(state.addons || []);
+  const legacyFallbackKey = `${getLegacyFamilyDoubleStoreyPackageKey(state)}_addons_${layoutAddons.join('-') || 'none'}`;
+
+  // If the user selects a non-default style, they should get a fresh layout or their specific saved one.
+  // If they select 'default' (standard), we can fallback to the old key to prevent data loss of past saves.
+  if (state.layoutStyle && state.layoutStyle !== 'default') {
+     return [currentKey];
+  }
+  return [currentKey, legacyFallbackKey].filter((key, index, keys) => key && keys.indexOf(key) === index);
+};
 
 const inferFamilyDoubleStoreyLayoutAddonsFromPlan = (planData: any): AddOn[] => {
   const groundRooms = Array.isArray(planData?.ground?.rooms) ? planData.ground.rooms : [];
