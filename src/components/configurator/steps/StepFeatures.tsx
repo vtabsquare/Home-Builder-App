@@ -62,18 +62,24 @@ export const StepFeatures = () => {
               { id: true, label: 'Multi-Storey', desc: 'Multi-Storey home design' }
             ].map((k) => {
               const active = isDoubleStorey === k.id;
+              const disabled = homeType === 'starter' && k.id === true;
               return (
                 <button
                   key={k.label}
-                  onClick={() => setDoubleStorey(k.id)}
+                  onClick={() => { if (!disabled) setDoubleStorey(k.id); }}
+                  disabled={disabled}
                   className={`group relative overflow-hidden rounded-xl p-2 sm:p-3 text-left transition-all duration-500 border ${
-                    active 
-                      ? 'bg-surface shadow-elev border-clay/30 scale-[1.02]' 
-                      : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'
+                    disabled
+                      ? 'bg-surface/30 border-border/50 opacity-50 cursor-not-allowed'
+                      : active 
+                        ? 'bg-surface shadow-elev border-clay/30 scale-[1.02]' 
+                        : 'bg-surface/50 border-border hover:border-muted-foreground/20 hover:bg-surface hover:shadow-soft'
                   }`}
                 >
                   <div className="relative z-10 flex items-center justify-between mb-2">
-                    <span className={`font-display font-medium tracking-tight text-base ${active ? 'text-foreground' : 'text-foreground/80'}`}>{k.label}</span>
+                    <span className={`font-display font-medium tracking-tight text-base ${active ? 'text-foreground' : 'text-foreground/80'}`}>
+                      {k.label} {disabled && <span className="text-[10px] text-muted-foreground ml-2">(Not available)</span>}
+                    </span>
                     {active && <div className="h-1.5 w-1.5 rounded-full bg-clay" />}
                   </div>
                   <p className="relative z-10 text-[11px] text-muted-foreground leading-relaxed font-light">{k.desc}</p>

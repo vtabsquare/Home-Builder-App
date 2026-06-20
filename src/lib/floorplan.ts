@@ -2768,20 +2768,28 @@ function applyDynamicChanges(plan: Plan, c: ConfigState): Plan {
   const beds = rooms.filter(r => r.type === 'bedroom');
   if (beds.length < c.bedrooms) {
     for (let i = beds.length; i < c.bedrooms; i++) {
-      const lastBed = beds[beds.length - 1] || rooms[rooms.length - 1];
-      rooms.push({
+      const rightmostBed = [...beds].sort((a, b) => (b.x + b.w) - (a.x + a.w))[0] || rooms[rooms.length - 1];
+      const newBed: Room = {
         id: `dynamic-bed-${i}`,
         type: 'bedroom',
         label: `BEDROOM ${i + 1}`,
-        x: lastBed.x,
-        y: lastBed.y + lastBed.h + 2,
-        w: 10,
-        h: 12,
+        x: rightmostBed.x + rightmostBed.w,
+        y: rightmostBed.y,
+        w: 12,
+        h: 10,
         color: COLORS.bedroom,
-        furniture: bedroomFurniture(10, 12, false),
+        furniture: bedroomFurniture(12, 10, false),
         doors: [{ wall: 'top', position: 0.5, width: 3, swing: 'in' }],
         windows: [{ wall: 'right', position: 0.5, width: 4 }],
-      });
+      };
+      
+      const subHallway = rooms.find(r => r.id === 'sub-hallway');
+      if (subHallway) {
+        subHallway.w = Math.max(subHallway.w, (newBed.x + newBed.w) - subHallway.x);
+      }
+      
+      rooms.push(newBed);
+      beds.push(newBed);
     }
   } else if (beds.length > c.bedrooms) {
     let toRemove = beds.length - c.bedrooms;
@@ -2798,20 +2806,68 @@ function applyDynamicChanges(plan: Plan, c: ConfigState): Plan {
   const baths = rooms.filter(r => r.type === 'bathroom');
   if (baths.length < c.bathrooms) {
     for (let i = baths.length; i < c.bathrooms; i++) {
-      const lastBath = baths[baths.length - 1] || rooms[rooms.length - 1];
-      rooms.push({
-        id: `dynamic-bath-${i}`,
-        type: 'bathroom',
-        label: `BATH ${i + 1}`,
-        x: lastBath.x + lastBath.w + 2,
-        y: lastBath.y,
-        w: 8,
-        h: 6,
-        color: COLORS.bathroom,
-        furniture: bathroomFurniture(8, 6, false),
-        doors: [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in' }],
-        windows: [],
-      });
+      // Determine the bath row y coordinate (same row as existing baths)
+      const bathRowY = baths.length > 0 ? Math.min(...baths.map(b => b.y)) : 16;
+      const bathRowH = baths.length > 0 ? Math.max(...baths.map(b => b.h)) : 6;
+
+      // Only non-master baths count as "covering" a bedroom's x-range for common access
+      const commonBaths = baths.filter(b => !b.label.toLowerCase().includes('master'));
+
+      // Find a non-master bedroom whose x-range is NOT already covered by a common bath
+      const unpairedBed = rooms
+        .filter(r => r.type === 'bedroom' && !r.label.toLowerCase().includes('master'))
+        .find(bed => {
+          return !commonBaths.some(b =>
+            // Common bath X-range overlaps this bedroom's x-range
+            b.x < bed.x + bed.w - 1 && b.x + b.w > bed.x + 1
+          );
+        });
+
+      let newBath: Room;
+
+      if (unpairedBed) {
+        // Place bath at bath-row height, directly above the unpaired bedroom
+        const bathW = Math.min(unpairedBed.w, 12);
+        newBath = {
+          id: `dynamic-bath-${i}`,
+          type: 'bathroom',
+          label: `BATH ${i + 1}`,
+          x: unpairedBed.x,
+          y: bathRowY,
+          w: bathW,
+          h: bathRowH,
+          color: COLORS.bathroom,
+          furniture: bathroomFurniture(bathW, bathRowH, false),
+          doors: [{ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in' }],
+          windows: [],
+        };
+      } else {
+        // Fallback: place to the right of the rightmost bath, expanding the plan
+        const rightmostBath = [...baths].sort((a, b) => (b.x + b.w) - (a.x + a.w))[0] || rooms[rooms.length - 1];
+        newBath = {
+          id: `dynamic-bath-${i}`,
+          type: 'bathroom',
+          label: `BATH ${i + 1}`,
+          x: rightmostBath.x + rightmostBath.w,
+          y: rightmostBath.y,
+          w: 8,
+          h: 6,
+          color: COLORS.bathroom,
+          furniture: bathroomFurniture(8, 6, false),
+          doors: [{ wall: 'bottom', position: 0.5, width: 2.5, swing: 'in' }],
+          windows: [{ wall: 'right', position: 0.5, width: 3 }],
+        };
+      }
+
+      const subHallway = rooms.find(r => r.id === 'sub-hallway');
+      if (subHallway) {
+        subHallway.w = Math.max(subHallway.w, (newBath.x + newBath.w) - subHallway.x);
+      } else {
+        newBath.doors = [{ wall: 'left', position: 0.5, width: 2.5, swing: 'in' }];
+      }
+
+      rooms.push(newBath);
+      baths.push(newBath);
     }
   } else if (baths.length > c.bathrooms) {
     let toRemove = baths.length - c.bathrooms;
@@ -3430,6 +3486,10 @@ export function applyDoubleStoreyLayoutStyle(
       livingRoom.label = 'ENTERTAINMENT LOUNGE';
       livingRoom.color = COLORS.lounge;
       livingRoom.furniture = entertainerLoungeFurniture(livingRoom.w, livingRoom.h);
+    } else if (layoutStyle === 'open_plan') {
+      livingRoom.label = 'OPEN LIVING ROOM';
+      livingRoom.color = 'hsl(200 40% 88%)';
+      livingRoom.furniture = livingFurniture(livingRoom.w, livingRoom.h, 2);
     }
   }
 
